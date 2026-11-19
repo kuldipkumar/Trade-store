@@ -162,6 +162,7 @@ Repeat until all of that story's acceptance criteria are covered. Commits should
 ```
 /
 ├── AGENTS.md
+├── CLAUDE.md         (imports AGENTS.md for Claude Code)
 ├── PROMPTS.md
 ├── ASSUMPTIONS.md
 ├── README.md
