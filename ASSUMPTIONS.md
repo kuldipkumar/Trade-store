@@ -43,7 +43,7 @@ The list of assumptions the Trade Store is built on. The reasoning and the impac
 | A-22 | Messages are keyed by `tradeId` so that versions of a trade are processed in order. | Agreed |
 | A-23 | Concurrent writes to the same trade are guarded at the database level (conditional or optimistic-locking write). | Proposed |
 | A-24 | Redelivered duplicates are harmless same-version replacements. | Proposed |
-| A-25 | Throughput target: thousands of trades per minute on a single instance, with no hard SLA. | Proposed |
+| A-25 | Throughput target: thousands of trades per minute on a single instance, with no hard SLA (measurable targets in A-41). | Proposed |
 
 ## Errors, poison pills and audit
 | ID | Assumption | Status |
@@ -67,3 +67,21 @@ The list of assumptions the Trade Store is built on. The reasoning and the impac
 | A-38 | Minimal read API: trade by ID, paged list, history and audit report. | Proposed |
 | A-39 | Authentication and authorisation are out of scope. | Proposed |
 | A-40 | Trade cancellation and deletion are out of scope. | Proposed |
+
+## Non-functional requirements
+| ID | Assumption | Status |
+|----|------------|--------|
+| A-41 | **Performance:** a burst of 10,000 streamed trades is fully processed and audited within 60 s with zero loss. A REST submission has p95 latency under 200 ms at 50 requests per second. Both are baselines for a single instance on the local stack. | Proposed |
+| A-42 | **Scalability:** the app is stateless and scales horizontally through the consumer group, up to the partition count (default 6). The expiry job is idempotent. One instance is deployed for the assignment. | Proposed |
+| A-43 | **Resilience:** no HA SLA. Offsets are committed only after processing (at-least-once), shutdown is graceful, and a restart loses no data. | Proposed |
+| A-44 | **Durability:** SQL writes are transactional and atomic per trade. History and audit are eventually consistent with SQL. | Proposed |
+| A-45 | **Audit integrity:** the audit trail is append-only and immutable. | Proposed |
+| A-46 | **Observability:** structured logs (IDs and outcomes only), Actuator health checks (both databases and the broker), and Micrometer/Prometheus metrics for outcomes, latency, consumer lag and the dead-letter topic. Dashboards and tracing are future work. | Proposed |
+| A-47 | **Security:** the OSS scan fails the build on CVSS ≥ 9, there are no secrets in the repo, input is capped at 1 MB with schema validation, and the container runs as non-root. | Proposed |
+| A-48 | **Maintainability:** JaCoCo line coverage of at least 80%, ADRs, and optional CodeQL. | Proposed |
+| A-49 | **Deployability:** `docker compose up` runs everything locally from one Docker image, configured through profiles and environment variables. | Proposed |
+| A-50 | **Configurability:** topics, partitions, retries, cron, time zone, size limits and connections are all externalised. | Proposed |
+| A-51 | **Recoverability:** expiries are caught up at startup. Replaying dead-lettered messages is a manual, documented step. | Proposed |
+| A-52 | **Capacity:** 1M trades and 10M audit entries without a design change. Expiry and report queries are indexed, and reports stream or page their results. | Proposed |
+| A-53 | **Timestamps:** business dates are local dates. Audit and history timestamps are UTC instants. | Proposed |
+| A-54 | **Backup and DR** are out of scope (a known limitation). | Proposed |
