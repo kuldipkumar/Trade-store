@@ -5,8 +5,9 @@ A trade store that receives trades, enforces version and maturity-date rules, an
 > Work in progress. The full README (architecture, run and test instructions, pipeline, assumptions, limitations) is written in Phase 8.
 
 - Assignment: [Requirements.md](Requirements.md)
-- Engineering playbook: [Agent.md](Agent.md)
-- AI prompt log: [Prompt.md](Prompt.md)
+- Engineering playbook: [AGENTS.md](AGENTS.md)
+- Assumptions: [ASSUMPTIONS.md](ASSUMPTIONS.md)
+- AI prompt log: [PROMPTS.md](PROMPTS.md)
 
 ## Build (current skeleton)
 

@@ -1,4 +1,4 @@
-# Agent.md: Engineering Playbook
+# AGENTS.md: Engineering Playbook
 
 This file tells Claude (and any engineer) how to build applications in this repo.
 It is reusable across projects. Project-specific details go only in the
@@ -22,7 +22,7 @@ It is reusable across projects. Project-specific details go only in the
 
 | # | Phase | Output | Gate (must be true to proceed) |
 |---|-------|--------|--------------------------------|
-| 0 | Setup | Repo structure, `Prompt.md`, this file | Repo builds with an empty app |
+| 0 | Setup | Repo structure, `PROMPTS.md`, this file | Repo builds with an empty app |
 | 1 | Requirement analysis | `docs/01-clarifications.md` | Every ambiguity has a question **and** a stated assumption |
 | 2 | Epics and stories | `docs/02-backlog.md` | Each story has Given/When/Then acceptance criteria |
 | 3 | High-level design | `docs/03-hld.md`, `docs/diagrams/*.puml`, `docs/adr/*.md` | Components, tech choices and ADRs agreed; diagrams render |
@@ -37,7 +37,7 @@ It is reusable across projects. Project-specific details go only in the
 ## 3. Phase Instructions
 
 ### Phase 0: Setup
-- Create the repo structure (Section 7), `Prompt.md` (Section 9) and this file.
+- Create the repo structure (Section 7), `PROMPTS.md` (Section 9) and this file.
 - Start logging prompts from the very first one.
 
 ### Phase 1: Requirement Analysis
@@ -161,8 +161,9 @@ Repeat until all of that story's acceptance criteria are covered. Commits should
 
 ```
 /
-├── Agent.md
-├── Prompt.md
+├── AGENTS.md
+├── PROMPTS.md
+├── ASSUMPTIONS.md
 ├── README.md
 ├── docker-compose.yml
 ├── .github/workflows/ci.yml
@@ -200,7 +201,7 @@ Repeat until all of that story's acceptance criteria are covered. Commits should
 
 ---
 
-## 9. Prompt Logging (`Prompt.md`)
+## 9. Prompt Logging (`PROMPTS.md`)
 
 Log **every** prompt given to the AI, in this format:
 
@@ -219,7 +220,7 @@ The last column is mandatory. It records human judgment over the AI's output.
 - [ ] No critical or blocker vulnerabilities
 - [ ] PlantUML diagrams created or updated in the same commit, and rendering successfully in CI
 - [ ] Docs updated if the design changed
-- [ ] Prompt(s) logged in `Prompt.md`
+- [ ] Prompt(s) logged in `PROMPTS.md`
 
 ---
 
@@ -232,7 +233,7 @@ The last column is mandatory. It records human judgment over the AI's output.
   - A trade with the same version replaces the stored record.
   - Reject a trade whose maturity date is earlier than today.
   - Automatically mark a trade as expired once its maturity date has passed.
-- **Current phase:** 0 (Setup)
+- **Current phase:** 1 (Requirement Analysis)
 
 ---
 
