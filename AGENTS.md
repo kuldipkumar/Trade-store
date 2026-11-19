@@ -234,7 +234,7 @@ The last column is mandatory. It records human judgment over the AI's output.
   - A trade with the same version replaces the stored record.
   - Reject a trade whose maturity date is earlier than today.
   - Automatically mark a trade as expired once its maturity date has passed.
-- **Current phase:** 1 (Requirement Analysis)
+- **Current phase:** 2 (Epics and Stories)
 
 ---
 
