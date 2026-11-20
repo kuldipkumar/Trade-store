@@ -234,7 +234,7 @@ The last column is mandatory. It records human judgment over the AI's output.
   - A trade with the same version replaces the stored record.
   - Reject a trade whose maturity date is earlier than today.
   - Automatically mark a trade as expired once its maturity date has passed.
-- **Current phase:** 4 (Walking skeleton and CI/CD). Phase 3 approved 2026-11-20. Skeleton, docker-compose, Dockerfile and .github/workflows/ci.yml written; gate = first green pipeline run on GitHub.
+- **Current phase:** 4 (Walking skeleton and CI/CD), in progress. Spring Boot 3.5 → 4.1.2 upgrade (human chose option A, 2026-11-20) to fix CRITICAL CVEs in Spring Web MVC 6.2 and Tomcat 10.1. Work in progress is on branch `wip/spring-boot-4`: pom.xml migrated; test code (Testcontainers 2 packages, RestTestClient/TestRestTemplate, metrics test annotation, Jackson 3) still to migrate. Gate = first fully green pipeline run.
 
 ---
 
