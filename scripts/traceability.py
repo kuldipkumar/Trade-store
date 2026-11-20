@@ -155,3 +155,13 @@ def parse_results(xml_texts):
             if rank[status] >= rank[results.get(key, "skipped")]:
                 results[key] = status
     return results
+
+
+# ---------------------------------------------------------------- check and render (stubs)
+
+def check(backlog, assumptions, tests, results):
+    return []
+
+
+def render(requirements, backlog, tests, results):
+    return ""

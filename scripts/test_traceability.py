@@ -154,5 +154,65 @@ class ParseResultsTest(unittest.TestCase):
                                    (cls, "should_doSomething_when_untagged"): "skipped"})
 
 
+def _fixture(with_results):
+    reqs = t.parse_requirements(CLARIFICATIONS)
+    backlog = t.parse_backlog(BACKLOG)
+    main = {"TradeIngestionService": "src/main/java/com/tradestore/service/TradeIngestionService.java",
+            "Trade": "src/main/java/com/tradestore/domain/Trade.java"}
+    tests = t.parse_java_tests({"src/test/java/com/tradestore/service/TradeIngestionServiceTest.java": JAVA_TEST}, main)
+    results = t.parse_results([SUREFIRE_XML]) if with_results else {}
+    return reqs, backlog, tests, results
+
+
+class CheckTest(unittest.TestCase):
+
+    def test_should_reportUnknownUntaggedAndFailingTests_when_checked(self):
+        reqs, backlog, tests, results = _fixture(with_results=True)
+        tests.append(t.TestCase("x.TypoTest", "should_x_when_y", ["US-101.9"], "TypoTest.java", []))
+
+        errors = t.check(backlog, {"A-13"}, tests, results)
+
+        self.assertEqual(errors, [
+            "com.tradestore.service.TradeIngestionServiceTest.should_reject_when_lower: tagged test is failing",
+            "com.tradestore.service.TradeIngestionServiceTest.should_doSomething_when_untagged: no @Tag naming an acceptance criterion or assumption",
+            "x.TypoTest.should_x_when_y: unknown tag US-101.9",
+        ])
+
+    def test_should_reportNothing_when_everyTestIsTaggedKnownAndPassing(self):
+        reqs, backlog, tests, _ = _fixture(with_results=False)
+        self.assertEqual(t.check(backlog, {"A-13"}, tests[:2], {}), [])
+
+
+class RenderTest(unittest.TestCase):
+
+    def test_should_summariseAndTraceRequirementsToTestedCriteria_when_rendered(self):
+        doc = t.render(*_fixture(with_results=True))
+
+        self.assertIn("Acceptance criteria with at least one test: **2 of 4 (50%)**", doc)
+        self.assertIn("| R-03 | Version rule: reject a lower version. | E1 | US-101, US-104 | 2 of 3 |", doc)
+        self.assertIn("### US-101: Store a new trade (E1): 1 of 2 criteria tested", doc)
+
+    def test_should_linkTestsAndCodeAndShowStatus_when_criterionIsTested(self):
+        doc = t.render(*_fixture(with_results=True))
+
+        test_link = "[TradeIngestionServiceTest.should_storeTrade_when_new](../src/test/java/com/tradestore/service/TradeIngestionServiceTest.java)"
+        code_links = ("[Trade](../src/main/java/com/tradestore/domain/Trade.java), "
+                      "[TradeIngestionService](../src/main/java/com/tradestore/service/TradeIngestionService.java)")
+        self.assertIn(f"| US-101.1 | `T1` v1 is stored | {test_link} | {code_links} | ✅ passed |", doc)
+        self.assertIn("| US-101.2 | values are ignored | | | ⚠️ no test |", doc)
+        self.assertIn("| US-104.1 | A `LowerVersionException` is raised |", doc)
+        self.assertIn("❌ failed |", doc)
+
+    def test_should_showNotRun_when_noResultsAreGiven(self):
+        doc = t.render(*_fixture(with_results=False))
+
+        self.assertIn("| ▫ not run |", doc)
+
+    def test_should_listAssumptionsVerifiedByTests_when_testsAreTaggedWithThem(self):
+        doc = t.render(*_fixture(with_results=False))
+
+        self.assertIn("| A-13 | [TradeIngestionServiceTest.should_reject_when_lower]", doc)
+
+
 if __name__ == "__main__":
     unittest.main()
