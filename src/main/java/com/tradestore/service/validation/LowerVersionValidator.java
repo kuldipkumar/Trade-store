@@ -2,8 +2,8 @@ package com.tradestore.service.validation;
 
 import java.util.List;
 
-import com.tradestore.domain.Violation;
 import com.tradestore.domain.ReasonCode;
+import com.tradestore.domain.Violation;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
