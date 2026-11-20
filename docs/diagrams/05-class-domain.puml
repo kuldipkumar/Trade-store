@@ -46,6 +46,8 @@ package "domain" {
     + reason : ReasonCode
     + field : String
     + message : String
+    + {static} invalidField(field, message) : Violation
+    + {static} lowerVersion(incoming, stored) : Violation
   }
 
   enum ReasonCode {
@@ -93,7 +95,7 @@ package "domain" {
   class TradeRejectedException {
     + tradeId : String
     + violations : List<Violation>
-    + {static} of(tradeId, violations, stored : StoredTrade, incomingVersion) : TradeRejectedException
+    + {static} of(s : TradeSubmission, stored : Optional<StoredTrade>, violations) : TradeRejectedException
   }
   note bottom of TradeRejectedException
     Exactly one exception per rejected trade,

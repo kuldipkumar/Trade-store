@@ -77,7 +77,7 @@ Base package: `com.tradestore`. The structure follows AGENTS.md §7. Services de
 ## 3. Rejections: one exception, all reasons (US-104.4)
 
 - `CompositeTradeValidator` returns **every** violation (A-15). Each validator **skips checks whose inputs are invalid**, so one bad field never adds a misleading second reason. For example, an unparseable maturity date gives `INVALID_FIELD` only, not also `MATURITY_IN_PAST`.
-- `TradeRejectedException.of(tradeId, violations, stored, incomingVersion)` is the only way to build a rejection. It returns a **`LowerVersionException`** (a subclass) when `LOWER_VERSION` is among the reasons, and a plain `TradeRejectedException` otherwise. So a lower-version trade with a past maturity raises one `LowerVersionException` that carries both reasons (US-201.4).
+- `TradeRejectedException.of(submission, stored, violations)` is the only way to build a rejection. It returns a **`LowerVersionException`** (a subclass) when `LOWER_VERSION` is among the reasons, and a plain `TradeRejectedException` otherwise. So a lower-version trade with a past maturity raises one `LowerVersionException` that carries both reasons (US-201.4).
 - `LowerVersionException.getMessage()` names both versions: `"Trade T2 version 1 is lower than stored version 2"` (US-104.1).
 - **The exception is thrown after the transaction commits.** The service runs its database work in a `TransactionTemplate` that returns a result, and throws only afterwards, so the `REJECTED` outbox row is never rolled back. (`@Transactional(noRollbackFor = …)` was rejected as easy to break silently.)
 
