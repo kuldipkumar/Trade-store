@@ -24,12 +24,12 @@ The Markdown files in this repository are the **source of truth**. GitHub Issues
 - **Issues:** [all user stories](https://github.com/kuldipkumar/Trade-store/issues?q=label%3Atype%3Astory) and [phase gates](https://github.com/kuldipkumar/Trade-store/issues?q=label%3Atype%3Aphase-gate)
 - **Milestones:** [one per phase](https://github.com/kuldipkumar/Trade-store/milestones)
 - **Labels:** `epic:E1`–`epic:E6`, `priority:must|should|could`, `type:story|phase-gate`
-- **Project board:** linked here once created
+- **Project board:** [Trade Store](https://github.com/users/kuldipkumar/projects/3) (Backlog → Ready → In Progress → In Review → Done)
 
 ### Keeping issues in sync with the backlog
 
 1. Edit [02-backlog.md](02-backlog.md). Never edit generated issues directly.
-2. Run `python3 scripts/sync_backlog_issues.py --dry-run` to preview the changes, then run it without the flag to apply them.
+2. Run `python3 scripts/sync_backlog_issues.py --dry-run` to preview the changes, then run it without the flag to apply them. Add any **new** issue to the project board (`gh project item-add 3 --owner kuldipkumar --url <issue-url>`).
 3. The script creates or updates issues, labels and milestones. It never opens or closes issues.
 4. Reference the story ID in commits (for example `feat: US-104 reject lower version`). Pull requests close a story with `Closes #<issue>`.
 
