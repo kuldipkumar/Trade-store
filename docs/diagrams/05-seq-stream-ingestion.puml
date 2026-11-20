@@ -1,0 +1,79 @@
+@startuml 05-seq-stream-ingestion
+title Kafka ingestion: happy path, business rejection, poison pill, transient failure
+
+autonumber
+queue "trades.inbound" as Topic
+participant "Listener container\n(DefaultErrorHandler)" as Container
+participant SizeLimitedJsonDeserializer
+participant TradeConsumer
+participant TradeIngestionService
+participant DeadLetterAuditRecoverer
+participant DeadLetterPublishingRecoverer
+queue "trades.inbound.DLT" as DLT
+participant AuditEventStore
+database MongoDB
+
+Topic -> Container : poll() record (key = tradeId)
+Container -> SizeLimitedJsonDeserializer : deserialize(bytes)
+note right of SizeLimitedJsonDeserializer
+  Wrapped by ErrorHandlingDeserializer.
+  Unknown JSON fields are ignored (US-607.2).
+end note
+
+alt bytes > max-message-bytes, not JSON, or wrong JSON types (POISON: US-302, US-607.1)
+  SizeLimitedJsonDeserializer --> Container : DeserializationException (not retryable)
+  Container -> DeadLetterAuditRecoverer : accept(record, exception)
+  DeadLetterAuditRecoverer -> DeadLetterPublishingRecoverer : accept(record, exception)
+  DeadLetterPublishingRecoverer -> DLT : publish original bytes + headers\n(topic, partition, offset, exception class/message)
+  DeadLetterAuditRecoverer -> AuditEventStore : insert(POISON, _id = "topic-partition-offset", payload capped)
+  AuditEventStore -> MongoDB : insertOne (duplicate key = already recorded)
+  note right of DeadLetterAuditRecoverer
+    A MongoDB failure here is logged at ERROR,
+    not thrown: the DLT record is the durable
+    fallback (ADR-005 §3).
+  end note
+  Container -> Topic : commit offset (after the DLT publish)
+
+else valid JSON
+  SizeLimitedJsonDeserializer --> Container : TradeMessage
+  Container -> TradeConsumer : onMessage(record)
+  TradeConsumer -> TradeIngestionService : ingest(TradeSubmission, channel = STREAM)
+
+  alt ACCEPTED / REPLACED (US-301)
+    TradeIngestionService --> TradeConsumer : IngestionResult
+    TradeConsumer -> TradeConsumer : log tradeId, version, outcome, channel (no payload)
+    Container -> Topic : commit offset
+
+  else TradeRejectedException (business rejection: US-304)
+    TradeIngestionService --> TradeConsumer : throw TradeRejectedException
+    TradeConsumer -> TradeConsumer : catch, log reasons
+    note right of TradeConsumer
+      Already audited (outbox row committed).
+      Not rethrown: never retried or dead-lettered.
+    end note
+    Container -> Topic : commit offset
+
+  else transient failure, e.g. DataAccessException (US-303)
+    TradeIngestionService --> TradeConsumer : throw DataAccessException
+    TradeConsumer --> Container : rethrow
+    loop up to max-attempts (default 3), exponential backoff
+      Container -> TradeConsumer : redeliver same record (seek)
+    end
+    alt a retry succeeds
+      Container -> Topic : commit offset (no DLT record: US-303.1)
+    else retries exhausted
+      Container -> DeadLetterAuditRecoverer : accept(record, exception)
+      DeadLetterAuditRecoverer -> DeadLetterPublishingRecoverer : accept(record, exception)
+      DeadLetterPublishingRecoverer -> DLT : publish + diagnostic headers
+      DeadLetterAuditRecoverer -> AuditEventStore : insert(FAILED, _id = "topic-partition-offset")
+      Container -> Topic : commit offset
+    end
+  end
+end
+
+alt the DLT publish itself fails
+  DeadLetterPublishingRecoverer --> Container : exception
+  Container -> Container : offset NOT committed; record is redelivered later
+end
+
+@enduml

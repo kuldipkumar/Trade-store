@@ -1,0 +1,63 @@
+@startuml 05-seq-queries-and-report
+title Read side: trade queries (US-402 to US-404) and audit report (US-502, US-503)
+
+autonumber
+actor Client
+participant TradeController
+participant TradeQueryService
+participant TradeRepository
+participant TradeHistoryStore
+participant AuditReportController
+participant AuditReportService
+participant AuditEventStore
+participant AuditCsvWriter
+participant GlobalExceptionHandler
+
+== GET /trades/{id} ==
+Client -> TradeController : get(tradeId)
+TradeController -> TradeQueryService : get(tradeId)
+TradeQueryService -> TradeRepository : findTrade(tradeId)
+alt found
+  TradeController --> Client : 200 TradeResponse (incl. createdDate, expired)
+else not found
+  TradeQueryService --> GlobalExceptionHandler : throw TradeNotFoundException
+  GlobalExceptionHandler --> Client : 404 standard error shape
+end
+
+== GET /trades?expired&page&size ==
+Client -> TradeController : list(expired, page, size)
+TradeController -> TradeQueryService : list(expired, page, min(size, max-page-size))
+TradeQueryService -> TradeRepository : findPage(...)  (ORDER BY trade_id)
+TradeController --> Client : 200 PageResponse {content, page, size, totalElements, totalPages}
+
+== GET /trades/{id}/history ==
+Client -> TradeController : history(tradeId)
+TradeController -> TradeQueryService : history(tradeId)
+TradeQueryService -> TradeHistoryStore : findByTradeId(tradeId)  (sort version, receivedTimestamp)
+alt entries found
+  TradeController --> Client : 200 List<TradeVersionResponse>
+else none
+  TradeQueryService --> GlobalExceptionHandler : throw TradeNotFoundException
+  GlobalExceptionHandler --> Client : 404
+end
+
+== GET /reports/audit?from&to&tradeId&outcome ==
+Client -> AuditReportController : report (local dates converted to UTC instants in the configured zone)
+alt Accept: application/json (default)
+  AuditReportController -> AuditReportService : report(query, page, size)
+  AuditReportService -> AuditEventStore : find(query, page, size)  (index-backed, sorted by eventTimestamp)
+  AuditReportService -> AuditEventStore : countByOutcome(query)  (aggregation $match + $group)
+  AuditReportController --> Client : 200 AuditReportResponse {summary, entries, page metadata}
+else Accept: text/csv (US-503)
+  AuditReportController -> AuditReportService : stream(query)
+  AuditReportService -> AuditEventStore : stream(query)  (MongoDB cursor, not loaded into memory: US-502.4)
+  loop each event
+    AuditReportController -> AuditCsvWriter : writeRow(event, out)
+  end
+  AuditReportController --> Client : 200 text/csv (header row + one row per entry)
+else invalid filter (e.g. from > to, unknown outcome)
+  AuditReportController --> GlobalExceptionHandler : IllegalArgumentException / binding error
+  GlobalExceptionHandler --> Client : 400
+end
+
+@enduml

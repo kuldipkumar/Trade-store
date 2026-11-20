@@ -1,0 +1,174 @@
+@startuml 05-class-domain
+title Domain model, validation rules and exceptions (com.tradestore.domain, com.tradestore.service.validation)
+
+skinparam classAttributeIconSize 0
+hide empty members
+
+package "domain" {
+  class Trade <<record>> {
+    + tradeId : String
+    + version : int
+    + counterPartyId : String
+    + bookId : String
+    + maturityDate : LocalDate
+    + createdDate : LocalDate
+    + expired : boolean
+    + {static} newVersion(s : TradeSubmission, maturity : LocalDate, today : LocalDate) : Trade
+  }
+  note right of Trade
+    Immutable. createdDate = today and
+    expired = false on every accepted
+    version (A-05, A-08, A-09).
+  end note
+
+  class TradeSubmission <<record>> {
+    + tradeId : String
+    + version : Integer
+    + counterPartyId : String
+    + bookId : String
+    + maturityDate : String
+    + channel : Channel
+    + rawPayload : String
+  }
+  note right of TradeSubmission
+    Unvalidated input from either channel.
+    Raw strings, so field errors become
+    INVALID_FIELD rejections (US-105).
+  end note
+
+  class StoredTrade <<record>> {
+    + tradeId : String
+    + version : int
+    + expired : boolean
+  }
+
+  class Violation <<record>> {
+    + reason : ReasonCode
+    + field : String
+    + message : String
+  }
+
+  enum ReasonCode {
+    INVALID_FIELD
+    LOWER_VERSION
+    MATURITY_IN_PAST
+  }
+
+  enum Outcome {
+    ACCEPTED
+    REPLACED
+    REJECTED
+    EXPIRED
+    POISON
+    FAILED
+  }
+
+  enum Channel {
+    STREAM
+    REST
+    SCHEDULER
+  }
+
+  class AuditEvent <<record>> {
+    + eventId : String
+    + tradeId : String
+    + version : Integer
+    + outcome : Outcome
+    + reasons : List<Violation>
+    + channel : Channel
+    + eventTimestamp : Instant
+    + payload : String
+    + trade : Trade  <<nullable>>
+    + source : DeadLetterSource  <<nullable>>
+    + error : String  <<nullable>>
+  }
+
+  class DeadLetterSource <<record>> {
+    + topic : String
+    + partition : int
+    + offset : long
+    + id() : String
+  }
+
+  class TradeRejectedException {
+    + tradeId : String
+    + violations : List<Violation>
+    + {static} of(tradeId, violations, stored : StoredTrade, incomingVersion) : TradeRejectedException
+  }
+  note bottom of TradeRejectedException
+    Exactly one exception per rejected trade,
+    carrying every reason (US-104.4).
+    of() returns a LowerVersionException
+    when LOWER_VERSION is among the reasons.
+  end note
+
+  class LowerVersionException {
+    + incomingVersion : int
+    + storedVersion : int
+  }
+
+  class TradeNotFoundException {
+    + tradeId : String
+  }
+
+  RuntimeException <|-- TradeRejectedException
+  TradeRejectedException <|-- LowerVersionException
+  RuntimeException <|-- TradeNotFoundException
+
+  Violation --> ReasonCode
+  AuditEvent --> Outcome
+  AuditEvent --> Channel
+  AuditEvent "1" o-- "0..*" Violation
+  AuditEvent o-- "0..1" Trade
+  AuditEvent o-- "0..1" DeadLetterSource
+  TradeSubmission --> Channel
+  TradeRejectedException "1" o-- "1..*" Violation
+}
+
+package "service.validation" {
+  interface TradeValidator {
+    + validate(ctx : ValidationContext) : List<Violation>
+  }
+
+  class ValidationContext <<record>> {
+    + submission : TradeSubmission
+    + stored : Optional<StoredTrade>
+    + today : LocalDate
+  }
+
+  class MandatoryFieldsValidator
+  class PositiveVersionValidator
+  class MaturityDateFormatValidator
+  class LowerVersionValidator
+  class MaturityNotInPastValidator
+
+  class CompositeTradeValidator {
+    - validators : List<TradeValidator>
+    + validate(ctx : ValidationContext) : List<Violation>
+  }
+  note bottom of CompositeTradeValidator
+    Runs every TradeValidator bean and
+    collects all violations (A-15).
+    A new rule = a new class (Open/Closed).
+  end note
+
+  class MaturityDates <<utility>> {
+    + {static} parse(value : String) : Optional<LocalDate>
+  }
+
+  TradeValidator <|.. MandatoryFieldsValidator
+  TradeValidator <|.. PositiveVersionValidator
+  TradeValidator <|.. MaturityDateFormatValidator
+  TradeValidator <|.. LowerVersionValidator
+  TradeValidator <|.. MaturityNotInPastValidator
+  CompositeTradeValidator o-- "1..*" TradeValidator
+  TradeValidator ..> ValidationContext
+  MaturityDateFormatValidator ..> MaturityDates
+  MaturityNotInPastValidator ..> MaturityDates
+}
+
+ValidationContext --> TradeSubmission
+ValidationContext --> StoredTrade
+TradeValidator ..> Violation : returns
+
+@enduml

@@ -1,0 +1,175 @@
+@startuml 05-class-components
+title Services, ports and adapters (com.tradestore)
+
+skinparam classAttributeIconSize 0
+hide empty members
+left to right direction
+
+package "api" {
+  class TradeController {
+    + submit(req : TradeRequest) : ResponseEntity<TradeResponse>
+    + get(tradeId) : TradeResponse
+    + list(expired : Boolean, page, size) : PageResponse<TradeResponse>
+    + history(tradeId) : List<TradeVersionResponse>
+  }
+  class AuditReportController {
+    + reportJson(query : AuditQuery, page, size) : AuditReportResponse
+    + reportCsv(query : AuditQuery, out : OutputStream)
+  }
+  class GlobalExceptionHandler <<@RestControllerAdvice>> {
+    + handleRejected(TradeRejectedException) : ApiErrorResponse
+    + handleNotFound(TradeNotFoundException) : ApiErrorResponse
+    + handleUnreadable(HttpMessageNotReadableException) : ApiErrorResponse
+    + handleTooLarge(PayloadTooLargeException) : ApiErrorResponse
+  }
+  class RequestSizeLimitFilter <<OncePerRequestFilter>>
+  class AuditCsvWriter
+  class PayloadTooLargeException
+  RequestSizeLimitFilter ..> PayloadTooLargeException : throws
+}
+
+package "messaging" {
+  class TradeConsumer {
+    + onMessage(record : ConsumerRecord<String, TradeMessage>)
+  }
+  class KafkaConfig {
+    + errorHandler(...) : DefaultErrorHandler
+    + topics() : NewTopics
+  }
+  class SizeLimitedJsonDeserializer
+  class DeadLetterAuditRecoverer <<ConsumerRecordRecoverer>> {
+    + accept(record, exception)
+  }
+  class KafkaHealthIndicator <<HealthIndicator>>
+}
+
+package "service" {
+  class TradeIngestionService {
+    + ingest(s : TradeSubmission) : IngestionResult
+  }
+  class TradeQueryService {
+    + get(tradeId) : Trade
+    + list(expired, page, size) : Page<Trade>
+    + history(tradeId) : List<TradeHistoryEntry>
+  }
+  class ExpiryService {
+    + expireMaturedTrades() : int
+  }
+  class OutboxRelayService {
+    + relayBatch() : int
+  }
+  class AuditReportService {
+    + report(query : AuditQuery, page, size) : AuditReport
+    + stream(query : AuditQuery) : Stream<AuditEvent>
+  }
+  class AuditEventFactory {
+    + accepted(trade, outcome, s) : AuditEvent
+    + rejected(s, violations) : AuditEvent
+    + expired(trade) : AuditEvent
+    + deadLettered(outcome, source, payload, error) : AuditEvent
+  }
+  class TradeMetrics
+  class IngestionResult <<record>> {
+    + outcome : Outcome
+    + trade : Trade
+  }
+}
+
+package "persistence" {
+  interface TradeRepository {
+    + findById(tradeId) : Optional<StoredTrade>
+    + findTrade(tradeId) : Optional<Trade>
+    + upsertIfNotOlder(trade : Trade) : UpsertResult
+    + markExpired(today : LocalDate) : List<Trade>
+    + findPage(expired : Boolean, page, size) : Page<Trade>
+  }
+  enum UpsertResult {
+    INSERTED
+    UPDATED
+    STALE
+  }
+  interface OutboxRepository {
+    + append(event : AuditEvent)
+    + claimBatch(limit : int) : List<AuditEvent>
+    + delete(eventIds : List<String>)
+    + backlog() : OutboxBacklog
+  }
+  interface AuditEventStore {
+    + insert(event : AuditEvent)
+    + find(query : AuditQuery, page, size) : Page<AuditEvent>
+    + countByOutcome(query : AuditQuery) : Map<Outcome, Long>
+    + stream(query : AuditQuery) : Stream<AuditEvent>
+  }
+  interface TradeHistoryStore {
+    + insert(entry : TradeHistoryEntry)
+    + findByTradeId(tradeId) : List<TradeHistoryEntry>
+  }
+
+  package "sql" {
+    class JdbcTradeRepository
+    class JdbcOutboxRepository
+  }
+  package "nosql" {
+    class MongoAuditEventStore
+    class MongoTradeHistoryStore
+    class MongoIndexInitializer <<startup>>
+  }
+}
+
+package "scheduler" {
+  class ExpiryScheduler {
+    + onApplicationReady()
+    + runScheduled()
+  }
+  class OutboxRelayScheduler {
+    + poll()
+  }
+}
+
+package "config" {
+  class TradeStoreProperties <<@ConfigurationProperties>>
+  class ClockConfig {
+    + clock(props) : Clock
+  }
+}
+
+TradeController --> TradeIngestionService
+TradeController --> TradeQueryService
+AuditReportController --> AuditReportService
+AuditReportController --> AuditCsvWriter
+TradeConsumer --> TradeIngestionService
+KafkaConfig ..> DeadLetterAuditRecoverer
+DeadLetterAuditRecoverer --> AuditEventStore
+DeadLetterAuditRecoverer --> AuditEventFactory
+
+TradeIngestionService --> CompositeTradeValidator
+TradeIngestionService --> TradeRepository
+TradeIngestionService --> OutboxRepository
+TradeIngestionService --> AuditEventFactory
+TradeIngestionService --> TradeMetrics
+TradeIngestionService --> Clock
+TradeQueryService --> TradeRepository
+TradeQueryService --> TradeHistoryStore
+ExpiryService --> TradeRepository
+ExpiryService --> OutboxRepository
+ExpiryService --> AuditEventFactory
+ExpiryService --> Clock
+OutboxRelayService --> OutboxRepository
+OutboxRelayService --> AuditEventStore
+OutboxRelayService --> TradeHistoryStore
+AuditReportService --> AuditEventStore
+ExpiryScheduler --> ExpiryService
+OutboxRelayScheduler --> OutboxRelayService
+
+TradeRepository <|.. JdbcTradeRepository
+OutboxRepository <|.. JdbcOutboxRepository
+AuditEventStore <|.. MongoAuditEventStore
+TradeHistoryStore <|.. MongoTradeHistoryStore
+TradeRepository ..> UpsertResult
+
+package "service.validation" {
+  class CompositeTradeValidator
+}
+class Clock <<java.time>>
+
+@enduml

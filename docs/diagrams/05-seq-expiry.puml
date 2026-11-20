@@ -1,0 +1,50 @@
+@startuml 05-seq-expiry
+title Expiry job: at startup and on the configured cron (US-202, US-203, US-204)
+
+autonumber
+participant "Spring\n(ApplicationReadyEvent / @Scheduled cron)" as Spring
+participant ExpiryScheduler
+participant ExpiryService
+participant Clock
+participant TradeRepository
+participant AuditEventFactory
+participant OutboxRepository
+database PostgreSQL
+
+alt application started (US-203: catch up after downtime)
+  Spring -> ExpiryScheduler : onApplicationReady()
+else cron fires (default "0 5 0 * * *" in the configured zone: US-202.4)
+  Spring -> ExpiryScheduler : runScheduled()
+end
+ExpiryScheduler -> ExpiryService : expireMaturedTrades()
+ExpiryService -> Clock : today = LocalDate.now(clock)
+ExpiryService -> PostgreSQL : BEGIN
+ExpiryService -> TradeRepository : markExpired(today)
+TradeRepository -> PostgreSQL : UPDATE trades SET expired = true\nWHERE maturity_date < ? AND expired = false\nRETURNING *
+note right of PostgreSQL
+  "<" not "<=": a trade maturing today stays live (A-17).
+  Already-expired rows are never returned, so a re-run
+  writes nothing (idempotent, US-202.2). The job never
+  sets expired back to false (US-204.2).
+end note
+TradeRepository --> ExpiryService : List<Trade> (newly expired)
+loop each newly expired trade
+  ExpiryService -> AuditEventFactory : expired(trade)  (channel = SCHEDULER)
+  ExpiryService -> OutboxRepository : append(EXPIRED event)
+end
+ExpiryService -> PostgreSQL : COMMIT
+ExpiryService --> ExpiryScheduler : count
+ExpiryScheduler -> ExpiryScheduler : log INFO "expired {count} trades"
+
+alt PostgreSQL unavailable
+  PostgreSQL --> ExpiryService : DataAccessException
+  ExpiryService --> ExpiryScheduler : rethrow
+  ExpiryScheduler -> ExpiryScheduler : log ERROR; the next run (or restart) catches up
+end
+
+note over ExpiryScheduler, PostgreSQL
+  Several instances may run the job at once: the UPDATE row locks
+  make each trade expire (and be audited) exactly once (A-42).
+end note
+
+@enduml

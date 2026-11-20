@@ -1,0 +1,53 @@
+@startuml 05-seq-outbox-relay
+title Outbox relay: PostgreSQL outbox_events to MongoDB (ADR-005)
+
+autonumber
+participant OutboxRelayScheduler
+participant OutboxRelayService
+participant OutboxRepository
+database PostgreSQL
+participant AuditEventStore
+participant TradeHistoryStore
+database MongoDB
+
+loop every outbox.poll-interval (default 1 s, fixed delay)
+  OutboxRelayScheduler -> OutboxRelayService : relayBatch()
+  activate OutboxRelayService
+  OutboxRelayService -> PostgreSQL : BEGIN
+  OutboxRelayService -> OutboxRepository : claimBatch(batch-size)
+  OutboxRepository -> PostgreSQL : SELECT ... FROM outbox_events ORDER BY id\nLIMIT ? FOR UPDATE SKIP LOCKED
+  OutboxRepository --> OutboxRelayService : List<AuditEvent> (ordered)
+
+  alt batch is empty
+    OutboxRelayService -> PostgreSQL : COMMIT
+  else events claimed
+    loop each event, in id order
+      OutboxRelayService -> AuditEventStore : insert(event)  (_id = eventId)
+      AuditEventStore -> MongoDB : insertOne audit_events
+      alt duplicate key (relayed before a crash)
+        MongoDB --> AuditEventStore : E11000
+        AuditEventStore --> OutboxRelayService : treated as success (idempotent)
+      end
+      opt outcome is ACCEPTED or REPLACED
+        OutboxRelayService -> TradeHistoryStore : insert(TradeHistoryEntry)  (_id = eventId)
+        TradeHistoryStore -> MongoDB : insertOne trade_history (duplicate key = success)
+      end
+    end
+    OutboxRelayService -> OutboxRepository : delete(eventIds)
+    OutboxRepository -> PostgreSQL : DELETE FROM outbox_events WHERE event_id = ANY(?)
+    OutboxRelayService -> PostgreSQL : COMMIT
+  end
+
+  alt MongoDB unavailable
+    MongoDB --> OutboxRelayService : MongoException
+    OutboxRelayService -> PostgreSQL : ROLLBACK (rows stay in the outbox)
+    OutboxRelayService -> OutboxRelayService : log WARN; retried on the next poll
+    note right of OutboxRelayService
+      Nothing is lost (CR-6). The backlog gauges
+      (outbox size and oldest age) show the delay.
+    end note
+  end
+  deactivate OutboxRelayService
+end
+
+@enduml

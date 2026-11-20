@@ -1,0 +1,53 @@
+@startuml 05-activity-validation-and-upsert
+title Validation and version-guarded write (inside one transaction)
+
+start
+:Receive TradeSubmission\n(tradeId, version, counterPartyId, bookId, maturityDate as raw values);
+:today = LocalDate.now(clock)  (configured zone, US-205);
+:stored = findById(tradeId)  (skipped if tradeId is blank);
+:attempt = 1;
+
+repeat
+  :Run ALL validators and collect violations (A-15);
+  note right
+    **MandatoryFieldsValidator**: tradeId, counterPartyId, bookId not blank → INVALID_FIELD
+    **PositiveVersionValidator**: version present and ≥ 1 → INVALID_FIELD
+    **MaturityDateFormatValidator**: present and strict yyyy-MM-dd → INVALID_FIELD
+    **LowerVersionValidator**: if stored and version valid: version < stored.version → LOWER_VERSION
+    **MaturityNotInPastValidator**: if date parses: maturity < today → MATURITY_IN_PAST
+    Each validator skips checks whose inputs are invalid, so
+    one bad field never causes a misleading second reason.
+  end note
+  if (any violations?) then (yes)
+    :append REJECTED outbox event with ALL reasons;
+    :commit;
+    if (LOWER_VERSION among reasons?) then (yes)
+      :throw LowerVersionException\n(carries every reason; US-104.4, US-201.4); <<#pink>>
+    else (no)
+      :throw TradeRejectedException; <<#pink>>
+    endif
+    stop
+  endif
+  :upsertIfNotOlder(Trade.newVersion(...))\nINSERT ... ON CONFLICT DO UPDATE WHERE stored.version <= new.version;
+  if (row written?) then (yes)
+    if (inserted? (xmax = 0)) then (yes)
+      :outcome = ACCEPTED;
+    else (no)
+      :outcome = REPLACED;
+    endif
+    :append ACCEPTED/REPLACED outbox event;
+    :commit;
+    :return IngestionResult(outcome, trade); <<#palegreen>>
+    stop
+  endif
+  :STALE: a higher version was committed concurrently (US-106);
+  :stored = findById(tradeId) (re-read);
+  :attempt = attempt + 1;
+repeat while (attempt <= 2?) is (yes: re-validate, US-106.2)
+-> no;
+:append REJECTED (LOWER_VERSION) outbox event;
+:commit;
+:throw LowerVersionException; <<#pink>>
+stop
+
+@enduml

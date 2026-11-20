@@ -234,7 +234,7 @@ The last column is mandatory. It records human judgment over the AI's output.
   - A trade with the same version replaces the stored record.
   - Reject a trade whose maturity date is earlier than today.
   - Automatically mark a trade as expired once its maturity date has passed.
-- **Current phase:** 5 (Low-level design), started 2026-11-20 by agreement while Phase 4 approval is pending (LLD docs and diagrams only, no production code). Phase 4 gate met: CI run 44760843594 fully green on main; awaiting human approval to close gate issue #2.
+- **Current phase:** 5 (Low-level design). docs/05-lld.md, 11 diagrams and ADR-008 written; awaiting the human's decision on D1 (ADR-008) and review of D2–D7, then Phase 5 approval. Phase 4 gate met (CI run 44760843594 green); awaiting approval to close gate issue #2.
 
 ---
 

@@ -1,0 +1,75 @@
+@startuml 05-seq-trade-ingestion
+title Trade ingestion use case (shared by Kafka and REST): TradeIngestionService.ingest()
+
+autonumber
+participant "Channel adapter\n(TradeConsumer / TradeController)" as Channel
+participant TradeIngestionService
+participant Clock
+participant TransactionTemplate
+participant TradeRepository
+participant CompositeTradeValidator
+participant AuditEventFactory
+participant OutboxRepository
+participant TradeMetrics
+database PostgreSQL
+
+Channel -> TradeIngestionService : ingest(TradeSubmission)
+TradeIngestionService -> Clock : today = LocalDate.now(clock)
+TradeIngestionService -> TransactionTemplate : execute(...)
+activate TransactionTemplate
+
+TransactionTemplate -> TradeRepository : findById(tradeId)
+TradeRepository -> PostgreSQL : SELECT trade_id, version, expired FROM trades WHERE trade_id = ?
+TradeRepository --> TransactionTemplate : Optional<StoredTrade>
+
+TransactionTemplate -> CompositeTradeValidator : validate(ValidationContext(submission, stored, today))
+note right of CompositeTradeValidator
+  Runs ALL validators (A-15):
+  MandatoryFields, PositiveVersion,
+  MaturityDateFormat, LowerVersion,
+  MaturityNotInPast
+end note
+CompositeTradeValidator --> TransactionTemplate : List<Violation>
+
+alt no violations
+  TransactionTemplate -> TradeRepository : upsertIfNotOlder(Trade.newVersion(s, maturity, today))
+  TradeRepository -> PostgreSQL : INSERT ... ON CONFLICT (trade_id) DO UPDATE ...\nWHERE trades.version <= EXCLUDED.version RETURNING (xmax = 0)
+  alt 1 row returned (INSERTED or UPDATED)
+    TradeRepository --> TransactionTemplate : INSERTED / UPDATED
+    TransactionTemplate -> AuditEventFactory : accepted(trade, ACCEPTED or REPLACED, s)
+    TransactionTemplate -> OutboxRepository : append(event)
+    OutboxRepository -> PostgreSQL : INSERT INTO outbox_events
+  else 0 rows: a higher version was committed concurrently (US-106)
+    TradeRepository --> TransactionTemplate : STALE
+    TransactionTemplate -> TradeRepository : findById(tradeId)  (re-read, retry once: US-106.2)
+    TransactionTemplate -> CompositeTradeValidator : validate(ctx with new stored version)
+    CompositeTradeValidator --> TransactionTemplate : [LOWER_VERSION, ...]
+    TransactionTemplate -> AuditEventFactory : rejected(s, violations)
+    TransactionTemplate -> OutboxRepository : append(REJECTED event)
+  end
+else one or more violations
+  TransactionTemplate -> AuditEventFactory : rejected(s, violations)
+  TransactionTemplate -> OutboxRepository : append(REJECTED event)
+  OutboxRepository -> PostgreSQL : INSERT INTO outbox_events
+  note right of TransactionTemplate : trades table untouched (US-104.2, US-201.3)
+end
+
+TransactionTemplate -> PostgreSQL : COMMIT (trade + outbox row, or outbox row only)
+deactivate TransactionTemplate
+
+alt transaction failed (e.g. PostgreSQL unavailable)
+  TradeIngestionService --> Channel : DataAccessException (transient: Kafka retries, REST 503)
+else committed
+  TradeIngestionService -> TradeMetrics : record(outcome, reasons, channel, duration)
+  alt accepted or replaced
+    TradeIngestionService --> Channel : IngestionResult(ACCEPTED or REPLACED, trade)
+  else rejected
+    TradeIngestionService --> Channel : throw TradeRejectedException.of(...)\n(LowerVersionException if LOWER_VERSION is among the reasons)
+    note right of Channel
+      Thrown only AFTER the commit, so the
+      REJECTED outbox row is never rolled back.
+    end note
+  end
+end
+
+@enduml

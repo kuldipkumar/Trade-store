@@ -1,0 +1,82 @@
+@startuml 05-er-data-model
+title Data model: PostgreSQL (system of record + outbox) and MongoDB (audit + history)
+
+hide circle
+skinparam linetype ortho
+
+package "PostgreSQL (Flyway migration V2)" {
+  entity "trades" as trades {
+    * trade_id : varchar(64) <<PK>>
+    --
+    * version : integer  CHECK (version >= 1)
+    * counter_party_id : varchar(64)
+    * book_id : varchar(64)
+    * maturity_date : date
+    * created_date : date
+    * expired : boolean  DEFAULT false
+    * updated_at : timestamptz
+    --
+    idx_trades_unexpired_maturity\n  (maturity_date) WHERE expired = false
+    idx_trades_expired (expired, trade_id)
+  }
+
+  entity "outbox_events" as outbox {
+    * id : bigserial <<PK>>  (relay order)
+    --
+    * event_id : uuid <<UK>>
+    trade_id : varchar(64)  (null if blank on input)
+    * outcome : varchar(16)
+    * payload : jsonb  (serialised AuditEvent)
+    * created_at : timestamptz
+  }
+}
+
+package "MongoDB (database tradestore)" {
+  entity "audit_events <<collection>>" as audit {
+    * _id : string  (eventId, or "topic-partition-offset")
+    --
+    tradeId : string
+    version : int
+    * outcome : ACCEPTED | REPLACED | REJECTED | EXPIRED | POISON | FAILED
+    reasons : [ {reason, field, message} ]
+    * channel : STREAM | REST | SCHEDULER
+    * eventTimestamp : date (UTC)
+    payload : string  (capped at audit.max-payload-chars)
+    source : {topic, partition, offset}  (POISON / FAILED)
+    error : string  (exception class + message)
+    --
+    idx {eventTimestamp: 1}
+    idx {outcome: 1, eventTimestamp: 1}
+    idx {tradeId: 1, eventTimestamp: 1}
+  }
+
+  entity "trade_history <<collection>>" as history {
+    * _id : string  (eventId)
+    --
+    * tradeId : string
+    * version : int
+    * counterPartyId : string
+    * bookId : string
+    * maturityDate : string (yyyy-MM-dd)
+    * createdDate : string (yyyy-MM-dd)
+    * outcome : ACCEPTED | REPLACED
+    * channel : STREAM | REST
+    * receivedTimestamp : date (UTC)
+    --
+    idx {tradeId: 1, version: 1, receivedTimestamp: 1}
+  }
+}
+
+trades ||..o{ outbox : "trade_id (logical, no FK:\nrejections of unknown trades too)"
+outbox ||..|| audit : "relayed, event_id = _id"
+outbox ||..o| history : "ACCEPTED / REPLACED only"
+trades ||..o{ history : "tradeId (logical)"
+
+note bottom of outbox
+  Rows live only until relayed, then are deleted (ADR-005).
+end note
+note bottom of audit
+  Append-only: no update or delete paths (A-45).
+end note
+
+@enduml

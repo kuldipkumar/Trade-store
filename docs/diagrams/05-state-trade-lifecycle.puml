@@ -1,0 +1,28 @@
+@startuml 05-state-trade-lifecycle
+title Trade lifecycle (row in PostgreSQL trades)
+
+hide empty description
+
+state "Not stored" as NotStored
+state "Live\n(expired = N)" as Live
+state "Expired\n(expired = Y)" as Expired
+
+[*] -down-> NotStored
+NotStored -down-> Live : [valid] submission\n/ ACCEPTED, createdDate = today
+Live -down-> Expired : expiry job\n[maturityDate < today]\n/ EXPIRED
+Expired -up[#green]-> Live : [valid, version >= stored]\nsubmission\n/ REPLACED, expired = N\n(A-09, A-19)
+
+NotStored : rejected submission → REJECTED (audit only)
+Live : valid submission, version >= stored → REPLACED, createdDate = today
+Live : rejected submission → REJECTED, row unchanged
+Expired : expiry job runs again → no change, no event (US-202.2)
+Expired : rejected submission → REJECTED, row unchanged
+
+note right of Expired
+  Only a new valid version resets expired to N;
+  the expiry job never does (US-204.2).
+  Deletion and cancellation are out of scope (A-40),
+  so there is no final state.
+end note
+
+@enduml
