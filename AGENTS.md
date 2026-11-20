@@ -234,7 +234,7 @@ The last column is mandatory. It records human judgment over the AI's output.
   - A trade with the same version replaces the stored record.
   - Reject a trade whose maturity date is earlier than today.
   - Automatically mark a trade as expired once its maturity date has passed.
-- **Current phase:** 2 (Epics and Stories). Backlog written; awaiting product-owner approval of the Phase 2 gate (priorities, US-605 on-demand perf test, US-401.6 413 response). Next: Phase 3 HLD and ADRs (streaming tool, databases, SQL/audit consistency, OSS scanner).
+- **Current phase:** 2 approved (2026-11-20, PO sign-off in docs/02-po-review.md). Next: Phase 3 HLD and ADRs, under PO constraint CR-6 (no lost audit entries). Open: how to store and track the requirement docs (options presented to the human).
 
 ---
 

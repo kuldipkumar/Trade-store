@@ -5,7 +5,7 @@
 | **Reviewer role** | Product Owner, the owner of [Requirements.md](../Requirements.md) (role played by the AI at the human's request) |
 | **Reviewed** | [02-backlog.md](02-backlog.md) (6 epics, 31 stories) and [ASSUMPTIONS.md](../ASSUMPTIONS.md) (A-01 to A-54) |
 | **Date** | 2026-11-20 |
-| **Verdict** | **Conditional sign-off.** The backlog becomes approved once change requests CR-1 to CR-5 are applied. CR-6 is a constraint on Phase 3. |
+| **Verdict** | **Approved** on 2026-11-20, after CR-1 to CR-5 were applied. CR-6 is a constraint on Phase 3. |
 
 > **Independence note:** the same AI wrote the backlog and is reviewing it. This review is a structured self-check against the assignment, not an independent review. The human remains the final approver and can overrule any item below.
 
@@ -97,7 +97,7 @@ Each statement in the assignment is checked against the backlog.
 
 - [x] All requirements in Requirements.md are traced to stories.
 - [x] All assumptions reviewed (agree, or agree with a condition).
-- [ ] CR-1 to CR-5 applied to 02-backlog.md.
-- [ ] Human confirms this review and authorises the changes.
+- [x] CR-1 to CR-5 applied to 02-backlog.md (2026-11-20).
+- [x] Human confirmed this review and authorised the changes (2026-11-20).
 
-**Product Owner sign-off: CONDITIONAL.** It becomes **APPROVED** once CR-1 to CR-5 are applied, and Phase 3 may then start under constraint CR-6.
+**Product Owner sign-off: APPROVED** (2026-11-20). Phase 3 may start under constraint CR-6.

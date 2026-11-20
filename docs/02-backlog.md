@@ -14,7 +14,7 @@ Derived from [Requirements.md](../Requirements.md) and the agreed [ASSUMPTIONS.m
 
 | Epic | Name | Stories | Main sources |
 |------|------|---------|--------------|
-| E1 | Trade versioning and storage | US-101 to US-106 | R-02, R-03, A-03, A-05 to A-12, A-23, A-24 |
+| E1 | Trade versioning and storage | US-101 to US-107 | R-02, R-03, A-03, A-05 to A-12, A-23, A-24 |
 | E2 | Maturity validation and expiry | US-201 to US-205 | R-04, R-05, A-13 to A-20 |
 | E3 | Stream ingestion and failure handling | US-301 to US-304 | R-01, R-11, A-21, A-22, A-26 to A-28, A-43 |
 | E4 | REST API | US-401 to US-404 | A-21, A-26, A-38 |
@@ -57,6 +57,7 @@ Derived from [Requirements.md](../Requirements.md) and the agreed [ASSUMPTIONS.m
 | AC | Given | When | Then |
 |----|-------|------|------|
 | US-104.1 | `T2` v2 is stored | `T2` v1 is submitted | A `LowerVersionException` is raised, and the message names the incoming and stored versions |
+| US-104.4 | Any state | A trade breaks one or more rules | **Exactly one** rejection exception is raised, carrying **all** violated reasons. If `LOWER_VERSION` is among them, the exception is identifiable as a `LowerVersionException` (CR-2; class design in Phase 5) |
 | US-104.2 | `T2` v2 is stored | `T2` v1 is rejected | The stored `T2` is still v2, unchanged |
 | US-104.3 | `T2` v2 is stored | `T2` v1 is rejected | An audit entry `REJECTED` with reason `LOWER_VERSION` is recorded (A-12) |
 
@@ -69,13 +70,27 @@ Derived from [Requirements.md](../Requirements.md) and the agreed [ASSUMPTIONS.m
 | US-105.2 | Any state | A trade with `version` 0 or negative is submitted | It is rejected with reason `INVALID_FIELD` |
 | US-105.3 | Any state | A trade with a missing `maturityDate`, or one not in `yyyy-MM-dd` format, is submitted | It is rejected with reason `INVALID_FIELD` (A-04) |
 
-### US-106: Concurrent updates to the same trade are safe (S)
+### US-106: Concurrent updates to the same trade are safe (M)
+*Priority raised from S to M by CR-1 (PO review).*
 *As a platform owner, I want concurrent submissions for one trade to be handled safely, so that a lower version can never win a race.*
 
 | AC | Given | When | Then |
 |----|-------|------|------|
 | US-106.1 | `T5` v1 is stored | `T5` v3 and `T5` v2 are processed concurrently | The final stored version is v3. v2 is either rejected as `LOWER_VERSION` or replaced by v3 (A-23) |
 | US-106.2 | A conditional write fails because of a concurrent update | The write is retried once | The incoming trade is re-validated against the newly stored version before writing |
+
+### US-107: Assignment example scenario (M)
+*Added by CR-3 (PO review).* *As an assessor, I want the assignment's sample trades replayed through the store, so that I can see exactly how the rules treat them.*
+
+Dates are relative to the fixed "today" of 2026-11-19, keeping the shape of the sample table (A-01).
+
+| AC | Given | When | Then |
+|----|-------|------|------|
+| US-107.1 | An empty store | `T1` v1 (`CP-1`, `B1`, maturity 2027-05-20) is submitted | `ACCEPTED`: stored with `createdDate` 2026-11-19 and `expired` = N |
+| US-107.2 | `T1` is stored | `T2` v2 (`CP-2`, `B1`, maturity 2027-05-20) is submitted | `ACCEPTED`: `T2` v2 is stored |
+| US-107.3 | `T2` v2 is stored | `T2` v1 (`CP-1`, `B1`, maturity 2027-05-20) is submitted | `REJECTED` with `LOWER_VERSION`, and `T2` stays at v2 |
+| US-107.4 | Today is 2026-11-19 | `T3` v3 (`CP-3`, `B2`, maturity 2026-05-20) is submitted | `REJECTED` with `MATURITY_IN_PAST`, and `T3` is not stored |
+| US-107.5 | The state after US-107.1 to US-107.4 | The clock moves to 2027-05-21 and the expiry job runs | `T1` and `T2` are `expired` = Y, and the audit trail holds 2 `ACCEPTED`, 2 `REJECTED` and 2 `EXPIRED` entries |
 
 ---
 
@@ -89,7 +104,7 @@ Derived from [Requirements.md](../Requirements.md) and the agreed [ASSUMPTIONS.m
 | US-201.1 | Today is 2026-11-19 | A trade with maturity 2026-11-18 is submitted | It is rejected with reason `MATURITY_IN_PAST` and is not stored |
 | US-201.2 | Today is 2026-11-19 | A trade with maturity 2026-11-19 (today) is submitted | It is accepted (A-13, boundary case) |
 | US-201.3 | `T3` v1 is stored | `T3` v2 with a past maturity is submitted | It is rejected, and the stored `T3` v1 is unchanged (A-14) |
-| US-201.4 | `T3` v2 is stored | `T3` v1 with a past maturity is submitted | It is rejected with **both** `LOWER_VERSION` and `MATURITY_IN_PAST` reasons (A-15) |
+| US-201.4 | `T3` v2 is stored | `T3` v1 with a past maturity is submitted | One rejection exception is raised, identifiable as a `LowerVersionException`, and it carries **both** `LOWER_VERSION` and `MATURITY_IN_PAST` reasons (A-15, US-104.4) |
 
 ### US-202: Mark matured trades as expired automatically (M)
 *As a trade operations user, I want trades whose maturity date has passed marked as expired automatically, so that the store shows which trades are no longer live.*
@@ -133,7 +148,7 @@ Derived from [Requirements.md](../Requirements.md) and the agreed [ASSUMPTIONS.m
 
 | AC | Given | When | Then |
 |----|-------|------|------|
-| US-301.1 | The service is running | A valid trade message is published to the trades topic | Within 5 s it is stored and audited, using the same rules as REST (A-21) |
+| US-301.1 | The service is running | A valid trade message is published to the trades topic | It is stored and audited, using the same rules as REST (A-21). The test waits with Awaitility up to a configurable timeout (default 5 s). This is a **test timeout, not an SLA**; performance targets are only in A-41 and US-605 (CR-4) |
 | US-301.2 | `T7` v1, v2 and v3 are published in order, keyed by `T7` | They are consumed | They are processed in order, and `T7` v3 is stored with no false `LOWER_VERSION` rejections (A-22) |
 | US-301.3 | A message is being processed | The service stops before processing completes | After restart the message is processed again. Its offset is committed only after processing (A-43) |
 
@@ -261,7 +276,7 @@ Derived from [Requirements.md](../Requirements.md) and the agreed [ASSUMPTIONS.m
 | AC | Given | When | Then |
 |----|-------|------|------|
 | US-603.1 | The CI runner has Docker | The integration stage runs | Tests run against Testcontainers instances of the broker, SQL and NoSQL stores (no in-memory fakes) |
-| US-603.2 | The regression suite | It runs | It covers at least: stream → stored → queryable, a lower-version rejection, a past-maturity rejection, a poison pill → dead-letter topic, and an expiry run |
+| US-603.2 | The regression suite | It runs | It covers at least: stream → stored → queryable, a lower-version rejection, a past-maturity rejection, a poison pill → dead-letter topic, an expiry run, and the assignment example scenario (US-107) |
 
 ### US-604: Observability (S)
 *As a platform owner, I want health checks, metrics and structured logs, so that I can see whether the store is healthy and what it's doing.*
@@ -312,6 +327,7 @@ Derived from [Requirements.md](../Requirements.md) and the agreed [ASSUMPTIONS.m
 | AC | Given | When | Then |
 |----|-------|------|------|
 | US-609.1 | A fresh clone | The README is followed | It covers the overview, architecture diagrams, run, test, pipeline stages, assumptions, limitations and future improvements (AGENTS.md Phase 8) |
+| US-609.2 | A message has been dead-lettered | An operator follows the README or runbook | They can inspect the dead-letter topic, find the matching `POISON` or `FAILED` audit entry, fix the cause and replay the message manually (A-51, CR-5) |
 
 ---
 
@@ -321,7 +337,7 @@ Derived from [Requirements.md](../Requirements.md) and the agreed [ASSUMPTIONS.m
 |-------------|---------|
 | R-01 Stream ingestion, high volume | US-301, US-605 |
 | R-02 SQL latest + NoSQL history/audit | US-101, US-102, US-404, US-501 |
-| R-03 Version rule + exception | US-102, US-103, US-104, US-106 |
+| R-03 Version rule + exception | US-102, US-103, US-104, US-106, US-107 |
 | R-04 Past maturity rejected | US-201, US-205 |
 | R-05 Auto-expiry | US-202, US-203, US-204 |
 | R-06 JUnit + TDD | All stories (Phase 6 process), US-601 |
@@ -334,15 +350,15 @@ Derived from [Requirements.md](../Requirements.md) and the agreed [ASSUMPTIONS.m
 ## Suggested delivery order
 
 1. **Phase 4 (walking skeleton):** US-601, US-602, US-606 (skeleton only).
-2. **Domain core:** US-101, US-105, US-104, US-102, US-103, US-201, US-205.
+2. **Domain core:** US-101, US-105, US-104, US-102, US-103, US-201, US-205, US-106, US-107.
 3. **Audit:** US-501.
 4. **Channels:** US-401, US-402, US-301, US-304, US-302, US-303.
 5. **Expiry:** US-202, US-203, US-204.
 6. **Queries and reports:** US-403, US-404, US-502, US-503.
-7. **Hardening:** US-106, US-607, US-604, US-603 (Phase 7), US-605.
+7. **Hardening:** US-607, US-604, US-603 (Phase 7), US-605.
 8. **Docs:** US-608 (ongoing), US-609 (Phase 8).
 
 ## Gate check
 - [x] Every story has Given/When/Then acceptance criteria.
 - [x] Non-functional stories included (security scan, observability, performance, deployability).
-- [ ] Product owner has approved the backlog and priorities.
+- [x] Product Owner review done ([02-po-review.md](02-po-review.md)). CR-1 to CR-5 applied and authorised by the human on 2026-11-20. **Backlog approved.**
