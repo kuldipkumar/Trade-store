@@ -53,6 +53,7 @@ class JdbcOutboxRepositoryIT {
     }
 
     @Test
+    @Tag("US-501.1")
     void should_returnAppendedEventsInOrder_when_batchIsClaimed() {
         inRolledBackTransaction(() -> {
             // Arrange
@@ -71,6 +72,7 @@ class JdbcOutboxRepositoryIT {
     }
 
     @Test
+    @Tag("US-501.1")
     void should_notReturnEvents_when_theyHaveBeenDeleted() {
         inRolledBackTransaction(() -> {
             // Arrange

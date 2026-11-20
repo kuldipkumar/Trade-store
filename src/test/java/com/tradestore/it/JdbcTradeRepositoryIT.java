@@ -9,6 +9,7 @@ import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
 import com.tradestore.persistence.TradeRepository;
 import com.tradestore.persistence.UpsertResult;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -33,6 +34,7 @@ class JdbcTradeRepositoryIT {
     }
 
     @Test
+    @Tag("US-101.1")
     void should_findNothing_when_tradeIsNotStored() {
         // Act + Assert
         assertThat(repository.findById(tradeId)).isEmpty();
@@ -40,6 +42,7 @@ class JdbcTradeRepositoryIT {
     }
 
     @Test
+    @Tag("US-101.1")
     void should_insertTrade_when_noTradeIsStored() {
         // Act (US-101.1)
         UpsertResult result = repository.upsertIfNotOlder(trade(1, "CP-1", TODAY));
@@ -51,6 +54,7 @@ class JdbcTradeRepositoryIT {
     }
 
     @Test
+    @Tag("US-102.1")
     void should_replaceTrade_when_versionIsHigher() {
         // Arrange
         repository.upsertIfNotOlder(trade(1, "CP-1", TODAY.minusDays(5)));
@@ -64,6 +68,7 @@ class JdbcTradeRepositoryIT {
     }
 
     @Test
+    @Tag("US-103.1")
     void should_replaceTradeAndResetCreatedDate_when_versionIsTheSame() {
         // Arrange
         repository.upsertIfNotOlder(trade(2, "CP-1", TODAY.minusDays(18)));
@@ -77,6 +82,7 @@ class JdbcTradeRepositoryIT {
     }
 
     @Test
+    @Tag("US-104.2")
     void should_leaveStoredTradeUnchanged_when_versionIsLower() {
         // Arrange
         repository.upsertIfNotOlder(trade(2, "CP-2", TODAY.minusDays(1)));
@@ -90,6 +96,7 @@ class JdbcTradeRepositoryIT {
     }
 
     @Test
+    @Tag("US-204.1")
     void should_clearExpiredFlag_when_expiredTradeIsReplaced() {
         // Arrange
         repository.upsertIfNotOlder(trade(1, "CP-1", TODAY.minusDays(30)));

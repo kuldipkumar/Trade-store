@@ -17,6 +17,7 @@ import com.tradestore.domain.Outcome;
 import com.tradestore.domain.Trade;
 import com.tradestore.domain.TradeSubmission;
 import com.tradestore.domain.Violation;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /** US-501.1: every audit entry has an ID, the trade identity, outcome, reasons, channel, UTC time and payload. */
@@ -27,6 +28,7 @@ class AuditEventFactoryTest {
     private final AuditEventFactory factory = new AuditEventFactory(Clock.fixed(NOW, ZoneOffset.UTC), 20);
 
     @Test
+    @Tag("US-501.1")
     void should_describeStoredTrade_when_tradeIsAccepted() {
         // Arrange
         Trade trade = Trade.newVersion(validSubmission(), LocalDate.of(2027, 5, 20), TODAY);
@@ -41,6 +43,8 @@ class AuditEventFactoryTest {
     }
 
     @Test
+    @Tag("US-104.3")
+    @Tag("US-501.1")
     void should_carryAllReasonsAndNoTrade_when_tradeIsRejected() {
         // Arrange
         List<Violation> violations = List.of(Violation.invalidField("bookId", "bookId is required"));
@@ -56,6 +60,7 @@ class AuditEventFactoryTest {
     }
 
     @Test
+    @Tag("US-302.2")
     void should_capPayload_when_payloadIsLongerThanTheLimit() {
         // Arrange
         TradeSubmission big = new TradeSubmission("T1", 1, "CP-1", "B1", "2027-05-20", Channel.STREAM, "x".repeat(50));
@@ -68,6 +73,7 @@ class AuditEventFactoryTest {
     }
 
     @Test
+    @Tag("US-501.1")
     void should_giveEachEventItsOwnId_when_calledTwice() {
         // Act
         AuditEvent first = factory.rejected(validSubmission(), List.of(Violation.invalidField("bookId", "x")));

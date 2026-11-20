@@ -36,6 +36,7 @@ import com.tradestore.service.validation.LowerVersionValidator;
 import com.tradestore.service.validation.MandatoryFieldsValidator;
 import com.tradestore.service.validation.MaturityDateFormatValidator;
 import com.tradestore.service.validation.PositiveVersionValidator;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.support.TransactionCallback;
@@ -76,6 +77,7 @@ class TradeIngestionServiceTest {
     }
 
     @Test
+    @Tag("US-101.1")
     void should_storeTradeAndRecordAccepted_when_tradeIsNew() {
         // Arrange (US-101.1)
         when(trades.findById("T1")).thenReturn(Optional.empty());
@@ -93,6 +95,8 @@ class TradeIngestionServiceTest {
     }
 
     @Test
+    @Tag("US-102.1")
+    @Tag("US-103.1")
     void should_recordReplaced_when_storedTradeIsUpdated() {
         // Arrange (US-102.1, US-103.1)
         when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 1, false)));
@@ -107,6 +111,9 @@ class TradeIngestionServiceTest {
     }
 
     @Test
+    @Tag("US-104.1")
+    @Tag("US-104.2")
+    @Tag("US-104.3")
     void should_rejectWithoutWritingTheTrade_when_versionIsLower() {
         // Arrange (US-104.1, US-104.2, US-104.3)
         when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 2, false)));
@@ -122,6 +129,7 @@ class TradeIngestionServiceTest {
     }
 
     @Test
+    @Tag("US-104.3")
     void should_commitTheRejectionBeforeThrowing_when_tradeIsRejected() {
         // Arrange: the REJECTED outbox row must not be rolled back by the exception (docs/05-lld.md section 3)
         when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 2, false)));
@@ -134,6 +142,7 @@ class TradeIngestionServiceTest {
     }
 
     @Test
+    @Tag("US-105.1")
     void should_rejectAndAudit_when_fieldsAreInvalid() {
         // Arrange (US-105.1: the "is rejected" part)
         when(trades.findById("T1")).thenReturn(Optional.empty());
@@ -147,6 +156,7 @@ class TradeIngestionServiceTest {
     }
 
     @Test
+    @Tag("US-105.1")
     void should_notLookUpTheStoredTrade_when_tradeIdIsBlank() {
         // Act
         assertThatThrownBy(() -> service.ingest(withTradeId(""))).isInstanceOf(TradeRejectedException.class);
@@ -156,6 +166,7 @@ class TradeIngestionServiceTest {
     }
 
     @Test
+    @Tag("US-106.2")
     void should_revalidateAgainstTheNewVersion_when_aHigherVersionWasWrittenConcurrently() {
         // Arrange (US-106.2): validation passes against v1, but v3 is committed before our write
         when(trades.findById("T1"))
@@ -172,6 +183,7 @@ class TradeIngestionServiceTest {
     }
 
     @Test
+    @Tag("US-106.2")
     void should_retryTheWriteOnce_when_revalidationStillPasses() {
         // Arrange (US-106.2): the first write lost a race, but the re-read version is still not higher
         when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 1, false)));
@@ -186,6 +198,7 @@ class TradeIngestionServiceTest {
     }
 
     @Test
+    @Tag("US-106.2")
     void should_rejectAsLowerVersion_when_theWriteKeepsLosingRaces() {
         // Arrange: two stale writes in a row; give up after the one retry
         when(trades.findById("T1"))

@@ -19,6 +19,7 @@ import com.tradestore.persistence.TradeRepository;
 import com.tradestore.service.IngestionResult;
 import com.tradestore.service.TradeIngestionService;
 import org.bson.Document;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -60,6 +61,9 @@ class StoreTradeIT {
     }
 
     @Test
+    @Tag("US-101.1")
+    @Tag("US-101.3")
+    @Tag("US-501.1")
     void should_storeTradeAndRecordHistoryAndAudit_when_newTradeIsSubmitted() {
         // Act (US-101.1)
         IngestionResult result = ingestion.ingest(submission(1));
@@ -79,6 +83,9 @@ class StoreTradeIT {
     }
 
     @Test
+    @Tag("US-104.1")
+    @Tag("US-104.2")
+    @Tag("US-104.3")
     void should_keepStoredTradeAndAuditRejection_when_lowerVersionIsSubmitted() {
         // Arrange
         ingestion.ingest(submission(2));

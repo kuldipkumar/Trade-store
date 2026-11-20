@@ -13,6 +13,7 @@ import com.tradestore.domain.Channel;
 import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.TradeSubmission;
 import com.tradestore.domain.Violation;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
@@ -24,6 +25,7 @@ class MandatoryFieldsValidatorTest {
     private final MandatoryFieldsValidator validator = new MandatoryFieldsValidator();
 
     @Test
+    @Tag("US-105.1")
     void should_reportNoViolation_when_allMandatoryFieldsArePresent() {
         // Act
         List<Violation> violations = validator.validate(contextFor(validSubmission()));
@@ -35,6 +37,7 @@ class MandatoryFieldsValidatorTest {
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", "   "})
+    @Tag("US-105.1")
     void should_reportInvalidTradeId_when_tradeIdIsBlank(String tradeId) {
         // Act
         List<Violation> violations = validator.validate(contextFor(withTradeId(tradeId)));
@@ -49,6 +52,7 @@ class MandatoryFieldsValidatorTest {
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", "   "})
+    @Tag("US-105.1")
     void should_reportInvalidCounterPartyId_when_counterPartyIdIsBlank(String counterPartyId) {
         // Act
         List<Violation> violations = validator.validate(contextFor(withCounterPartyId(counterPartyId)));
@@ -61,6 +65,7 @@ class MandatoryFieldsValidatorTest {
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", "   "})
+    @Tag("US-105.1")
     void should_reportInvalidBookId_when_bookIdIsBlank(String bookId) {
         // Act
         List<Violation> violations = validator.validate(contextFor(withBookId(bookId)));
@@ -71,6 +76,7 @@ class MandatoryFieldsValidatorTest {
     }
 
     @Test
+    @Tag("US-105.1")
     void should_reportEveryBlankField_when_severalFieldsAreBlank() {
         // Arrange
         TradeSubmission submission = new TradeSubmission(" ", 1, null, "", "2027-05-20", Channel.STREAM, "{}");
@@ -84,6 +90,7 @@ class MandatoryFieldsValidatorTest {
     }
 
     @Test
+    @Tag("US-105.1")
     void should_reportInvalidField_when_idIsLongerThan64Characters() {
         // Arrange: the database columns are VARCHAR(64) (docs/05-lld.md section 5)
         String tooLong = "T".repeat(65);
@@ -100,6 +107,7 @@ class MandatoryFieldsValidatorTest {
     }
 
     @Test
+    @Tag("US-105.1")
     void should_reportNoViolation_when_idIsExactly64Characters() {
         // Act
         List<Violation> violations = validator.validate(contextFor(withTradeId("T".repeat(64))));

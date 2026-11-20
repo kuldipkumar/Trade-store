@@ -15,6 +15,7 @@ import com.tradestore.domain.TradeHistoryEntry;
 import com.tradestore.persistence.AuditEventStore;
 import com.tradestore.persistence.TradeHistoryStore;
 import org.bson.Document;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -41,6 +42,7 @@ class MongoStoresIT {
     }
 
     @Test
+    @Tag("US-501.1")
     void should_storeAuditEntryWithEventIdAsKey_when_eventIsInserted() {
         // Arrange
         AuditEvent event = stored(1, Outcome.ACCEPTED, Instant.parse("2026-11-19T10:15:30Z"));
@@ -60,6 +62,7 @@ class MongoStoresIT {
     }
 
     @Test
+    @Tag("US-501.1")
     void should_keepOneEntry_when_sameEventIsInsertedTwice() {
         // Arrange: a relay crash after the MongoDB write but before the outbox delete (ADR-005)
         AuditEvent event = stored(1, Outcome.ACCEPTED, Instant.parse("2026-11-19T10:15:30Z"));
@@ -73,6 +76,8 @@ class MongoStoresIT {
     }
 
     @Test
+    @Tag("US-102.3")
+    @Tag("US-404.1")
     void should_returnHistoryOrderedByVersion_when_versionsArriveOutOfOrder() {
         // Arrange (US-102.3, US-404.1)
         TradeHistoryEntry v2 = TradeHistoryEntry.from(stored(2, Outcome.REPLACED, Instant.parse("2026-11-19T10:00:00Z")));
@@ -88,6 +93,7 @@ class MongoStoresIT {
     }
 
     @Test
+    @Tag("A-52")
     void should_haveReportAndHistoryIndexes_when_applicationStarts() {
         // Act
         List<String> auditIndexes = mongo.indexOps("audit_events").getIndexInfo().stream().map(IndexInfo::getName).toList();

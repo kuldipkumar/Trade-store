@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.ZoneId;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /** US-205.1: "today" uses the configured zone, or the server's default zone when none is set (A-16). */
@@ -12,6 +13,7 @@ class ClockConfigTest {
     private final ClockConfig config = new ClockConfig();
 
     @Test
+    @Tag("US-205.1")
     void should_useServerDefaultZone_when_noZoneIsConfigured() {
         // Act + Assert
         assertThat(config.clock(new TradeStoreProperties(null, null, null)).getZone()).isEqualTo(ZoneId.systemDefault());
@@ -19,6 +21,7 @@ class ClockConfigTest {
     }
 
     @Test
+    @Tag("US-205.1")
     void should_useConfiguredZone_when_zoneIsSet() {
         // Act + Assert
         assertThat(config.clock(new TradeStoreProperties("Asia/Kolkata", null, null)).getZone()).isEqualTo(ZoneId.of("Asia/Kolkata"));

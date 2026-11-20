@@ -10,6 +10,7 @@ import com.tradestore.domain.Channel;
 import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.TradeSubmission;
 import com.tradestore.domain.Violation;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /** A-15 / US-104.4: all validators run and every violation is collected, not just the first. */
@@ -21,6 +22,7 @@ class CompositeTradeValidatorTest {
             new MaturityDateFormatValidator()));
 
     @Test
+    @Tag("US-104.4")
     void should_reportNoViolation_when_submissionIsValid() {
         // Act
         List<Violation> violations = validator.validate(contextFor(validSubmission()));
@@ -30,6 +32,7 @@ class CompositeTradeValidatorTest {
     }
 
     @Test
+    @Tag("US-104.4")
     void should_collectEveryViolation_when_severalRulesAreBroken() {
         // Arrange
         TradeSubmission submission = new TradeSubmission("", 0, "CP-1", null, "2027-02-30", Channel.STREAM, "{}");
@@ -44,6 +47,7 @@ class CompositeTradeValidatorTest {
     }
 
     @Test
+    @Tag("US-104.4")
     void should_runValidatorsInTheirGivenOrder_when_eachReportsAViolation() {
         // Arrange: a rule list in a different order gives the same violations in that order
         CompositeTradeValidator reversed = new CompositeTradeValidator(List.of(

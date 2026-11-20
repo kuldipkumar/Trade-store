@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 
 import tools.jackson.databind.JsonNode;
 import org.apache.kafka.clients.admin.AdminClient;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -31,6 +32,7 @@ class WalkingSkeletonIT {
     private KafkaAdmin kafkaAdmin;
 
     @Test
+    @Tag("US-604.1")
     void should_reportHealthUp_when_databasesAreAvailable() {
         // Act
         EntityExchangeResult<JsonNode> response = get("/actuator/health", JsonNode.class);
@@ -44,6 +46,7 @@ class WalkingSkeletonIT {
     }
 
     @Test
+    @Tag("US-603.1")
     void should_applyFlywayBaseline_when_applicationStarts() {
         // Act
         Integer applied = jdbc.queryForObject(
@@ -54,6 +57,7 @@ class WalkingSkeletonIT {
     }
 
     @Test
+    @Tag("US-603.1")
     void should_reachKafkaCluster_when_applicationStarts() throws Exception {
         // Arrange
         try (AdminClient admin = AdminClient.create(kafkaAdmin.getConfigurationProperties())) {
@@ -66,6 +70,7 @@ class WalkingSkeletonIT {
     }
 
     @Test
+    @Tag("US-604.2")
     void should_exposePrometheusMetrics_when_applicationStarts() {
         // Act
         EntityExchangeResult<String> response = get("/actuator/prometheus", String.class);

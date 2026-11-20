@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /** US-104.1 and US-104.4: one exception per rejected trade, carrying every reason. */
@@ -18,6 +19,7 @@ class TradeRejectedExceptionTest {
     private static final Violation BLANK_BOOK = Violation.invalidField("bookId", "bookId is required");
 
     @Test
+    @Tag("US-104.1")
     void should_beLowerVersionException_when_lowerVersionIsTheOnlyReason() {
         // Act
         TradeRejectedException e = TradeRejectedException.of(withVersion(1), STORED_V2, List.of(LOWER));
@@ -31,6 +33,8 @@ class TradeRejectedExceptionTest {
     }
 
     @Test
+    @Tag("US-104.4")
+    @Tag("US-201.4")
     void should_beOneLowerVersionExceptionCarryingAllReasons_when_lowerVersionAndPastMaturity() {
         // Act (US-201.4)
         TradeRejectedException e = TradeRejectedException.of(withVersion(1), STORED_V2, List.of(LOWER, PAST));
@@ -43,6 +47,7 @@ class TradeRejectedExceptionTest {
     }
 
     @Test
+    @Tag("US-104.4")
     void should_bePlainRejection_when_lowerVersionIsNotAReason() {
         // Act
         TradeRejectedException e = TradeRejectedException.of(withVersion(1), Optional.empty(), List.of(BLANK_BOOK, PAST));
@@ -54,6 +59,7 @@ class TradeRejectedExceptionTest {
     }
 
     @Test
+    @Tag("US-104.4")
     void should_failFast_when_thereAreNoViolations() {
         // Act + Assert
         assertThatIllegalArgumentException()
@@ -61,6 +67,7 @@ class TradeRejectedExceptionTest {
     }
 
     @Test
+    @Tag("US-104.4")
     void should_notExposeAMutableViolationList_when_created() {
         // Arrange
         java.util.ArrayList<Violation> violations = new java.util.ArrayList<>(List.of(PAST));
