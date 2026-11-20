@@ -12,4 +12,9 @@ public record Violation(ReasonCode reason, String field, String message) {
     public static Violation invalidField(String field, String message) {
         return new Violation(ReasonCode.INVALID_FIELD, field, message);
     }
+
+    public static Violation lowerVersion(int incomingVersion, int storedVersion) {
+        return new Violation(ReasonCode.LOWER_VERSION, "version",
+                "version " + incomingVersion + " is lower than stored version " + storedVersion);
+    }
 }
