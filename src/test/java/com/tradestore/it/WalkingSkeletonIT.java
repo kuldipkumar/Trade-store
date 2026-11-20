@@ -2,9 +2,9 @@ package com.tradestore.it;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,14 +36,14 @@ class WalkingSkeletonIT {
     @Test
     void should_reportHealthUp_when_databasesAreAvailable() {
         // Act
-        ResponseEntity<Map> response = rest.getForEntity("/actuator/health", Map.class);
+        ResponseEntity<JsonNode> response = rest.getForEntity("/actuator/health", JsonNode.class);
 
         // Assert
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).containsEntry("status", "UP");
-        assertThat(response.getBody()).extractingByKey("components")
-                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
-                .containsKeys("db", "mongo");
+        JsonNode health = response.getBody();
+        assertThat(health.path("status").asText()).isEqualTo("UP");
+        assertThat(health.path("components").path("db").path("status").asText()).isEqualTo("UP");
+        assertThat(health.path("components").path("mongo").path("status").asText()).isEqualTo("UP");
     }
 
     @Test
