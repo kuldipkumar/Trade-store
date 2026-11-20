@@ -144,6 +144,23 @@ class ParseJavaTestsTest(unittest.TestCase):
         self.assertEqual(self.tests[1].code, ["LowerVersionValidator", "TradeIngestionService"])
 
 
+class MultiLineAnnotationTest(unittest.TestCase):
+
+    def test_should_findTheTest_when_anAnnotationSpansSeveralLines(self):
+        java = """package p;
+class ATest {
+    @ParameterizedTest
+    @ValueSource(strings = {"a",
+            "b", "c"})
+    @Tag("US-105.3")
+    void should_x_when_y(String v) {
+    }
+}
+"""
+        tests = t.parse_java_tests({"ATest.java": java}, {})
+        self.assertEqual([(c.method, c.tags) for c in tests], [("should_x_when_y", ["US-105.3"])])
+
+
 class ParseResultsTest(unittest.TestCase):
 
     def test_should_aggregateParameterizedRunsAndStatuses_when_reportsAreRead(self):
