@@ -42,7 +42,7 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-302.2 | Partial | `AuditEventFactoryTest`: the payload is capped at the configured size | The POISON entry itself. Closed in **US-302**. |
 | US-404.1 | Partial | `MongoStoresIT`: ordered by version, then received time | `GET /trades/{id}/history`. Closed in **US-404**. |
 | US-501.1 | Partial | `MongoStoresIT`, `AuditEventFactoryTest`, `JdbcOutboxRepositoryIT`, `OutboxRelayServiceTest`, `StoreTradeIT` (all the fields) | Proven for the REST channel value only. Closed by **US-301** (the STREAM channel). |
-| US-501.3 | Partial | `OutboxRelayServiceTest`, `OutboxRelaySchedulerTest`: a failed relay keeps the events and is retried | **Wording mismatch (decision D8 below):** the criterion asks for "a persistent failure is logged at ERROR with the tradeId". The relay logs WARN per failed poll, without trade IDs. |
+| US-501.3 | Partial | `OutboxRelayServiceTest`, `OutboxRelaySchedulerTest`: a failed relay keeps the events and is retried | Retry is proven. The ERROR log with trade IDs after N failed polls (reworded by D8) is still to build, test-first, in **US-501**. |
 | US-603.1 | Full | `@IntegrationTest` + `TestcontainersConfiguration`; every `*IT` runs on real Kafka, PostgreSQL and MongoDB | |
 | US-604.1 | Partial | `WalkingSkeletonIT`: health is UP with db and mongo | `/actuator/health/readiness` including Kafka. Closed in **US-604**. |
 | US-604.2 | Partial | `WalkingSkeletonIT`: the Prometheus endpoint is exposed | The outcome counters, latency timer and dead-letter counter. Closed in **US-604**. |
@@ -72,11 +72,11 @@ These criteria belong to stories already started, but no test covers them yet. T
 | Q5 | The end-to-end tests use the real system clock, which is fine for now. US-107 and US-202 need to move "today" (to 2027-05-21). | Open: add a test-only adjustable `Clock` bean with US-107 / US-202. |
 | Q6 | The traceability parser missed tests with multi-line annotations | Fixed test-first (`MultiLineAnnotationTest`) |
 
-## Decision needed
+## Decision D8 (accepted: option A, 2026-11-20)
 
 **D8 (US-501.3 wording versus ADR-005).** The criterion was written for A-37 ("SQL first, then audit with retry"), which ADR-005 superseded. With the outbox, a failed audit write is never lost: it is retried on every poll until MongoDB is back. The open question is only how to signal a long outage.
 
 | Option | Meaning |
 |--------|---------|
-| **A (recommended)** | Reword US-501.3: *"the audit write is retried until it succeeds; an outage longer than N polls is logged at ERROR with the affected trade IDs, and the outbox backlog gauges (US-604) show it"*. Implement it test-first in US-501. |
+| **A (chosen)** | Reword US-501.3: *"the audit write is retried until it succeeds; an outage longer than N polls is logged at ERROR with the affected trade IDs, and the outbox backlog gauges (US-604) show it"*. Implement it test-first in US-501. |
 | B | Keep the wording and add an ERROR log with trade IDs on every failed poll (noisy during an outage). |

@@ -228,7 +228,7 @@ Dates are relative to the fixed "today" of 2026-11-19, keeping the shape of the 
 |----|-------|------|------|
 | US-501.1 | Any trade is processed through either channel | Processing finishes | One audit entry exists with `tradeId`, `version`, `outcome`, `reasons`, `channel` (STREAM or REST), `eventTimestamp` (UTC) and `payload` (A-29, A-53) |
 | US-501.2 | The audit trail exists | Any API is examined | No operation updates or deletes audit entries (A-45) |
-| US-501.3 | The SQL write succeeds but the audit write fails transiently | Processing continues | The audit write is retried, and a persistent failure is logged at ERROR with the `tradeId` (A-37; the final mechanism is set by the Phase 3 ADR) |
+| US-501.3 | The SQL write succeeds but the audit write to MongoDB fails | The outbox relay runs again | The audit write is retried until it succeeds, nothing is lost, and an outage longer than the configured number of polls is logged at ERROR with the affected `tradeId`s (ADR-005; reworded by D8, 2026-11-20) |
 
 ### US-502: Generate an audit report on demand (M)
 *As a compliance user, I want to generate an audit report whenever I need it, so that I can review rejections, poison pills and expiries.*
