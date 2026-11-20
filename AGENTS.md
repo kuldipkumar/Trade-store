@@ -234,7 +234,7 @@ The last column is mandatory. It records human judgment over the AI's output.
   - A trade with the same version replaces the stored record.
   - Reject a trade whose maturity date is earlier than today.
   - Automatically mark a trade as expired once its maturity date has passed.
-- **Current phase:** 4 (Walking skeleton and CI/CD), in progress. Spring Boot 4.1.2 upgrade (ADR-007) on branch `wip/spring-boot-4`: pom.xml and tests migrated, docs updated. Paused 2026-11-20 because of slow internet. Next: re-render 03-c4-container.svg, run `./mvnw verify` locally (needs images mongo:8.0.38, postgres:17.11-alpine, apache/kafka:4.3.2, plantuml/plantuml:1.2026.9), merge to main, get CI fully green including both Trivy scans. Gate = first fully green pipeline run.
+- **Current phase:** 5 (Low-level design), started 2026-11-20 by agreement while Phase 4 approval is pending (LLD docs and diagrams only, no production code). Phase 4 gate met: CI run 44760843594 fully green on main; awaiting human approval to close gate issue #2.
 
 ---
 
