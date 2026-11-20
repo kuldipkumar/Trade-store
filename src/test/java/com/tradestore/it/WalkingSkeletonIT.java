@@ -8,10 +8,6 @@ import tools.jackson.databind.JsonNode;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.micrometer.metrics.test.autoconfigure.AutoConfigureMetrics;
-import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaAdmin;
@@ -22,10 +18,7 @@ import org.springframework.test.web.servlet.client.RestTestClient;
  * Phase 4 walking skeleton: the application starts against real PostgreSQL, MongoDB and Kafka
  * (Testcontainers), Flyway migrates, and operational endpoints respond.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@AutoConfigureMetrics // tests disable metrics exporters by default; we verify the real setup
-@AutoConfigureRestTestClient
-@Import(TestcontainersConfiguration.class)
+@IntegrationTest
 class WalkingSkeletonIT {
 
     @Autowired
