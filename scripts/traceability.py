@@ -114,13 +114,18 @@ def parse_java_tests(files, main_classes):
         fqcn = f"{package.group(1)}.{cls_name}" if package else cls_name
         class_tags = _TAG.findall("\n".join(lines[:class_idx + 1]))
 
-        starts, pending, pending_start = [], [], None
+        starts, pending, pending_start, depth = [], [], None, 0
         for i in range(class_idx + 1, len(lines)):
             stripped = lines[i].strip()
+            if depth > 0:  # continuation of a multi-line annotation, e.g. @ValueSource(strings = {...})
+                pending[-1] += " " + stripped
+                depth += stripped.count("(") - stripped.count(")")
+                continue
             if stripped.startswith("@"):
                 if not pending:
                     pending_start = i
                 pending.append(stripped)
+                depth = stripped.count("(") - stripped.count(")")
                 continue
             m = _METHOD.match(lines[i])
             if m and any(a.startswith(_TEST_ANNOTATIONS) for a in pending):
