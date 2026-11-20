@@ -1,6 +1,7 @@
 package com.tradestore.it;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -14,6 +15,7 @@ import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.Trade;
 import com.tradestore.domain.Violation;
 import com.tradestore.persistence.OutboxRepository;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -81,5 +83,12 @@ class JdbcOutboxRepositoryIT {
             // Assert
             assertThat(outbox.claimBatch(1000)).extracting(AuditEvent::eventId).doesNotContain(event.eventId());
         });
+    }
+
+    @Test
+    @Tag("US-501.1")
+    void should_doNothing_when_noEventIdsAreGiven() {
+        // Act + Assert: an empty batch must not produce invalid SQL ("IN ()")
+        assertThatCode(() -> outbox.delete(List.of())).doesNotThrowAnyException();
     }
 }
