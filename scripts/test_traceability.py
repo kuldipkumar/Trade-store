@@ -161,13 +161,13 @@ def _fixture(with_results):
             "Trade": "src/main/java/com/tradestore/domain/Trade.java"}
     tests = t.parse_java_tests({"src/test/java/com/tradestore/service/TradeIngestionServiceTest.java": JAVA_TEST}, main)
     results = t.parse_results([SUREFIRE_XML]) if with_results else {}
-    return reqs, backlog, tests, results
+    return reqs, backlog, tests, results, main
 
 
 class CheckTest(unittest.TestCase):
 
     def test_should_reportUnknownUntaggedAndFailingTests_when_checked(self):
-        reqs, backlog, tests, results = _fixture(with_results=True)
+        reqs, backlog, tests, results, _ = _fixture(with_results=True)
         tests.append(t.TestCase("x.TypoTest", "should_x_when_y", ["US-101.9"], "TypoTest.java", []))
 
         errors = t.check(backlog, {"A-13"}, tests, results)
@@ -179,7 +179,7 @@ class CheckTest(unittest.TestCase):
         ])
 
     def test_should_reportNothing_when_everyTestIsTaggedKnownAndPassing(self):
-        reqs, backlog, tests, _ = _fixture(with_results=False)
+        reqs, backlog, tests, _, _ = _fixture(with_results=False)
         self.assertEqual(t.check(backlog, {"A-13"}, tests[:2], {}), [])
 
 
