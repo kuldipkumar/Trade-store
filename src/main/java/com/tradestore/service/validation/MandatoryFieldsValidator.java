@@ -5,8 +5,12 @@ import java.util.List;
 
 import com.tradestore.domain.TradeSubmission;
 import com.tradestore.domain.Violation;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
 
 /** US-105.1: tradeId, counterPartyId and bookId must be present, not blank, and fit the 64-character columns. */
+@Component
+@Order(100)
 public class MandatoryFieldsValidator implements TradeValidator {
 
     static final int MAX_ID_LENGTH = 64;

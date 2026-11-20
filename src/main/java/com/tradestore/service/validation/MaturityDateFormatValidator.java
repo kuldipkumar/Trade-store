@@ -3,8 +3,12 @@ package com.tradestore.service.validation;
 import java.util.List;
 
 import com.tradestore.domain.Violation;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
 
 /** US-105.3: maturityDate must be present and a real date in yyyy-MM-dd format (A-04). */
+@Component
+@Order(300)
 public class MaturityDateFormatValidator implements TradeValidator {
 
     @Override
