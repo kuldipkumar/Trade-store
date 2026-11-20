@@ -11,7 +11,6 @@ import com.tradestore.persistence.TradeRepository;
 import com.tradestore.persistence.UpsertResult;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /** The version-guarded upsert against real PostgreSQL (ADR-003, docs/05-lld.md section 4.1). */
@@ -21,13 +20,16 @@ class JdbcTradeRepositoryIT {
     private static final LocalDate TODAY = LocalDate.of(2026, 11, 19);
     private static final LocalDate MATURITY = LocalDate.of(2027, 5, 20);
 
-    @Autowired
-    private TradeRepository repository;
+    private final TradeRepository repository;
 
-    @Autowired
-    private JdbcClient jdbc;
+    private final JdbcClient jdbc;
 
     private final String tradeId = "T-" + UUID.randomUUID();
+
+    JdbcTradeRepositoryIT(TradeRepository repository, JdbcClient jdbc) {
+        this.repository = repository;
+        this.jdbc = jdbc;
+    }
 
     private Trade trade(int version, String counterPartyId, LocalDate createdDate) {
         return new Trade(tradeId, version, counterPartyId, "B1", MATURITY, createdDate, false);

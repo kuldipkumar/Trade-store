@@ -17,7 +17,6 @@ import com.tradestore.domain.Violation;
 import com.tradestore.persistence.OutboxRepository;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -27,11 +26,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 @IntegrationTest
 class JdbcOutboxRepositoryIT {
 
-    @Autowired
-    private OutboxRepository outbox;
+    private final OutboxRepository outbox;
 
-    @Autowired
-    private TransactionTemplate tx;
+    private final TransactionTemplate tx;
+
+    JdbcOutboxRepositoryIT(OutboxRepository outbox, TransactionTemplate tx) {
+        this.outbox = outbox;
+        this.tx = tx;
+    }
 
     private static AuditEvent accepted(String tradeId) {
         Trade trade = new Trade(tradeId, 1, "CP-1", "B1", LocalDate.of(2027, 5, 20), LocalDate.of(2026, 11, 19), false);

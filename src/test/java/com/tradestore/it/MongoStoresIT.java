@@ -17,7 +17,6 @@ import com.tradestore.persistence.TradeHistoryStore;
 import org.bson.Document;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.IndexInfo;
 
@@ -25,16 +24,19 @@ import org.springframework.data.mongodb.core.index.IndexInfo;
 @IntegrationTest
 class MongoStoresIT {
 
-    @Autowired
-    private AuditEventStore auditEvents;
+    private final AuditEventStore auditEvents;
 
-    @Autowired
-    private TradeHistoryStore history;
+    private final TradeHistoryStore history;
 
-    @Autowired
-    private MongoTemplate mongo;
+    private final MongoTemplate mongo;
 
     private final String tradeId = "T-" + UUID.randomUUID();
+
+    MongoStoresIT(AuditEventStore auditEvents, TradeHistoryStore history, MongoTemplate mongo) {
+        this.auditEvents = auditEvents;
+        this.history = history;
+        this.mongo = mongo;
+    }
 
     private AuditEvent stored(int version, Outcome outcome, Instant at) {
         Trade trade = new Trade(tradeId, version, "CP-" + version, "B1", LocalDate.of(2027, 5, 20), LocalDate.of(2026, 11, 19), false);

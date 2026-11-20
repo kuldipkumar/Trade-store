@@ -6,18 +6,25 @@ import java.time.ZoneId;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** US-205.1: "today" uses the configured zone, or the server's default zone when none is set (A-16). */
 class ClockConfigTest {
 
     private final ClockConfig config = new ClockConfig();
 
-    @Test
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "  "})
     @Tag("US-205.1")
-    void should_useServerDefaultZone_when_noZoneIsConfigured() {
-        // Act + Assert
-        assertThat(config.clock(new TradeStoreProperties(null, null, null)).getZone()).isEqualTo(ZoneId.systemDefault());
-        assertThat(config.clock(new TradeStoreProperties("  ", null, null)).getZone()).isEqualTo(ZoneId.systemDefault());
+    void should_useServerDefaultZone_when_noZoneIsConfigured(String zone) {
+        // Act
+        ZoneId actual = config.clock(new TradeStoreProperties(zone, null, null)).getZone();
+
+        // Assert
+        assertThat(actual).isEqualTo(ZoneId.systemDefault());
     }
 
     @Test

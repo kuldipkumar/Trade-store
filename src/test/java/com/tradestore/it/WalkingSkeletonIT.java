@@ -8,7 +8,6 @@ import tools.jackson.databind.JsonNode;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaAdmin;
@@ -22,14 +21,17 @@ import org.springframework.test.web.servlet.client.RestTestClient;
 @IntegrationTest
 class WalkingSkeletonIT {
 
-    @Autowired
-    private RestTestClient rest;
+    private final RestTestClient rest;
 
-    @Autowired
-    private JdbcTemplate jdbc;
+    private final JdbcTemplate jdbc;
 
-    @Autowired
-    private KafkaAdmin kafkaAdmin;
+    private final KafkaAdmin kafkaAdmin;
+
+    WalkingSkeletonIT(RestTestClient rest, JdbcTemplate jdbc, KafkaAdmin kafkaAdmin) {
+        this.rest = rest;
+        this.jdbc = jdbc;
+        this.kafkaAdmin = kafkaAdmin;
+    }
 
     @Test
     @Tag("US-604.1")

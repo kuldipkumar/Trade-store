@@ -6,6 +6,7 @@ import static com.tradestore.TestTrades.withBookId;
 import static com.tradestore.TestTrades.withCounterPartyId;
 import static com.tradestore.TestTrades.withTradeId;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 
 import java.util.List;
 
@@ -59,7 +60,7 @@ class MandatoryFieldsValidatorTest {
 
         // Assert
         assertThat(violations).extracting(Violation::reason, Violation::field)
-                .containsExactly(org.assertj.core.groups.Tuple.tuple(ReasonCode.INVALID_FIELD, "counterPartyId"));
+                .containsExactly(tuple(ReasonCode.INVALID_FIELD, "counterPartyId"));
     }
 
     @ParameterizedTest
@@ -72,7 +73,7 @@ class MandatoryFieldsValidatorTest {
 
         // Assert
         assertThat(violations).extracting(Violation::reason, Violation::field)
-                .containsExactly(org.assertj.core.groups.Tuple.tuple(ReasonCode.INVALID_FIELD, "bookId"));
+                .containsExactly(tuple(ReasonCode.INVALID_FIELD, "bookId"));
     }
 
     @Test

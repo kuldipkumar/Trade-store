@@ -4,6 +4,7 @@ import static com.tradestore.TestTrades.withVersion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -70,7 +71,7 @@ class TradeRejectedExceptionTest {
     @Tag("US-104.4")
     void should_notExposeAMutableViolationList_when_created() {
         // Arrange
-        java.util.ArrayList<Violation> violations = new java.util.ArrayList<>(List.of(PAST));
+        ArrayList<Violation> violations = new ArrayList<>(List.of(PAST));
 
         // Act
         TradeRejectedException e = TradeRejectedException.of(withVersion(1), Optional.empty(), violations);

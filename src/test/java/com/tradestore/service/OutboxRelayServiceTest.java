@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -61,7 +62,7 @@ class OutboxRelayServiceTest {
         verify(audit).insert(accepted);
         verify(audit).insert(rejected);
         verify(history).insert(TradeHistoryEntry.from(accepted));
-        verify(history, org.mockito.Mockito.times(1)).insert(any(TradeHistoryEntry.class)); // not for REJECTED
+        verify(history, times(1)).insert(any(TradeHistoryEntry.class)); // not for REJECTED
         verify(outbox).delete(List.of(accepted.eventId(), rejected.eventId()));
     }
 
