@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.context.annotation.Import;
@@ -21,6 +22,7 @@ import org.springframework.kafka.core.KafkaAdmin;
  * (Testcontainers), Flyway migrates, and operational endpoints respond.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureObservability // tests disable metrics exporters by default; we verify the real setup
 @Import(TestcontainersConfiguration.class)
 class WalkingSkeletonIT {
 
