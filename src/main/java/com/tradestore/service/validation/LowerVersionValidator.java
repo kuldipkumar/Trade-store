@@ -2,7 +2,6 @@ package com.tradestore.service.validation;
 
 import java.util.List;
 
-import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.Violation;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -24,8 +23,7 @@ public class LowerVersionValidator implements TradeValidator {
         }
         int storedVersion = context.stored().get().version();
         if (version < storedVersion) {
-            return List.of(new Violation(ReasonCode.LOWER_VERSION, "version",
-                    "version " + version + " is lower than stored version " + storedVersion));
+            return List.of(Violation.lowerVersion(version, storedVersion));
         }
         return List.of();
     }

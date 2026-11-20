@@ -63,10 +63,10 @@ package "service" {
     + stream(query : AuditQuery) : Stream<AuditEvent>
   }
   class AuditEventFactory {
-    + accepted(trade, outcome, s) : AuditEvent
+    + stored(trade, outcome, s) : AuditEvent
     + rejected(s, violations) : AuditEvent
-    + expired(trade) : AuditEvent
-    + deadLettered(outcome, source, payload, error) : AuditEvent
+    + expired(trade) : AuditEvent  <<US-202>>
+    + deadLettered(outcome, source, payload, error) : AuditEvent  <<US-302>>
   }
   class TradeMetrics
   class IngestionResult <<record>> {

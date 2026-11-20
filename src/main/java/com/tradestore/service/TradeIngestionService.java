@@ -1,0 +1,107 @@
+package com.tradestore.service;
+
+import java.time.Clock;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
+import com.tradestore.domain.Outcome;
+import com.tradestore.domain.StoredTrade;
+import com.tradestore.domain.Trade;
+import com.tradestore.domain.TradeRejectedException;
+import com.tradestore.domain.TradeSubmission;
+import com.tradestore.domain.Violation;
+import com.tradestore.persistence.OutboxRepository;
+import com.tradestore.persistence.TradeRepository;
+import com.tradestore.persistence.UpsertResult;
+import com.tradestore.service.validation.CompositeTradeValidator;
+import com.tradestore.service.validation.MaturityDates;
+import com.tradestore.service.validation.ValidationContext;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionOperations;
+
+/**
+ * The single ingestion use case for the stream and REST channels (A-21, docs/05-lld.md sections 3 and 4.1).
+ * In one transaction it validates the trade, writes it with a version guard, and records the outcome in the
+ * outbox. A rejection is recorded and committed first, and only then thrown, so it is never rolled back.
+ */
+@Service
+public class TradeIngestionService {
+
+    /** One write plus one retry after losing a race to a concurrent higher version (US-106.2). */
+    static final int MAX_WRITE_ATTEMPTS = 2;
+
+    private final CompositeTradeValidator validator;
+    private final TradeRepository trades;
+    private final OutboxRepository outbox;
+    private final AuditEventFactory events;
+    private final TransactionOperations transactions;
+    private final Clock clock;
+
+    public TradeIngestionService(CompositeTradeValidator validator, TradeRepository trades, OutboxRepository outbox,
+                                 AuditEventFactory events, TransactionOperations transactions, Clock clock) {
+        this.validator = validator;
+        this.trades = trades;
+        this.outbox = outbox;
+        this.events = events;
+        this.transactions = transactions;
+        this.clock = clock;
+    }
+
+    /**
+     * @return the stored trade and whether it was ACCEPTED or REPLACED
+     * @throws TradeRejectedException (or its subclass LowerVersionException) after the rejection is recorded
+     */
+    public IngestionResult ingest(TradeSubmission submission) {
+        LocalDate today = LocalDate.now(clock);
+        Decision decision = transactions.execute(status -> decide(submission, today));
+        if (decision.rejection() != null) {
+            throw decision.rejection();
+        }
+        return decision.result();
+    }
+
+    private Decision decide(TradeSubmission submission, LocalDate today) {
+        Optional<StoredTrade> stored = lookUp(submission);
+        for (int attempt = 1; ; attempt++) {
+            List<Violation> violations = validator.validate(new ValidationContext(submission, stored, today));
+            if (!violations.isEmpty()) {
+                return reject(submission, stored, violations);
+            }
+            Trade trade = Trade.newVersion(submission, MaturityDates.parse(submission.maturityDate()).orElseThrow(), today);
+            UpsertResult result = trades.upsertIfNotOlder(trade);
+            if (result != UpsertResult.STALE) {
+                Outcome outcome = result == UpsertResult.INSERTED ? Outcome.ACCEPTED : Outcome.REPLACED;
+                outbox.append(events.stored(trade, outcome, submission));
+                return Decision.stored(new IngestionResult(outcome, trade));
+            }
+            // A higher version was committed concurrently: re-read and re-validate (US-106.2).
+            stored = lookUp(submission);
+            if (attempt == MAX_WRITE_ATTEMPTS) {
+                StoredTrade latest = stored.orElseThrow();
+                return reject(submission, stored, List.of(Violation.lowerVersion(submission.version(), latest.version())));
+            }
+        }
+    }
+
+    private Optional<StoredTrade> lookUp(TradeSubmission submission) {
+        String tradeId = submission.tradeId();
+        return tradeId == null || tradeId.isBlank() ? Optional.empty() : trades.findById(tradeId);
+    }
+
+    private Decision reject(TradeSubmission submission, Optional<StoredTrade> stored, List<Violation> violations) {
+        outbox.append(events.rejected(submission, violations));
+        return Decision.rejected(TradeRejectedException.of(submission, stored, violations));
+    }
+
+    /** The transaction's result: either a stored trade or a rejection to throw after commit. */
+    private record Decision(IngestionResult result, TradeRejectedException rejection) {
+        static Decision stored(IngestionResult result) {
+            return new Decision(result, null);
+        }
+
+        static Decision rejected(TradeRejectedException rejection) {
+            return new Decision(null, rejection);
+        }
+    }
+}

@@ -36,7 +36,7 @@ alt no violations
   TradeRepository -> PostgreSQL : INSERT ... ON CONFLICT (trade_id) DO UPDATE ...\nWHERE trades.version <= EXCLUDED.version RETURNING (xmax = 0)
   alt 1 row returned (INSERTED or UPDATED)
     TradeRepository --> TransactionTemplate : INSERTED / UPDATED
-    TransactionTemplate -> AuditEventFactory : accepted(trade, ACCEPTED or REPLACED, s)
+    TransactionTemplate -> AuditEventFactory : stored(trade, ACCEPTED or REPLACED, s)
     TransactionTemplate -> OutboxRepository : append(event)
     OutboxRepository -> PostgreSQL : INSERT INTO outbox_events
   else 0 rows: a higher version was committed concurrently (US-106)
