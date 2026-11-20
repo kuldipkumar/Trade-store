@@ -18,7 +18,7 @@ The Trade Store is **one Spring Boot application** (ADR-001) that receives trade
 | [005](adr/005-transactional-outbox-for-audit.md) | Transactional outbox | Satisfies CR-6 (no lost audit entries) for all three event sources. Supersedes A-37. |
 | [006](adr/006-trivy-oss-vulnerability-scan.md) | Trivy (dependencies + image) | One fast tool; fails the build on CRITICAL |
 | [007](adr/007-spring-boot-4.md) | Spring Boot 4.1 (Spring Framework 7) | Spring Boot 3.5 / Framework 6.2 had CRITICAL CVEs with no free fix; upgraded before any business code existed |
-| [008](adr/008-plain-jdbc-for-postgresql.md) | Spring `JdbcClient` for PostgreSQL (*Proposed*, Phase 5) | Every write is PostgreSQL-specific SQL (guarded upsert, `RETURNING`, `SKIP LOCKED`); an ORM adds nothing |
+| [008](adr/008-plain-jdbc-for-postgresql.md) | Spring `JdbcClient` for PostgreSQL (Phase 5) | Every write is PostgreSQL-specific SQL (guarded upsert, `RETURNING`, `SKIP LOCKED`); an ORM adds nothing |
 
 ## 2. System context
 

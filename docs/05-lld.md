@@ -36,7 +36,7 @@ Base package: `com.tradestore`. The structure follows AGENTS.md §7. Services de
 | | `CompositeTradeValidator` | Runs every `TradeValidator` bean and collects all violations (A-15). A new rule is a new bean (Open/Closed). |
 | | `MaturityDates` | Strict `yyyy-MM-dd` parsing (`ResolverStyle.STRICT`, so `2026-02-30` is invalid). |
 | `persistence` | `TradeRepository`, `OutboxRepository`, `AuditEventStore`, `TradeHistoryStore` | Ports (interfaces). |
-| `persistence.sql` | `JdbcTradeRepository`, `JdbcOutboxRepository` | `JdbcClient` adapters ([ADR-008](adr/008-plain-jdbc-for-postgresql.md), *proposed*). |
+| `persistence.sql` | `JdbcTradeRepository`, `JdbcOutboxRepository` | `JdbcClient` adapters ([ADR-008](adr/008-plain-jdbc-for-postgresql.md)). |
 | `persistence.nosql` | `MongoAuditEventStore`, `MongoTradeHistoryStore` | `MongoTemplate` adapters. Insert-only. A duplicate key counts as success. |
 | `messaging` | `TradeConsumer` | `@KafkaListener`: maps `TradeMessage` to `TradeSubmission`, calls the service, catches business rejections. |
 | | `TradeMessage` (record) | Kafka value DTO. `@JsonIgnoreProperties(ignoreUnknown = true)` (US-607.2). |
@@ -247,11 +247,11 @@ CREATE TABLE outbox_events (
 
 Test names follow `should_<behaviour>_when_<condition>` and reference the AC ID in a comment.
 
-## 10. Decisions that need human review
+## 10. Design decisions (accepted by the human on 2026-11-20)
 
-| ID | Decision | Why it needs a look |
+| ID | Decision | Context |
 |----|----------|---------------------|
-| **D1** | **[ADR-008](adr/008-plain-jdbc-for-postgresql.md): `JdbcClient` for PostgreSQL** (status *Proposed*) | Left open in ADR-003 for Phase 5. The alternatives are Spring Data JDBC and JPA. |
+| **D1** | **[ADR-008](adr/008-plain-jdbc-for-postgresql.md): `JdbcClient` for PostgreSQL** (Accepted) | Left open in ADR-003 for Phase 5. The alternatives are Spring Data JDBC and JPA. |
 | **D2** | **On the stream, a JSON message with the right types but invalid field values** (blank ID, version 0, bad date) **is `REJECTED` with `INVALID_FIELD`, not `POISON`.** Only bytes that can't be read as a `TradeMessage` (too large, not JSON, wrong types) are poison pills. | It narrows HLD §5.4's "schema failure" so that the same rules apply on both channels (A-21, US-105). |
 | **D3** | **Malformed REST JSON gets `400` but is not audited.** | It is not a trade (there is no `tradeId`), and the caller gets the error immediately. Kafka's equivalent is audited as `POISON` because no caller sees it. |
 | **D4** | **New channel value `SCHEDULER`** for `EXPIRED` events. | The backlog lists only `STREAM` and `REST`, but expiry comes from neither. |
@@ -304,5 +304,5 @@ Test names follow `should_<behaviour>_when_<condition>` and reference the AC ID 
 - [x] Interfaces, API and message contracts, and the error-handling strategy defined.
 - [x] Every story maps to classes and a flow (§11).
 - [x] All diagrams render with PlantUML 1.2026.9 (the CI version).
-- [ ] Human decision on D1 (ADR-008) and review of D2–D7.
-- [ ] Human approval of this LLD.
+- [x] Human decision on D1 (ADR-008) and review of D2–D7: all accepted (2026-11-20).
+- [x] Human approval of this LLD (2026-11-20).

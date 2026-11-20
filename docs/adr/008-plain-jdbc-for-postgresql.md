@@ -1,6 +1,6 @@
 # ADR-008: Spring `JdbcClient` (plain JDBC) for PostgreSQL access
 
-- **Status:** Proposed (2026-11-20). Awaiting the human's decision.
+- **Status:** Accepted (2026-11-20)
 - **Deciders:** Product owner (human), AI architect
 
 ## Context
@@ -16,7 +16,7 @@ ADR-003 left open how the application talks to PostgreSQL ("the choice between S
 
 There are two tables, no object graph, no relationships and no lazy loading.
 
-## Decision (proposed)
+## Decision
 Use Spring Framework's **`JdbcClient`** (from `spring-boot-starter-jdbc`) with hand-written SQL, behind the repository interfaces `TradeRepository` and `OutboxRepository` (Dependency Inversion: the services never see JDBC). Rows map to Java records through small `RowMapper`s. Transactions use Spring's `DataSourceTransactionManager`, through `TransactionTemplate` and `@Transactional`.
 
 ## Alternatives considered
