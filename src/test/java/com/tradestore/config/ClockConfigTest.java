@@ -14,13 +14,13 @@ class ClockConfigTest {
     @Test
     void should_useServerDefaultZone_when_noZoneIsConfigured() {
         // Act + Assert
-        assertThat(config.clock(new TradeStoreProperties(null, null)).getZone()).isEqualTo(ZoneId.systemDefault());
-        assertThat(config.clock(new TradeStoreProperties("  ", null)).getZone()).isEqualTo(ZoneId.systemDefault());
+        assertThat(config.clock(new TradeStoreProperties(null, null, null)).getZone()).isEqualTo(ZoneId.systemDefault());
+        assertThat(config.clock(new TradeStoreProperties("  ", null, null)).getZone()).isEqualTo(ZoneId.systemDefault());
     }
 
     @Test
     void should_useConfiguredZone_when_zoneIsSet() {
         // Act + Assert
-        assertThat(config.clock(new TradeStoreProperties("Asia/Kolkata", null)).getZone()).isEqualTo(ZoneId.of("Asia/Kolkata"));
+        assertThat(config.clock(new TradeStoreProperties("Asia/Kolkata", null, null)).getZone()).isEqualTo(ZoneId.of("Asia/Kolkata"));
     }
 }
