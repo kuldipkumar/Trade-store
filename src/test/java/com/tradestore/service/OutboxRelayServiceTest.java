@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -24,6 +25,7 @@ import com.tradestore.domain.Violation;
 import com.tradestore.persistence.AuditEventStore;
 import com.tradestore.persistence.OutboxRepository;
 import com.tradestore.persistence.TradeHistoryStore;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 
@@ -44,6 +46,8 @@ class OutboxRelayServiceTest {
     }
 
     @Test
+    @Tag("US-101.3")
+    @Tag("US-501.1")
     void should_writeAuditAndHistoryThenDelete_when_eventsAreClaimed() {
         // Arrange
         AuditEvent accepted = event(Outcome.ACCEPTED, T1);
@@ -58,11 +62,12 @@ class OutboxRelayServiceTest {
         verify(audit).insert(accepted);
         verify(audit).insert(rejected);
         verify(history).insert(TradeHistoryEntry.from(accepted));
-        verify(history, org.mockito.Mockito.times(1)).insert(any(TradeHistoryEntry.class)); // not for REJECTED
+        verify(history, times(1)).insert(any(TradeHistoryEntry.class)); // not for REJECTED
         verify(outbox).delete(List.of(accepted.eventId(), rejected.eventId()));
     }
 
     @Test
+    @Tag("US-102.3")
     void should_recordReplacedInHistory_when_eventIsReplaced() {
         // Arrange (US-102.3)
         AuditEvent replaced = event(Outcome.REPLACED, T1);
@@ -76,6 +81,7 @@ class OutboxRelayServiceTest {
     }
 
     @Test
+    @Tag("US-501.1")
     void should_doNothing_when_outboxIsEmpty() {
         // Arrange
         when(outbox.claimBatch(100)).thenReturn(List.of());
@@ -89,6 +95,7 @@ class OutboxRelayServiceTest {
     }
 
     @Test
+    @Tag("US-501.3")
     void should_keepEventsInOutbox_when_mongoWriteFails() {
         // Arrange: the exception rolls back the claim, so the rows are retried on the next poll (CR-6)
         AuditEvent accepted = event(Outcome.ACCEPTED, T1);

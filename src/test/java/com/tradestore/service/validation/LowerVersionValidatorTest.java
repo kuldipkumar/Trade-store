@@ -9,6 +9,7 @@ import java.util.List;
 import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Violation;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
@@ -22,6 +23,7 @@ class LowerVersionValidatorTest {
     private final LowerVersionValidator validator = new LowerVersionValidator();
 
     @Test
+    @Tag("US-101.1")
     void should_reportNoViolation_when_noTradeIsStored() {
         // Act
         List<Violation> violations = validator.validate(contextFor(withVersion(1)));
@@ -32,6 +34,8 @@ class LowerVersionValidatorTest {
 
     @ParameterizedTest
     @ValueSource(ints = {2, 3, 10})
+    @Tag("US-102.1")
+    @Tag("US-103.1")
     void should_reportNoViolation_when_versionIsSameOrHigherThanStored(int version) {
         // Act
         List<Violation> violations = validator.validate(contextFor(withVersion(version), STORED_V2));
@@ -41,6 +45,7 @@ class LowerVersionValidatorTest {
     }
 
     @Test
+    @Tag("US-104.1")
     void should_reportLowerVersion_when_versionIsLowerThanStored() {
         // Act
         List<Violation> violations = validator.validate(contextFor(withVersion(1), STORED_V2));
@@ -54,6 +59,8 @@ class LowerVersionValidatorTest {
     }
 
     @Test
+    @Tag("US-104.1")
+    @Tag("A-09")
     void should_reportLowerVersion_when_storedTradeIsExpired() {
         // Arrange: expiry does not relax the version rule (A-09 only allows same or higher)
         StoredTrade expiredV2 = new StoredTrade("T1", 2, true);
@@ -68,6 +75,7 @@ class LowerVersionValidatorTest {
     @ParameterizedTest
     @NullSource
     @ValueSource(ints = {0, -1})
+    @Tag("US-104.4")
     void should_skipCheck_when_versionIsItselfInvalid(Integer version) {
         // Act: PositiveVersionValidator reports this; no misleading second reason
         List<Violation> violations = validator.validate(contextFor(withVersion(version), STORED_V2));

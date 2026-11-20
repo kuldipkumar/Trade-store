@@ -24,6 +24,11 @@ if (Line coverage < 80%?) then (yes)
   :Fail build; <<#pink>>
   stop
 endif
+:5b. Traceability matrix\n(every test tagged with a known acceptance criterion;\ndocs/traceability.md up to date);
+if (Unknown/missing tag, failing tagged test\nor stale matrix?) then (yes)
+  :Fail build; <<#pink>>
+  stop
+endif
 :6a. Trivy dependency scan;
 if (CRITICAL vulnerability?) then (yes)
   :Fail build; <<#pink>>
@@ -36,7 +41,7 @@ if (CRITICAL vulnerability?) then (yes)
   stop
 endif
 :Pipeline green; <<#palegreen>>
-:9. Upload reports (tests, coverage, scans) and rendered SVGs\n(always, also on failure);
+:9. Upload reports (tests, coverage, traceability, scans) and rendered SVGs\n(always, also on failure);
 stop
 
 @enduml

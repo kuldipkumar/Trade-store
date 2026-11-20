@@ -234,7 +234,7 @@ The last column is mandatory. It records human judgment over the AI's output.
   - A trade with the same version replaces the stored record.
   - Reject a trade whose maturity date is earlier than today.
   - Automatically mark a trade as expired once its maturity date has passed.
-- **Current phase:** 6 (TDD implementation), started 2026-11-20. Phases 4 and 5 approved 2026-11-20. Work one story per branch (`story/US-xxx-…`), red/green/refactor commits, pull request to main (CI on PR), merge when green. Done: US-105, US-104, US-101 (PRs #39–#41). Next: US-102, US-103 (acceptance-level checks; mostly built), US-201, US-205, US-106, US-107, then US-501, channels (US-401, US-402, US-301, US-304, US-302, US-303).
+- **Current phase:** 6 (TDD implementation), started 2026-11-20. Phases 4 and 5 approved 2026-11-20. Strict TDD (§3 Phase 6): one test at a time, red shown on an assertion, minimum code, refactor. One story per branch (`story/US-xxx-…`), pull request to main (CI on PR), merge when green. Every test carries `@Tag("US-xxx.y")` or `@Tag("A-nn")`; run `python3 scripts/traceability.py` and commit [docs/traceability.md](docs/traceability.md) (CI checks it); update [docs/06-test-review.md](docs/06-test-review.md) when a story completes. Done: US-105, US-104, US-101 (PRs #39–#41), test backfill and traceability (PR #42). Next: US-201, US-205.2, US-102/103 gaps, US-106.1, US-107, then US-501 and the channels.
 
 ---
 

@@ -1,6 +1,7 @@
 package com.tradestore.it;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -14,8 +15,8 @@ import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.Trade;
 import com.tradestore.domain.Violation;
 import com.tradestore.persistence.OutboxRepository;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -25,11 +26,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 @IntegrationTest
 class JdbcOutboxRepositoryIT {
 
-    @Autowired
-    private OutboxRepository outbox;
+    private final OutboxRepository outbox;
 
-    @Autowired
-    private TransactionTemplate tx;
+    private final TransactionTemplate tx;
+
+    JdbcOutboxRepositoryIT(OutboxRepository outbox, TransactionTemplate tx) {
+        this.outbox = outbox;
+        this.tx = tx;
+    }
 
     private static AuditEvent accepted(String tradeId) {
         Trade trade = new Trade(tradeId, 1, "CP-1", "B1", LocalDate.of(2027, 5, 20), LocalDate.of(2026, 11, 19), false);
@@ -51,6 +55,7 @@ class JdbcOutboxRepositoryIT {
     }
 
     @Test
+    @Tag("US-501.1")
     void should_returnAppendedEventsInOrder_when_batchIsClaimed() {
         inRolledBackTransaction(() -> {
             // Arrange
@@ -69,6 +74,7 @@ class JdbcOutboxRepositoryIT {
     }
 
     @Test
+    @Tag("US-501.1")
     void should_notReturnEvents_when_theyHaveBeenDeleted() {
         inRolledBackTransaction(() -> {
             // Arrange
@@ -81,5 +87,12 @@ class JdbcOutboxRepositoryIT {
             // Assert
             assertThat(outbox.claimBatch(1000)).extracting(AuditEvent::eventId).doesNotContain(event.eventId());
         });
+    }
+
+    @Test
+    @Tag("US-501.1")
+    void should_doNothing_when_noEventIdsAreGiven() {
+        // Act + Assert: an empty batch must not produce invalid SQL ("IN ()")
+        assertThatCode(() -> outbox.delete(List.of())).doesNotThrowAnyException();
     }
 }

@@ -52,6 +52,19 @@ jobs:
       - name: Integration tests and coverage gate
         run: ./mvnw -B verify -DskipUnitTests=true
 
+      # 5b. Traceability: Requirements -> epics -> stories -> acceptance criteria -> tests -> code (US-608)
+      - name: Traceability matrix and tag check
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_*.py'
+          python3 scripts/traceability.py --out target/traceability-committed.md
+          if ! diff -u docs/traceability.md target/traceability-committed.md; then
+            echo "::error::docs/traceability.md is out of date. Run 'python3 scripts/traceability.py' and commit it."
+            exit 1
+          fi
+          python3 scripts/traceability.py --results target/surefire-reports target/failsafe-reports \
+            --out target/traceability.md --check
+          cat target/traceability.md >> "$GITHUB_STEP_SUMMARY"
+
       # 6a. OSS vulnerability scan of dependencies (fails on CRITICAL)
       - name: Trivy dependency scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -100,6 +113,7 @@ jobs:
             target/surefire-reports/
             target/failsafe-reports/
             target/site/jacoco/
+            target/traceability.md
             trivy-*.txt
 
       - name: Upload rendered diagrams

@@ -8,6 +8,7 @@ import java.util.List;
 
 import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.Violation;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -19,6 +20,7 @@ class PositiveVersionValidatorTest {
 
     @ParameterizedTest
     @ValueSource(ints = {1, 2, Integer.MAX_VALUE})
+    @Tag("US-105.2")
     void should_reportNoViolation_when_versionIsOneOrMore(int version) {
         // Act
         List<Violation> violations = validator.validate(contextFor(withVersion(version)));
@@ -30,6 +32,7 @@ class PositiveVersionValidatorTest {
     @ParameterizedTest
     @NullSource
     @ValueSource(ints = {0, -1, Integer.MIN_VALUE})
+    @Tag("US-105.2")
     void should_reportInvalidVersion_when_versionIsMissingZeroOrNegative(Integer version) {
         // Act
         List<Violation> violations = validator.validate(contextFor(withVersion(version)));

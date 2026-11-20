@@ -19,8 +19,8 @@ import com.tradestore.persistence.TradeRepository;
 import com.tradestore.service.IngestionResult;
 import com.tradestore.service.TradeIngestionService;
 import org.bson.Document;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
 /**
@@ -33,22 +33,25 @@ class StoreTradeIT {
     /** The relay polls every second; this is a test timeout, not an SLA (CR-4). */
     private static final Duration RELAY_TIMEOUT = Duration.ofSeconds(10);
 
-    @Autowired
-    private TradeIngestionService ingestion;
+    private final TradeIngestionService ingestion;
 
-    @Autowired
-    private TradeRepository trades;
+    private final TradeRepository trades;
 
-    @Autowired
-    private TradeHistoryStore history;
+    private final TradeHistoryStore history;
 
-    @Autowired
-    private MongoTemplate mongo;
+    private final MongoTemplate mongo;
 
-    @Autowired
-    private Clock clock;
+    private final Clock clock;
 
     private final String tradeId = "T-" + UUID.randomUUID();
+
+    StoreTradeIT(TradeIngestionService ingestion, TradeRepository trades, TradeHistoryStore history, MongoTemplate mongo, Clock clock) {
+        this.ingestion = ingestion;
+        this.trades = trades;
+        this.history = history;
+        this.mongo = mongo;
+        this.clock = clock;
+    }
 
     private TradeSubmission submission(int version) {
         return new TradeSubmission(tradeId, version, "CP-1", "B1", "2099-05-20", Channel.REST, "{\"v\":" + version + "}");
@@ -60,6 +63,9 @@ class StoreTradeIT {
     }
 
     @Test
+    @Tag("US-101.1")
+    @Tag("US-101.3")
+    @Tag("US-501.1")
     void should_storeTradeAndRecordHistoryAndAudit_when_newTradeIsSubmitted() {
         // Act (US-101.1)
         IngestionResult result = ingestion.ingest(submission(1));
@@ -79,6 +85,9 @@ class StoreTradeIT {
     }
 
     @Test
+    @Tag("US-104.1")
+    @Tag("US-104.2")
+    @Tag("US-104.3")
     void should_keepStoredTradeAndAuditRejection_when_lowerVersionIsSubmitted() {
         // Arrange
         ingestion.ingest(submission(2));
