@@ -201,10 +201,7 @@ def render(requirements, backlog, tests, results, main_classes=None):
     for tc in tests:
         for tag in tc.tags:
             by_tag.setdefault(tag, []).append(tc)
-    code_paths = dict(main_classes or {})
-    for tc in tests:  # fall back to the conventional path when no map is given
-        for c in tc.code:
-            code_paths.setdefault(c, None)
+    code_paths = main_classes or {}
 
     def code_links(cases):
         names = sorted({c for tc in cases for c in tc.code})
