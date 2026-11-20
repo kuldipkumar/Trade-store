@@ -19,7 +19,7 @@ import org.testcontainers.utility.DockerImageName;
 public class TestcontainersConfiguration {
 
     static final String POSTGRES_IMAGE = "postgres:17.11-alpine";
-    static final String MONGO_IMAGE = "mongo:8.0.34";
+    static final String MONGO_IMAGE = "mongo:8.0.38";
     static final String KAFKA_IMAGE = "apache/kafka:4.3.2";
 
     // Container output goes to the test log, so CI failures can be diagnosed.
