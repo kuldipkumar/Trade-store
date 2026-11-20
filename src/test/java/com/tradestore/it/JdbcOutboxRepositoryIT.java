@@ -1,0 +1,85 @@
+package com.tradestore.it;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+import com.tradestore.domain.AuditEvent;
+import com.tradestore.domain.Channel;
+import com.tradestore.domain.Outcome;
+import com.tradestore.domain.ReasonCode;
+import com.tradestore.domain.Trade;
+import com.tradestore.domain.Violation;
+import com.tradestore.persistence.OutboxRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/**
+ * The transactional outbox against real PostgreSQL (ADR-005). Each test runs in its own transaction and
+ * rolls back, so uncommitted rows are invisible to the outbox relay running in the same application.
+ */
+@IntegrationTest
+class JdbcOutboxRepositoryIT {
+
+    @Autowired
+    private OutboxRepository outbox;
+
+    @Autowired
+    private TransactionTemplate tx;
+
+    private static AuditEvent accepted(String tradeId) {
+        Trade trade = new Trade(tradeId, 1, "CP-1", "B1", LocalDate.of(2027, 5, 20), LocalDate.of(2026, 11, 19), false);
+        return new AuditEvent(UUID.randomUUID().toString(), tradeId, 1, Outcome.ACCEPTED, List.of(), Channel.REST,
+                Instant.parse("2026-11-19T10:15:30.123456Z"), "{\"tradeId\":\"" + tradeId + "\"}", trade);
+    }
+
+    private static AuditEvent rejected(String tradeId) {
+        return new AuditEvent(UUID.randomUUID().toString(), tradeId, 1, Outcome.REJECTED,
+                List.of(new Violation(ReasonCode.LOWER_VERSION, "version", "version 1 is lower than stored version 2")),
+                Channel.STREAM, Instant.parse("2026-11-19T10:15:31Z"), "{}", null);
+    }
+
+    private void inRolledBackTransaction(Runnable work) {
+        tx.executeWithoutResult(status -> {
+            work.run();
+            status.setRollbackOnly();
+        });
+    }
+
+    @Test
+    void should_returnAppendedEventsInOrder_when_batchIsClaimed() {
+        inRolledBackTransaction(() -> {
+            // Arrange
+            String tradeId = "T-" + UUID.randomUUID();
+            AuditEvent first = accepted(tradeId);
+            AuditEvent second = rejected(tradeId);
+            outbox.append(first);
+            outbox.append(second);
+
+            // Act
+            List<AuditEvent> claimed = outbox.claimBatch(1000);
+
+            // Assert: a full round trip through JSONB, in insertion order
+            assertThat(claimed).filteredOn(e -> tradeId.equals(e.tradeId())).containsExactly(first, second);
+        });
+    }
+
+    @Test
+    void should_notReturnEvents_when_theyHaveBeenDeleted() {
+        inRolledBackTransaction(() -> {
+            // Arrange
+            AuditEvent event = accepted("T-" + UUID.randomUUID());
+            outbox.append(event);
+
+            // Act
+            outbox.delete(List.of(event.eventId()));
+
+            // Assert
+            assertThat(outbox.claimBatch(1000)).extracting(AuditEvent::eventId).doesNotContain(event.eventId());
+        });
+    }
+}
