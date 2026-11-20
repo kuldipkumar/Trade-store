@@ -63,7 +63,7 @@ The list of assumptions the Trade Store is built on. The reasoning and the impac
 | A-34 | GitHub Actions for CI/CD. | Agreed |
 | A-35 | The streaming tool is chosen in Phase 3 (ADR). | Agreed |
 | A-36 | SQL holds the latest version and is the system of record. NoSQL holds history and audit. | Agreed |
-| A-37 | SQL commits first, then the history and audit write with retry. Phase 3 will weigh this against an outbox in an ADR. | Agreed |
+| A-37 | ~~SQL commits first, then the history and audit write with retry.~~ **Superseded by [ADR-005](docs/adr/005-transactional-outbox-for-audit.md):** a transactional outbox, as required by PO constraint CR-6. | Superseded |
 | A-38 | Minimal read API: trade by ID, paged list, history and audit report. | Agreed |
 | A-39 | Authentication and authorisation are out of scope. | Agreed |
 | A-40 | Trade cancellation and deletion are out of scope. | Agreed |

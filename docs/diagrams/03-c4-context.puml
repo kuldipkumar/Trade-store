@@ -1,0 +1,21 @@
+@startuml 03-c4-context
+!include <C4/C4_Context>
+
+title Trade Store: System Context
+
+LAYOUT_WITH_LEGEND()
+
+Person(ops, "Trade Operations User", "Submits or corrects single trades; looks up trades and their history")
+Person(compliance, "Compliance User", "Generates audit reports on demand")
+Person(operator, "Platform Operator", "Monitors health and metrics; replays dead-lettered messages")
+
+System_Ext(upstream, "Upstream Trading Systems", "Publish thousands of trades, keyed by tradeId")
+
+System(tradeStore, "Trade Store", "Validates trades (version, maturity), keeps the latest version, marks matured trades expired, audits every outcome")
+
+Rel(upstream, tradeStore, "Publishes trades", "Kafka")
+Rel(ops, tradeStore, "Submits and queries trades", "REST/JSON")
+Rel(compliance, tradeStore, "Requests audit reports", "REST/JSON, CSV")
+Rel(operator, tradeStore, "Checks health and metrics; replays dead letters", "Actuator, Kafka tools")
+
+@enduml

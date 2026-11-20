@@ -1,0 +1,44 @@
+@startuml 03-deployment
+title Trade Store: Deployment (Local and CI)
+
+node "Developer machine" as dev {
+  node "Docker Compose" as compose {
+    node "trade-store container" as appc <<non-root>> {
+      artifact "trade-store.jar" as jar
+    }
+    node "kafka container" as kafkac <<KRaft, single broker>>
+    database "postgres container" as pgc
+    database "mongo container" as mongoc
+  }
+}
+
+node "GitHub Actions runner (ubuntu)" as ci {
+  node "Maven build (JDK 21)" as mvn {
+    artifact "Unit + slice tests" as unit
+    artifact "Integration / regression tests" as it
+  }
+  node "Testcontainers (Docker)" as tc {
+    node "Kafka" as tck
+    database "PostgreSQL" as tcp
+    database "MongoDB" as tcm
+  }
+  node "Trivy" as trivy
+  node "PlantUML render" as puml
+}
+
+cloud "GitHub" as gh {
+  artifact "Build artifacts\n(reports, SVGs, image)" as artifacts
+}
+
+jar --> kafkac : consume / produce
+jar --> pgc : JDBC
+jar --> mongoc : MongoDB driver
+
+it --> tck
+it --> tcp
+it --> tcm
+mvn --> artifacts : test + coverage reports
+trivy --> artifacts : scan report (fails on CRITICAL)
+puml --> artifacts : rendered SVGs
+
+@enduml

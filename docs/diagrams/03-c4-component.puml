@@ -1,0 +1,44 @@
+@startuml 03-c4-component
+!include <C4/C4_Component>
+
+title Trade Store Application: Components
+
+LAYOUT_WITH_LEGEND()
+
+ContainerQueue(kafka, "Kafka", "trades.inbound / trades.inbound.DLT")
+ContainerDb(postgres, "PostgreSQL", "trades, outbox_events")
+ContainerDb(mongo, "MongoDB", "audit_events, trade_history")
+Person(users, "REST clients")
+
+Container_Boundary(app, "Trade Store Application (Spring Boot)") {
+    Component(api, "REST API", "Spring MVC", "Trade submission and queries; audit report (JSON/CSV); central error handling")
+    Component(consumer, "Trade Consumer", "Spring Kafka", "Deserialises and validates messages; error handler separates poison pills, transient failures and business rejections")
+    Component(ingestion, "Trade Ingestion Service", "Use case", "Single entry point for both channels: runs validators, version-guarded write, records outcome event")
+    Component(validators, "Trade Validators", "One class per rule", "Field, version and maturity rules; collect all violations")
+    Component(expiry, "Expiry Job", "Spring @Scheduled", "Daily after local midnight and at startup; marks matured trades expired")
+    Component(relay, "Outbox Relay", "Spring @Scheduled", "Moves outbox events to MongoDB idempotently, then deletes them")
+    Component(reports, "Audit Report Service", "Use case", "Filters, pages and summarises audit events")
+    Component(sqlRepo, "Trade + Outbox Repositories", "Spring Data JDBC/JPA", "Atomic upsert guarded by version; outbox inserts in the same transaction")
+    Component(mongoRepo, "Audit + History Repositories", "Spring Data MongoDB", "Append-only writes keyed by event id; report queries")
+    Component(clock, "Clock", "java.time.Clock", "Configured local time zone; injected everywhere 'today' matters")
+}
+
+Rel(kafka, consumer, "Trade messages")
+Rel(consumer, kafka, "Dead letters (poison, exhausted retries)")
+Rel(users, api, "HTTP")
+Rel(api, ingestion, "Submit trade")
+Rel(consumer, ingestion, "Submit trade")
+Rel(ingestion, validators, "Validate")
+Rel(ingestion, sqlRepo, "Upsert trade + insert outbox event (1 transaction)")
+Rel(expiry, sqlRepo, "Mark expired + insert outbox events (1 transaction)")
+Rel(sqlRepo, postgres, "JDBC")
+Rel(relay, sqlRepo, "Read and delete relayed events")
+Rel(relay, mongoRepo, "Write audit + history events")
+Rel(consumer, mongoRepo, "Audit POISON / FAILED directly")
+Rel(api, reports, "Report request")
+Rel(reports, mongoRepo, "Query")
+Rel(mongoRepo, mongo, "MongoDB driver")
+Rel(validators, clock, "today")
+Rel(expiry, clock, "today")
+
+@enduml

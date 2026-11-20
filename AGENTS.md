@@ -228,13 +228,13 @@ The last column is mandatory. It records human judgment over the AI's output.
 ## 11. Project Context (edit per project)
 
 - **Project:** Trade Store
-- **Stack:** Java 21, Spring Boot 3.x, Kafka, PostgreSQL (system of record: latest trade version), MongoDB (trade history and audit, including rejections), Testcontainers, GitHub Actions, PlantUML
+- **Stack:** Java 21, Spring Boot 3.x, Kafka (KRaft), PostgreSQL + Flyway (system of record: latest trade version, plus transactional outbox), MongoDB (trade history and audit, including rejections), Testcontainers, GitHub Actions, Trivy, PlantUML
 - **Core rules:**
   - Reject a trade whose version is lower than the stored version.
   - A trade with the same version replaces the stored record.
   - Reject a trade whose maturity date is earlier than today.
   - Automatically mark a trade as expired once its maturity date has passed.
-- **Current phase:** 2 approved (2026-11-20, PO sign-off in docs/02-po-review.md). Next: Phase 3 HLD and ADRs, under PO constraint CR-6 (no lost audit entries). Open: how to store and track the requirement docs (options presented to the human).
+- **Current phase:** 3 (High-Level Design) delivered 2026-11-20 and awaiting human approval: docs/03-hld.md, ADRs 001–006, 4 diagrams. Decisions: single app, Kafka (KRaft), PostgreSQL + Flyway, MongoDB, transactional outbox (CR-6), Trivy. Next: Phase 4 walking skeleton and CI/CD.
 
 ---
 

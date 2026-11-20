@@ -1,0 +1,27 @@
+@startuml 03-c4-container
+!include <C4/C4_Container>
+
+title Trade Store: Containers
+
+LAYOUT_WITH_LEGEND()
+
+System_Ext(upstream, "Upstream Trading Systems", "Trade producers")
+Person(users, "Ops / Compliance Users", "REST clients")
+Person(operator, "Platform Operator", "Monitoring")
+
+System_Boundary(ts, "Trade Store") {
+    Container(app, "Trade Store Application", "Java 21, Spring Boot 3.5", "Single deployable: REST API, Kafka consumer, validation, expiry job, outbox relay, audit reports")
+    ContainerQueue(kafka, "Kafka", "Apache Kafka (KRaft)", "trades.inbound (keyed by tradeId, 6 partitions); trades.inbound.DLT for poison pills and exhausted retries")
+    ContainerDb(postgres, "PostgreSQL", "PostgreSQL + Flyway", "System of record: latest version per trade; transactional outbox of audit/history events")
+    ContainerDb(mongo, "MongoDB", "MongoDB", "Append-only audit events and trade version history")
+}
+
+Rel(upstream, kafka, "Publishes trades", "Kafka protocol")
+Rel(kafka, app, "Consumes trades", "Consumer group; offset committed after processing")
+Rel(app, kafka, "Publishes dead letters", "Kafka protocol")
+Rel(users, app, "Submits/queries trades, audit reports", "HTTPS/JSON, CSV")
+Rel(app, postgres, "Version-guarded upsert + outbox insert in one transaction", "JDBC")
+Rel(app, mongo, "Relays outbox events; queries audit/history", "MongoDB driver")
+Rel(operator, app, "Health, Prometheus metrics", "HTTP /actuator")
+
+@enduml

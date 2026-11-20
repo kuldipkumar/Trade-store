@@ -16,7 +16,7 @@ The Markdown files in this repository are the **source of truth**. GitHub Issues
 
 | Document | Phase |
 |----------|-------|
-| `03-hld.md`, `adr/`, `diagrams/` | 3: High-level design |
+| [03-hld.md](03-hld.md), [adr/](adr/), [diagrams/](diagrams/) | 3: High-level design (awaiting approval) |
 | `05-lld.md` | 5: Low-level design |
 
 ## Tracking
