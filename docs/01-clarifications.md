@@ -95,7 +95,7 @@ Source: [Requirements.md](../Requirements.md). The resulting assumptions are kep
 
 | ID | Question | Proposed Assumption | Impact if wrong | Status |
 |----|----------|---------------------|-----------------|--------|
-| C-33 | Java or Python? | **Java 21** with Spring Boot 3.x. | None. | Agreed |
+| C-33 | Java or Python? | **Java 21** with Spring Boot 4.1 (was 3.x; see ADR-007). | None. | Agreed |
 | C-34 | GitHub Actions or Jenkins? | **GitHub Actions.** | None. | Agreed |
 | C-35 | Which streaming tool? | To be **decided in Phase 3** with an ADR. | Medium. | Agreed (deferred) |
 | C-36 | SQL and NoSQL: which is the system of record? | **SQL** holds the latest version of each trade and is the system of record. **NoSQL** holds the version history and the audit trail. | Medium. | Agreed (from AGENTS.md) |

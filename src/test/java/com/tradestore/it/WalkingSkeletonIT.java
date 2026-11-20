@@ -4,30 +4,32 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.concurrent.TimeUnit;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
+import org.springframework.boot.micrometer.metrics.test.autoconfigure.AutoConfigureMetrics;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaAdmin;
+import org.springframework.test.web.servlet.client.EntityExchangeResult;
+import org.springframework.test.web.servlet.client.RestTestClient;
 
 /**
  * Phase 4 walking skeleton: the application starts against real PostgreSQL, MongoDB and Kafka
  * (Testcontainers), Flyway migrates, and operational endpoints respond.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@AutoConfigureObservability // tests disable metrics exporters by default; we verify the real setup
+@AutoConfigureMetrics // tests disable metrics exporters by default; we verify the real setup
+@AutoConfigureRestTestClient
 @Import(TestcontainersConfiguration.class)
 class WalkingSkeletonIT {
 
     @Autowired
-    private TestRestTemplate rest;
+    private RestTestClient rest;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -38,14 +40,14 @@ class WalkingSkeletonIT {
     @Test
     void should_reportHealthUp_when_databasesAreAvailable() {
         // Act
-        ResponseEntity<JsonNode> response = rest.getForEntity("/actuator/health", JsonNode.class);
+        EntityExchangeResult<JsonNode> response = get("/actuator/health", JsonNode.class);
 
         // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        JsonNode health = response.getBody();
-        assertThat(health.path("status").asText()).isEqualTo("UP");
-        assertThat(health.path("components").path("db").path("status").asText()).isEqualTo("UP");
-        assertThat(health.path("components").path("mongo").path("status").asText()).isEqualTo("UP");
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.OK);
+        JsonNode health = response.getResponseBody();
+        assertThat(health.path("status").asString()).isEqualTo("UP");
+        assertThat(health.path("components").path("db").path("status").asString()).isEqualTo("UP");
+        assertThat(health.path("components").path("mongo").path("status").asString()).isEqualTo("UP");
     }
 
     @Test
@@ -73,10 +75,14 @@ class WalkingSkeletonIT {
     @Test
     void should_exposePrometheusMetrics_when_applicationStarts() {
         // Act
-        ResponseEntity<String> response = rest.getForEntity("/actuator/prometheus", String.class);
+        EntityExchangeResult<String> response = get("/actuator/prometheus", String.class);
 
         // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).contains("jvm_memory_used_bytes");
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getResponseBody()).contains("jvm_memory_used_bytes");
+    }
+
+    private <T> EntityExchangeResult<T> get(String path, Class<T> bodyType) {
+        return rest.get().uri(path).exchange().expectBody(bodyType).returnResult();
     }
 }

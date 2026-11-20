@@ -17,6 +17,7 @@ The Trade Store is **one Spring Boot application** (ADR-001) that receives trade
 | [004](adr/004-mongodb-audit-and-history.md) | MongoDB | Append-only documents of varying shape; aggregations for the report |
 | [005](adr/005-transactional-outbox-for-audit.md) | Transactional outbox | Satisfies CR-6 (no lost audit entries) for all three event sources. Supersedes A-37. |
 | [006](adr/006-trivy-oss-vulnerability-scan.md) | Trivy (dependencies + image) | One fast tool; fails the build on CRITICAL |
+| [007](adr/007-spring-boot-4.md) | Spring Boot 4.1 (Spring Framework 7) | Spring Boot 3.5 / Framework 6.2 had CRITICAL CVEs with no free fix; upgraded before any business code existed |
 
 ## 2. System context
 

@@ -10,7 +10,7 @@ Person(users, "Ops / Compliance Users", "REST clients")
 Person(operator, "Platform Operator", "Monitoring")
 
 System_Boundary(ts, "Trade Store") {
-    Container(app, "Trade Store Application", "Java 21, Spring Boot 3.5", "Single deployable: REST API, Kafka consumer, validation, expiry job, outbox relay, audit reports")
+    Container(app, "Trade Store Application", "Java 21, Spring Boot 4.1", "Single deployable: REST API, Kafka consumer, validation, expiry job, outbox relay, audit reports")
     ContainerQueue(kafka, "Kafka", "Apache Kafka (KRaft)", "trades.inbound (keyed by tradeId, 6 partitions); trades.inbound.DLT for poison pills and exhausted retries")
     ContainerDb(postgres, "PostgreSQL", "PostgreSQL + Flyway", "System of record: latest version per trade; transactional outbox of audit/history events")
     ContainerDb(mongo, "MongoDB", "MongoDB", "Append-only audit events and trade version history")
