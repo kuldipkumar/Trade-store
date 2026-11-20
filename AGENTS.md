@@ -234,7 +234,7 @@ The last column is mandatory. It records human judgment over the AI's output.
   - A trade with the same version replaces the stored record.
   - Reject a trade whose maturity date is earlier than today.
   - Automatically mark a trade as expired once its maturity date has passed.
-- **Current phase:** 6 (TDD implementation), started 2026-11-20. Phases 4 and 5 approved 2026-11-20. Work one story per branch (`story/US-xxx-…`), red/green/refactor commits, pull request to main (CI on PR), merge when green. Delivery order: 02-backlog.md, 'Suggested delivery order'.
+- **Current phase:** 6 (TDD implementation), started 2026-11-20. Phases 4 and 5 approved 2026-11-20. Work one story per branch (`story/US-xxx-…`), red/green/refactor commits, pull request to main (CI on PR), merge when green. Done: US-105, US-104, US-101 (PRs #39–#41). Next: US-102, US-103 (acceptance-level checks; mostly built), US-201, US-205, US-106, US-107, then US-501, channels (US-401, US-402, US-301, US-304, US-302, US-303).
 
 ---
 
