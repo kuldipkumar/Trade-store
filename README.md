@@ -6,6 +6,7 @@ A trade store that receives trades, enforces version and maturity-date rules, an
 
 - Assignment: [Requirements.md](Requirements.md)
 - Engineering playbook: [AGENTS.md](AGENTS.md)
+- Documentation index: [docs/README.md](docs/README.md)
 - Assumptions: [ASSUMPTIONS.md](ASSUMPTIONS.md)
 - AI prompt log: [PROMPTS.md](PROMPTS.md)
 
