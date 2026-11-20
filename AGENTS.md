@@ -234,7 +234,7 @@ The last column is mandatory. It records human judgment over the AI's output.
   - A trade with the same version replaces the stored record.
   - Reject a trade whose maturity date is earlier than today.
   - Automatically mark a trade as expired once its maturity date has passed.
-- **Current phase:** 3 (High-Level Design) delivered 2026-11-20 and awaiting human approval: docs/03-hld.md, ADRs 001–006, 4 diagrams. Decisions: single app, Kafka (KRaft), PostgreSQL + Flyway, MongoDB, transactional outbox (CR-6), Trivy. Next: Phase 4 walking skeleton and CI/CD.
+- **Current phase:** 4 (Walking skeleton and CI/CD). Phase 3 approved 2026-11-20. Skeleton, docker-compose, Dockerfile and .github/workflows/ci.yml written; gate = first green pipeline run on GitHub.
 
 ---
 

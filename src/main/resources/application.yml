@@ -1,3 +1,30 @@
 spring:
   application:
     name: trade-store
+  # Connection settings come from environment variables (A-47, A-50).
+  # The defaults match the local docker-compose stack only.
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/tradestore}
+    username: ${POSTGRES_USER:tradestore}
+    password: ${POSTGRES_PASSWORD:tradestore}
+  flyway:
+    enabled: true
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/tradestore}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+
+server:
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always

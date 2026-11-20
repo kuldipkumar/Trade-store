@@ -1,0 +1,111 @@
+# CI pipeline (AGENTS.md section 6, US-601, US-602, US-603).
+# Fails on: diagram syntax error, test failure, coverage < 80%, CRITICAL vulnerability.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PLANTUML_IMAGE: plantuml/plantuml:1.2026.9
+  TRIVY_VERSION: v0.70.0
+  IMAGE_NAME: trade-store
+
+jobs:
+  build:
+    name: Build, test, scan, package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      # 1. Checkout and JDK (with Maven dependency cache)
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # 2. Render and validate PlantUML diagrams (fails on syntax error)
+      - name: Render PlantUML diagrams
+        run: |
+          docker run --rm -v "$PWD/docs/diagrams:/data" -w /data "$PLANTUML_IMAGE" \
+            -tsvg -failfast2 -o out "*.puml"
+
+      # 3. Build and unit tests
+      - name: Unit tests
+        run: ./mvnw -B test
+
+      # 4 + 5. Integration / regression tests (Testcontainers), coverage report and gate (JaCoCo)
+      - name: Integration tests and coverage gate
+        run: ./mvnw -B verify -DskipUnitTests=true
+
+      # 6a. OSS vulnerability scan of dependencies (fails on CRITICAL)
+      - name: Trivy dependency scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: CRITICAL
+          exit-code: '1'
+          format: table
+          output: trivy-dependencies.txt
+
+      # 8. Package the Docker image
+      - name: Build Docker image
+        run: docker build -t "$IMAGE_NAME:${{ github.sha }}" .
+
+      # 6b. OSS vulnerability scan of the image, including OS packages (fails on CRITICAL)
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: image
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          scanners: vuln
+          severity: CRITICAL
+          exit-code: '1'
+          format: table
+          output: trivy-image.txt
+
+      - name: Show scan results
+        if: always()
+        run: |
+          for f in trivy-dependencies.txt trivy-image.txt; do
+            [ -f "$f" ] && { echo "::group::$f"; cat "$f"; echo "::endgroup::"; } || true
+          done
+
+      # 9. Upload test, coverage and scan reports, plus rendered diagrams
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: reports
+          if-no-files-found: warn
+          path: |
+            target/surefire-reports/
+            target/failsafe-reports/
+            target/site/jacoco/
+            trivy-*.txt
+
+      - name: Upload rendered diagrams
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: diagrams
+          if-no-files-found: warn
+          path: docs/diagrams/out/*.svg

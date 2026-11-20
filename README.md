@@ -10,10 +10,13 @@ A trade store that receives trades, enforces version and maturity-date rules, an
 - Assumptions: [ASSUMPTIONS.md](ASSUMPTIONS.md)
 - AI prompt log: [PROMPTS.md](PROMPTS.md)
 
-## Build (current skeleton)
+## Build and run (walking skeleton)
 
-Requires JDK 21.
+Requires JDK 21 and a running Docker daemon (integration tests use Testcontainers).
 
 ```bash
-./mvnw verify
+./mvnw verify                 # unit + integration tests, 80% coverage gate
+docker compose up --build     # app + Kafka + PostgreSQL + MongoDB
+curl localhost:8080/actuator/health
+scripts/render-diagrams.sh    # render PlantUML to docs/diagrams/out
 ```

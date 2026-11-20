@@ -1,0 +1,42 @@
+@startuml 04-activity-ci-pipeline
+title CI/CD Pipeline Flow (.github/workflows/ci.yml)
+
+start
+:Trigger: pull request to main, push to main, or manual run;
+:1. Checkout + set up JDK 21 (Maven cache);
+:2. Render PlantUML diagrams to SVG;
+if (Diagram syntax error?) then (yes)
+  #pink:Fail build;
+  stop
+endif
+:3. Unit tests (mvn test);
+if (Any unit test fails?) then (yes)
+  #pink:Fail build;
+  stop
+endif
+:4. Integration / regression tests\n(Testcontainers: Kafka, PostgreSQL, MongoDB);
+if (Any integration test fails?) then (yes)
+  #pink:Fail build;
+  stop
+endif
+:5. JaCoCo coverage report + gate;
+if (Line coverage < 80%?) then (yes)
+  #pink:Fail build;
+  stop
+endif
+:6a. Trivy dependency scan;
+if (CRITICAL vulnerability?) then (yes)
+  #pink:Fail build;
+  stop
+endif
+:8. Build Docker image (non-root);
+:6b. Trivy image scan (OS + libraries);
+if (CRITICAL vulnerability?) then (yes)
+  #pink:Fail build;
+  stop
+endif
+#palegreen:Pipeline green;
+:9. Upload reports (tests, coverage, scans) and rendered SVGs\n(always, also on failure);
+stop
+
+@enduml
