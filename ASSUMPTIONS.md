@@ -59,7 +59,7 @@ The list of assumptions the Trade Store is built on. The reasoning and the impac
 ## Scope and technology
 | ID | Assumption | Status |
 |----|------------|--------|
-| A-33 | Java 21 with Spring Boot 3.x. | Agreed |
+| A-33 | Java 21 with Spring Boot 4.1 (was 3.x; upgraded to fix CRITICAL CVEs, see ADR-007). | Agreed |
 | A-34 | GitHub Actions for CI/CD. | Agreed |
 | A-35 | The streaming tool is chosen in Phase 3 (ADR). | Agreed |
 | A-36 | SQL holds the latest version and is the system of record. NoSQL holds history and audit. | Agreed |

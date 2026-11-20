@@ -193,7 +193,7 @@ Repeat until all of that story's acceptance criteria are covered. Commits should
 
 ## 8. Coding Conventions
 
-- Java 21 LTS, Spring Boot 3.x, Maven.
+- Java 21 LTS, Spring Boot 4.x, Maven.
 - Use constructor injection only (no field `@Autowired`).
 - Use records for DTOs and immutable value objects.
 - Handle errors centrally with `@ControllerAdvice`, using a consistent error response shape.
@@ -228,13 +228,13 @@ The last column is mandatory. It records human judgment over the AI's output.
 ## 11. Project Context (edit per project)
 
 - **Project:** Trade Store
-- **Stack:** Java 21, Spring Boot 3.x, Kafka (KRaft), PostgreSQL + Flyway (system of record: latest trade version, plus transactional outbox), MongoDB (trade history and audit, including rejections), Testcontainers, GitHub Actions, Trivy, PlantUML
+- **Stack:** Java 21, Spring Boot 4.1 (ADR-007), Kafka (KRaft), PostgreSQL + Flyway (system of record: latest trade version, plus transactional outbox), MongoDB (trade history and audit, including rejections), Testcontainers, GitHub Actions, Trivy, PlantUML
 - **Core rules:**
   - Reject a trade whose version is lower than the stored version.
   - A trade with the same version replaces the stored record.
   - Reject a trade whose maturity date is earlier than today.
   - Automatically mark a trade as expired once its maturity date has passed.
-- **Current phase:** 4 (Walking skeleton and CI/CD). Phase 3 approved 2026-11-20. Skeleton, docker-compose, Dockerfile and .github/workflows/ci.yml written; gate = first green pipeline run on GitHub.
+- **Current phase:** 4 (Walking skeleton and CI/CD), in progress. Spring Boot 4.1.2 upgrade (ADR-007) on branch `wip/spring-boot-4`: pom.xml and tests migrated, docs updated. Paused 2026-11-20 because of slow internet. Next: re-render 03-c4-container.svg, run `./mvnw verify` locally (needs images mongo:8.0.38, postgres:17.11-alpine, apache/kafka:4.3.2, plantuml/plantuml:1.2026.9), merge to main, get CI fully green including both Trivy scans. Gate = first fully green pipeline run.
 
 ---
 
