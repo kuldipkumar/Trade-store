@@ -4,12 +4,16 @@ import java.util.List;
 
 import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.Violation;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
 
 /**
  * US-201: the maturity date must not be before today (A-13: today itself is valid; A-14: applies to every
  * version). "Today" comes from the injected Clock via the ValidationContext (A-16). Skipped when the date
  * can't be parsed; MaturityDateFormatValidator reports that.
  */
+@Component
+@Order(500)
 public class MaturityNotInPastValidator implements TradeValidator {
 
     @Override
