@@ -83,4 +83,37 @@ class OutboxRelaySchedulerTest {
         scheduler.poll();
         assertThat(output).contains("ERROR").contains("3 consecutive polls").contains("[T1, T2]");
     }
+
+    @Test
+    @Tag("US-501.3")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_startCountingAgain_when_aPollSucceedsInBetween(CapturedOutput output) {
+        // Arrange: fail, fail, succeed, fail, fail (threshold 3)
+        DataAccessResourceFailureException down = new DataAccessResourceFailureException("MongoDB down");
+        when(relay.relayBatch()).thenThrow(down, down).thenReturn(5).thenThrow(down, down);
+
+        // Act
+        for (int i = 0; i < 5; i++) {
+            scheduler.poll();
+        }
+
+        // Assert: never three in a row, so no outage
+        assertThat(output).doesNotContain("ERROR");
+    }
+
+    @Test
+    @Tag("US-501.3")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_repeatTheOutageErrorEveryThresholdPolls_when_theOutageContinues(CapturedOutput output) {
+        // Arrange (threshold 3)
+        when(relay.relayBatch()).thenThrow(new DataAccessResourceFailureException("MongoDB down"));
+
+        // Act: six consecutive failures
+        for (int i = 0; i < 6; i++) {
+            scheduler.poll();
+        }
+
+        // Assert: reminded at 3 and 6, not on every poll
+        assertThat(output.getAll().split("consecutive polls", -1).length - 1).isEqualTo(2);
+    }
 }
