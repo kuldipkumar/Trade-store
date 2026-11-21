@@ -52,9 +52,12 @@ public class AuditReportController {
             @RequestParam(required = false) String tradeId,
             @RequestParam(required = false) Outcome outcome) {
         validateRange(from, to);
+        // Opened here, not in the body: a database outage then fails the request as a plain 503 (D7) instead of
+        // a response already marked as a CSV download.
+        Stream<AuditEvent> opened = reports.stream(from, to, tradeId, outcome);
         StreamingResponseBody body = output -> {
             Writer out = new BufferedWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8));
-            try (Stream<AuditEvent> events = reports.stream(from, to, tradeId, outcome)) {
+            try (Stream<AuditEvent> events = opened) {
                 AuditCsvWriter.writeHeader(out);
                 for (AuditEvent event : (Iterable<AuditEvent>) events::iterator) {
                     AuditCsvWriter.writeRow(event, out);
