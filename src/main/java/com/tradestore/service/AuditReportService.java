@@ -40,6 +40,7 @@ public class AuditReportService {
         AuditQuery query = new AuditQuery(from == null ? null : from.atStartOfDay(zone).toInstant(),
                 to == null ? null : to.plusDays(1).atStartOfDay(zone).toInstant(), tradeId, outcome);
         Map<Outcome, Long> summary = audit.countByOutcome(query);
-        return new AuditReport(summary, audit.find(query, page, size), page, size, 0, 0);
+        long total = summary.values().stream().mapToLong(Long::longValue).sum();
+        return new AuditReport(summary, audit.find(query, page, size), page, size, total, (total + size - 1) / size);
     }
 }
