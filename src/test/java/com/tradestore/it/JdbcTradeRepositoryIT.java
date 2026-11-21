@@ -5,6 +5,7 @@ import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -212,5 +213,39 @@ class JdbcTradeRepositoryIT {
         assertThat(race.holder()).isEqualTo(UpsertResult.UPDATED);
         assertThat(race.waiter()).isEqualTo(UpsertResult.UPDATED);
         assertThat(repository.findTrade(tradeId).orElseThrow().version()).isEqualTo(3);
+    }
+
+    @Test
+    @Tag("US-202.1")
+    void should_markOnlyTradesMaturedBeforeTodayAndReturnThem_when_expiryRuns() {
+        // Arrange
+        String live = tradeId + "-live";
+        repository.upsertIfNotOlder(new Trade(tradeId, 1, "CP-1", "B1", TODAY.minusDays(1), TODAY.minusDays(30), false));
+        repository.upsertIfNotOlder(new Trade(live, 1, "CP-1", "B1", TODAY, TODAY.minusDays(30), false));
+
+        // Act
+        List<Trade> expired = repository.markExpired(TODAY);
+
+        // Assert: the returned row is the stored trade, now expired; the one maturing today is untouched
+        assertThat(expired).filteredOn(t -> t.tradeId().startsWith(tradeId)).singleElement().satisfies(t -> {
+            assertThat(t.tradeId()).isEqualTo(tradeId);
+            assertThat(t.expired()).isTrue();
+        });
+        assertThat(repository.findById(live).orElseThrow().expired()).isFalse();
+    }
+
+    @Test
+    @Tag("US-202.2")
+    void should_returnNothing_when_expiryRunsAgainOnAnAlreadyExpiredTrade() {
+        // Arrange
+        repository.upsertIfNotOlder(new Trade(tradeId, 1, "CP-1", "B1", TODAY.minusDays(1), TODAY.minusDays(30), false));
+        repository.markExpired(TODAY);
+
+        // Act
+        List<Trade> second = repository.markExpired(TODAY);
+
+        // Assert
+        assertThat(second).extracting(Trade::tradeId).doesNotContain(tradeId);
+        assertThat(repository.findById(tradeId).orElseThrow().expired()).isTrue();
     }
 }

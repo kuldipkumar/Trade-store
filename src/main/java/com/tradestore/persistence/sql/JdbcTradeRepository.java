@@ -2,6 +2,8 @@ package com.tradestore.persistence.sql;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import com.tradestore.domain.StoredTrade;
@@ -79,5 +81,10 @@ public class JdbcTradeRepository implements TradeRepository {
                 rs.getObject("maturity_date", java.time.LocalDate.class),
                 rs.getObject("created_date", java.time.LocalDate.class),
                 rs.getBoolean("expired"));
+    }
+
+    @Override
+    public List<Trade> markExpired(LocalDate today) {
+        return List.of(); // stub: implemented test-first
     }
 }
