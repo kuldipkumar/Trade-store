@@ -46,6 +46,17 @@ class KafkaErrorHandlingTest {
     }
 
     @Test
+    @Tag("US-302.1")
+    void should_recoverAtOnceWithoutRetries_when_anIllegalArgumentIsThrown() {
+        // Act: the same input would fail the same way on every retry (LLD section 6.2, ADR-002)
+        boolean handled = fail(new IllegalArgumentException("unusable value"));
+
+        // Assert
+        assertThat(handled).isTrue();
+        verify(recoverer).accept(any(), any());
+    }
+
+    @Test
     @Tag("US-303.1")
     void should_retryNotRecover_when_theDatabaseIsBrieflyUnavailable() {
         // Act
