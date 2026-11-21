@@ -99,6 +99,8 @@ def parse_backlog(text):
 _TEST_ANNOTATIONS = ("@Test", "@ParameterizedTest", "@RepeatedTest")
 _METHOD = re.compile(r"^\s*(?:public\s+|protected\s+|private\s+)?void\s+(\w+)\s*\(")
 _TAG = re.compile(r'@Tag\("([^"]+)"\)')
+# A field declaration: "private final TradeRepository trades;" or "... = new X(...);" -> (type, name)
+_FIELD = re.compile(r"^\s*(?:private|protected|public)?\s*(?:static\s+)?(?:final\s+)?([A-Z]\w*)(?:<[^>]*>)?\s+(\w+)\s*[=;]", re.M)
 
 
 def parse_java_tests(files, main_classes):
@@ -133,10 +135,12 @@ def parse_java_tests(files, main_classes):
             pending = []
 
         class_level = "\n".join(lines[class_idx + 1:starts[0][0]]) if starts else ""
+        fields = dict((name, type_) for type_, name in _FIELD.findall(class_level))
         for n, (start, method, tags) in enumerate(starts):
             end = starts[n + 1][0] if n + 1 < len(starts) else len(lines)
             body = "\n".join(lines[start:end])
-            code = sorted(c for c in main_classes if re.search(rf"\b{c}\b", class_level + "\n" + body))
+            used_field_types = " ".join(t for f, t in fields.items() if re.search(rf"\b{f}\b", body))
+            code = sorted(c for c in main_classes if re.search(rf"\b{c}\b", body + "\n" + used_field_types))
             cases.append(TestCase(fqcn, method, class_tags + tags, path, code))
     return cases
 
