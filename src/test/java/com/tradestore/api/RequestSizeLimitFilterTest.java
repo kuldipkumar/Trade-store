@@ -75,4 +75,56 @@ class RequestSizeLimitFilterTest {
         // Assert
         assertThat(seen.toString()).isEqualTo("0123456789");
     }
+
+    /** Runs the filter with a downstream that reads the body in the given way, and returns what it threw. */
+    private Throwable readThrough(String body, ReadStrategy strategy) {
+        MockFilterChain downstream = new MockFilterChain() {
+            @Override
+            public void doFilter(jakarta.servlet.ServletRequest request, jakarta.servlet.ServletResponse response)
+                    throws IOException {
+                strategy.read((HttpServletRequest) request);
+            }
+        };
+        try {
+            filter.doFilter(chunked(body), new MockHttpServletResponse(), downstream);
+            return null;
+        } catch (Throwable t) {
+            return t;
+        }
+    }
+
+    interface ReadStrategy {
+        void read(HttpServletRequest request) throws IOException;
+    }
+
+    @Test
+    @Tag("US-401.6")
+    void should_limitTheBody_when_itIsReadThroughGetReader() {
+        // Act + Assert
+        assertThat(readThrough("x".repeat(11), r -> r.getReader().lines().count()))
+                .isInstanceOf(PayloadTooLargeException.class);
+    }
+
+    @Test
+    @Tag("US-401.6")
+    void should_notResetTheAllowance_when_getInputStreamIsCalledAgain() {
+        // Act: 6 bytes through one stream, then 5 more through a second call (11 in total, limit 10)
+        Throwable thrown = readThrough("x".repeat(11), r -> {
+            r.getInputStream().readNBytes(6);
+            r.getInputStream().readAllBytes();
+        });
+
+        // Assert
+        assertThat(thrown).isInstanceOf(PayloadTooLargeException.class);
+    }
+
+    @Test
+    @Tag("US-401.6")
+    void should_countBulkReads_when_theBodyIsReadInBlocks() {
+        // Act: one bulk read of the whole 11-byte body
+        Throwable thrown = readThrough("x".repeat(11), r -> r.getInputStream().read(new byte[64], 0, 64));
+
+        // Assert
+        assertThat(thrown).isInstanceOf(PayloadTooLargeException.class);
+    }
 }
