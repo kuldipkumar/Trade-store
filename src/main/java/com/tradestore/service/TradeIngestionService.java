@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.tradestore.domain.Outcome;
+import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
 import com.tradestore.domain.TradeRejectedException;
@@ -60,13 +61,11 @@ public class TradeIngestionService {
         Timer.Sample timing = metrics.startProcessing();
         LocalDate today = LocalDate.now(clock);
         Decision decision = transactions.execute(status -> decide(submission, today));
+        metrics.recordOutcome(decision.outcome(), decision.reasons(), submission.channel());
+        metrics.stopProcessing(timing, submission.channel());
         if (decision.rejection() != null) {
-            metrics.recordOutcome(Outcome.REJECTED, decision.rejection().reasons(), submission.channel());
-            metrics.stopProcessing(timing, submission.channel());
             throw decision.rejection();
         }
-        metrics.recordOutcome(decision.result().outcome(), List.of(), submission.channel());
-        metrics.stopProcessing(timing, submission.channel());
         return decision.result();
     }
 
@@ -111,6 +110,14 @@ public class TradeIngestionService {
 
         static Decision rejected(TradeRejectedException rejection) {
             return new Decision(null, rejection);
+        }
+
+        Outcome outcome() {
+            return rejection == null ? result.outcome() : Outcome.REJECTED;
+        }
+
+        List<ReasonCode> reasons() {
+            return rejection == null ? List.of() : rejection.reasons();
         }
     }
 }
