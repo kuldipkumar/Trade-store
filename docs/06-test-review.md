@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301; US-304; US-302; US-303). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301; US-304; US-302; US-303; US-502). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -82,6 +82,10 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-501.1 | Full | `MongoStoresIT`, `AuditEventFactoryTest`, `JdbcOutboxRepositoryIT`, `OutboxRelayServiceTest`, `StoreTradeIT` (all the fields); `TradeApiIT` (REST: the payload is exactly the body sent); `StreamIngestionIT` (STREAM channel) | |
 | US-501.2 | Full | `AuditTrailImmutabilityTest`: the audit and history ports and their MongoDB implementations offer only insert and read operations (mutation-verified) | |
 | US-501.3 | Full | `OutboxRelayServiceTest` (failed batch kept), `OutboxRelaySchedulerTest` (each failure counted; ERROR with waiting trade IDs every N consecutive failures; reset on success), `JdbcOutboxRepositoryIT` (`pendingTradeIds`) | |
+| US-502.1 | Full | `AuditReportIT` (entries at 23:59:59 the day before, 00:00 on `from`, 23:59:59 on `to` and 00:00 the day after, in the configured zone: only the middle two, oldest first; invalid page, size, date order, date format or outcome → 400 `INVALID_PARAMETER`), `AuditReportServiceTest` (inclusive local dates → `[from 00:00, to+1 00:00)` in the zone), `MongoStoresIT` (`find` on a half-open range) | |
+| US-502.2 | Full | `AuditReportIT` (`outcome=REJECTED&tradeId=…` → only that entry, with reasons and channel), `MongoStoresIT` (outcome filter) | |
+| US-502.3 | Full | `AuditReportIT` (summary 1 ACCEPTED, 2 REJECTED, no EXPIRED key), `MongoStoresIT` (`countByOutcome` respects the range), `AuditReportServiceTest` (totals from the summary) | |
+| US-502.4 | Full | `AuditReportIT` (3 entries, size 2 → 2 + 1, totals and pages), `MongoStoresIT` (skip/limit), `AuditReportServiceTest` (size capped at `api.max-page-size`) | Known limitation: deep pages use skip, like the trade list (keyset paging is future work). |
 | US-603.1 | Full | `@IntegrationTest` + `TestcontainersConfiguration`; every `*IT` runs on real Kafka, PostgreSQL and MongoDB | |
 | US-604.3 | Full | `TradeIngestionServiceTest`: one INFO line per trade with outcome, tradeId, version, channel and reasons; a payload marker never appears in the log | MDC context (`tradeId`, `channel`) is added by the channel adapters (US-401/US-301). |
 | US-604.1 | Partial | `WalkingSkeletonIT`: health is UP with db and mongo | `/actuator/health/readiness` including Kafka. Closed in **US-604**. |
