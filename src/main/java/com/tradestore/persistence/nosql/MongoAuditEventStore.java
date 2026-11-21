@@ -33,6 +33,9 @@ public class MongoAuditEventStore implements AuditEventStore {
                 .append("channel", event.channel().name())
                 .append("eventTimestamp", Date.from(event.eventTimestamp()))
                 .append("payload", event.payload());
+        if (event.error() != null) {
+            doc.append("error", event.error());
+        }
         try {
             mongo.insert(doc, COLLECTION);
         } catch (DuplicateKeyException alreadyRecorded) {
