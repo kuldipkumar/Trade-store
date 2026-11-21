@@ -271,4 +271,29 @@ class TradeApiIT {
         assertThat(trade.has("expired")).isTrue();
         assertThat(trade.path("expired").asBoolean()).isFalse();
     }
+
+    @Test
+    @Tag("US-402.2")
+    void should_return404WithTheStandardErrorShape_when_noTradeIsStored() {
+        // Act
+        EntityExchangeResult<JsonNode> response = get("/trades/" + tradeId);
+
+        // Assert
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        JsonNode error = response.getResponseBody();
+        assertThat(error.path("status").asInt()).isEqualTo(404);
+        assertThat(error.path("path").asString()).isEqualTo("/trades/" + tradeId);
+        assertThat(error.path("reasons").get(0).path("reason").asString()).isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    @Tag("US-402.2")
+    void should_return404NotServerError_when_thePathDoesNotExist() {
+        // Act: the catch-all 500 handler must not swallow Spring's "no such route"
+        EntityExchangeResult<JsonNode> response = get("/no-such-path");
+
+        // Assert
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("NOT_FOUND");
+    }
 }
