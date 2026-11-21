@@ -18,33 +18,37 @@ else cron fires (default "0 5 0 * * *" in the configured zone: US-202.4)
 end
 ExpiryScheduler -> ExpiryService : expireMaturedTrades()
 ExpiryService -> Clock : today = LocalDate.now(clock)
-ExpiryService -> PostgreSQL : BEGIN
-ExpiryService -> TradeRepository : markExpired(today)
-TradeRepository -> PostgreSQL : UPDATE trades SET expired = true\nWHERE maturity_date < ? AND expired = false\nRETURNING *
-note right of PostgreSQL
-  "<" not "<=": a trade maturing today stays live (A-17).
-  Already-expired rows are never returned, so a re-run
-  writes nothing (idempotent, US-202.2). The job never
-  sets expired back to false (US-204.2).
-end note
-TradeRepository --> ExpiryService : List<Trade> (newly expired)
-loop each newly expired trade
-  ExpiryService -> AuditEventFactory : expired(trade)  (channel = SCHEDULER)
-  ExpiryService -> OutboxRepository : append(EXPIRED event)
+loop while the last batch was full (batch-size, default 1000)
+  ExpiryService -> PostgreSQL : BEGIN
+  ExpiryService -> TradeRepository : markExpired(today, batchSize)
+  TradeRepository -> PostgreSQL : WITH due AS (SELECT … WHERE maturity_date < ? AND expired = false\nLIMIT ? FOR UPDATE SKIP LOCKED) UPDATE … RETURNING *
+  note right of PostgreSQL
+    "<" not "<=": a trade maturing today stays live (A-17).
+    Already-expired rows are never returned, so a re-run
+    writes nothing (idempotent, US-202.2). The job never
+    sets expired back to false (US-204.2). Rows locked by
+    ingestion or another instance are skipped.
+  end note
+  TradeRepository --> ExpiryService : List<Trade> (this batch)
+  loop each newly expired trade
+    ExpiryService -> AuditEventFactory : expired(trade)  (channel = SCHEDULER)
+    ExpiryService -> OutboxRepository : append(EXPIRED event)
+  end
+  ExpiryService -> PostgreSQL : COMMIT
+  ExpiryService -> ExpiryService : count trade_outcomes_total{EXPIRED, SCHEDULER};\nlog INFO outcome=EXPIRED tradeId=… per trade
 end
-ExpiryService -> PostgreSQL : COMMIT
 ExpiryService --> ExpiryScheduler : count
-ExpiryScheduler -> ExpiryScheduler : log INFO "expired {count} trades"
+ExpiryScheduler -> ExpiryScheduler : log INFO "Expiry run expired {count} trades"
 
 alt PostgreSQL unavailable
   PostgreSQL --> ExpiryService : DataAccessException
   ExpiryService --> ExpiryScheduler : rethrow
-  ExpiryScheduler -> ExpiryScheduler : log ERROR; the next run (or restart) catches up
+  ExpiryScheduler -> ExpiryScheduler : count trade_job_failures_total{job=expiry};\nlog ERROR with cause; the next run (or restart) catches up
 end
 
 note over ExpiryScheduler, PostgreSQL
-  Several instances may run the job at once: the UPDATE row locks
-  make each trade expire (and be audited) exactly once (A-42).
+  Several instances may run the job at once: FOR UPDATE SKIP LOCKED
+  makes each trade expire (and be audited) exactly once (A-42).
 end note
 
 @enduml
