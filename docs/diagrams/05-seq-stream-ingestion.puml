@@ -22,13 +22,13 @@ alt empty, not JSON, or wrong JSON types (POISON: US-302; oversized: US-607.1)
   TradeConsumer --> Container : rethrow (not retryable)
   Container -> DeadLetterAuditRecoverer : accept(record, exception)
   DeadLetterAuditRecoverer -> DeadLetterPublishingRecoverer : accept(record, exception)
-  DeadLetterPublishingRecoverer -> DLT : publish original value, same partition, + headers\n(topic, partition, offset, exception class/message)
+  DeadLetterPublishingRecoverer -> DLT : publish key + value, partition by key, + headers\n(topic, partition, offset, exception class/message)
   DeadLetterAuditRecoverer -> DeadLetterAuditRecoverer : count trade.deadletter{type=POISON},\nWARN position (no payload)
   DeadLetterAuditRecoverer -> AuditEventStore : insert(POISON, _id = "topic-partition-offset", payload capped, error)
   AuditEventStore -> MongoDB : insertOne (duplicate key = already recorded)
   note right of DeadLetterAuditRecoverer
-    A MongoDB failure here is logged at ERROR,
-    not thrown: the DLT record is the durable
+    A MongoDB failure here is logged at ERROR
+    and counted, not thrown: the DLT record is the durable
     fallback (ADR-005 §3).
   end note
   Container -> Topic : commit offset (after the DLT publish)

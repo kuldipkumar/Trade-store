@@ -32,10 +32,7 @@ public class KafkaConfig {
         return TopicBuilder.name(kafka.topic()).partitions(kafka.partitions()).replicas(kafka.replicationFactor()).build();
     }
 
-    /**
-     * The dead-letter topic (US-302). It has the same partition count as the inbound topic because a dead letter
-     * keeps its original partition number (docs/05-lld.md section 6.2).
-     */
+    /** The dead-letter topic (US-302), sized like the inbound topic; records are partitioned by key. */
     @Bean
     NewTopic tradesDeadLetter(TradeStoreProperties properties) {
         TradeStoreProperties.Kafka kafka = properties.kafka();
@@ -56,8 +53,12 @@ public class KafkaConfig {
         return errorHandler(new DeadLetterAuditRecoverer(publisher, events, audit, registry));
     }
 
+    /**
+     * Where a dead letter goes: the producer chooses the partition by key (-1), so it exists even when the inbound
+     * topic has more partitions than the dead-letter topic. The original partition is in the headers (US-302.3).
+     */
     static BiFunction<ConsumerRecord<?, ?>, Exception, TopicPartition> deadLetterDestination(String topic) {
-        return (record, e) -> new TopicPartition(topic, record.partition());
+        return (record, e) -> new TopicPartition(topic, -1);
     }
 
     DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer) {

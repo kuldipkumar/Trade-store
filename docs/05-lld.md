@@ -41,7 +41,7 @@ Base package: `com.tradestore`. The structure follows AGENTS.md §7. Services de
 | `persistence.nosql` | `MongoAuditEventStore`, `MongoTradeHistoryStore` | `MongoTemplate` adapters. Insert-only. A duplicate key counts as success. |
 | `messaging` | `TradeConsumer` | `@KafkaListener` on `trades.inbound`: reads the message as **text**, parses it with the shared strict `TradeJsonParser` (raw text kept for the audit), calls the ingestion service. *Simplification of the original design (US-301): no custom deserializer; unparseable messages surface as `MalformedTradeException` in the listener and are dead-lettered as poison pills (US-302).* |
 | | `SizeLimitedJsonDeserializer` (US-607) | Rejects payloads over `kafka.max-message-bytes` before parsing. Wrapped by `ErrorHandlingDeserializer`. |
-| | `DeadLetterAuditRecoverer` | Publishes to the dead-letter topic (delegating to `DeadLetterPublishingRecoverer`, same partition number), then counts `trade.deadletter{type}`, logs one WARN line (`outcome=POISON position=… error=<class>`, no payload) and writes the audit entry directly to MongoDB (not through the outbox: there is no trade transaction). A failed publish propagates (offset not committed, redelivered); a failed audit write is logged at ERROR, not thrown. `POISON` now; `FAILED` with US-303. |
+| | `DeadLetterAuditRecoverer` | Publishes to the dead-letter topic (delegating to `DeadLetterPublishingRecoverer`; partition chosen by key), then counts `trade.deadletter{type}`, logs one WARN line (`outcome=POISON position=… error=<class>`, no payload) and writes the audit entry directly to MongoDB (not through the outbox: there is no trade transaction). A failed publish propagates (offset not committed, redelivered); a failed audit write is logged at ERROR and counted (`trade.deadletter.audit.failures`), not thrown. `POISON` now; `FAILED` with US-303. |
 | | `KafkaConfig` | Topics (`NewTopic`: `trades.inbound` and `trades.inbound.DLT` with the same partition count, from `trade-store.kafka.*`, default 6 partitions / 1 replica; **never increase partitions on a live topic**, it reorders keys) and the `DefaultErrorHandler`: `MalformedTradeException` not retried; other failures retried with exponential backoff (1 s → 10 s). Retry limit: US-303. |
 | | `KafkaHealthIndicator` | `describeCluster` with a timeout; part of the readiness group (US-604.1). |
 | `api` | `TradeController`, `AuditReportController` | HTTP endpoints (§6.1). |
@@ -196,7 +196,7 @@ CREATE TABLE outbox_events (
 | Consumer | Group `trade-store`; `enable.auto.commit=false`; container `AckMode.BATCH` (offsets committed after the records in a poll are processed or recovered); concurrency `kafka.concurrency` (default 3, ≤ partitions). |
 | Not retryable | `DeserializationException` (covers too large, not JSON, wrong types), `TradeRejectedException` (it never reaches the handler anyway), `IllegalArgumentException`. |
 | Retryable | Everything else (for example `DataAccessException`): `ExponentialBackOff` from `retry.initial-interval` (1 s) × `retry.multiplier` (2.0) up to `retry.max-interval` (10 s), **`retry.max-attempts` = 3 deliveries in total**. |
-| `trades.inbound.DLT` | The original key and bytes. Spring headers `kafka_dlt-original-topic`, `-partition`, `-offset`, `-exception-fqcn`, `-exception-message` (US-302.3). Same partition number as the source. |
+| `trades.inbound.DLT` (`kafka.dlt-topic`, default `<topic>.DLT`) | The original key and the value **as text** (the listener reads UTF-8; bytes that are not valid UTF-8 are not preserved exactly, see known limitations). Spring headers `kafka_dlt-original-topic`, `-partition`, `-offset`, `-exception-fqcn`, `-exception-message` (US-302.3). The partition is chosen by the producer from the key, so it always exists on the DLT; the original partition is in the header. |
 
 ### 6.3 Audit event IDs
 - Outcomes recorded through the outbox use a random UUID `eventId`, so a redelivered message produces a second, accurate event (A-24).
@@ -242,6 +242,7 @@ CREATE TABLE outbox_events (
 | Counter | `trade_outcomes_total{outcome, reason, channel}`: one increment per reason for rejections |
 | Timer | `trade_processing_seconds{channel}`: ingestion use case latency |
 | Counter | `trade_deadletter_total{type=POISON\|FAILED}` |
+| Counter | `trade_deadletter_audit_failures_total`: dead letters whose audit entry could not be written (logged at ERROR with the position; the DLT record remains) |
 | Counter | `trade_job_failures_total{job}`: failed runs of a scheduled job: `expiry` (each logged at ERROR) and `outbox-relay` (each logged at WARN; every `outbox.alert-after-failed-polls` consecutive failures, ERROR with the waiting trade IDs) |
 | Gauges | `trade_outbox_backlog_size`, `trade_outbox_oldest_age_seconds` |
 | Kafka lag | Micrometer's Kafka client metrics (`kafka_consumer_fetch_manager_records_lag_max`) |
