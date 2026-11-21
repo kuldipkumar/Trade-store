@@ -334,4 +334,16 @@ class TradeIngestionServiceTest {
         verify(trades, never()).upsertIfNotOlder(any());
         assertThat(outcomes("REJECTED", "MATURITY_IN_PAST")).isEqualTo(1.0);
     }
+
+    @Test
+    @Tag("US-201.3")
+    void should_leaveTheStoredVersionUnchanged_when_aHigherVersionHasAPastMaturity() {
+        // Arrange (A-14: the maturity rule applies to replacements too)
+        when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 1, false)));
+        TradeSubmission v2Past = new TradeSubmission("T1", 2, "CP-1", "B1", "2026-11-18", Channel.REST, "{}");
+
+        // Act + Assert
+        assertThatThrownBy(() -> service.ingest(v2Past)).isExactlyInstanceOf(TradeRejectedException.class);
+        verify(trades, never()).upsertIfNotOlder(any());
+    }
 }
