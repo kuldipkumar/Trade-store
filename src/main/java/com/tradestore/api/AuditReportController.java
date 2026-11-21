@@ -26,6 +26,15 @@ public class AuditReportController {
                                       @RequestParam(required = false) Outcome outcome,
                                       @RequestParam(defaultValue = "0") int page,
                                       @RequestParam(defaultValue = "50") int size) {
+        if (page < 0) {
+            throw new InvalidRequestParameterException("page", "page must be 0 or greater");
+        }
+        if (size < 1) {
+            throw new InvalidRequestParameterException("size", "size must be 1 or greater");
+        }
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new InvalidRequestParameterException("from", "from must not be after to");
+        }
         return AuditReportResponse.from(reports.report(from, to, tradeId, outcome, page, size));
     }
 }
