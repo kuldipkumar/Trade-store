@@ -7,6 +7,10 @@ import com.tradestore.service.parsing.MalformedTradeException;
 import com.tradestore.service.parsing.TradeJsonParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.nio.charset.StandardCharsets;
+
+import com.tradestore.config.TradeStoreProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
@@ -26,16 +30,28 @@ public class TradeConsumer {
 
     private final TradeIngestionService ingestion;
     private final TradeJsonParser parser;
+    private final int maxMessageBytes;
 
-    public TradeConsumer(TradeIngestionService ingestion, TradeJsonParser parser) {
+    @Autowired
+    public TradeConsumer(TradeIngestionService ingestion, TradeJsonParser parser, TradeStoreProperties properties) {
+        this(ingestion, parser, properties.kafka().maxMessageBytes());
+    }
+
+    TradeConsumer(TradeIngestionService ingestion, TradeJsonParser parser, int maxMessageBytes) {
         this.ingestion = ingestion;
         this.parser = parser;
+        this.maxMessageBytes = maxMessageBytes;
     }
 
     @KafkaListener(topics = "${trade-store.kafka.topic:trades.inbound}", groupId = "${spring.kafka.consumer.group-id:trade-store}")
     public void onMessage(@Payload(required = false) String message) {
         if (message == null || message.isBlank()) {
             throw new MalformedTradeException("The message is empty");
+        }
+        // Checked before parsing (US-607.1, A-47). UTF-8 needs at most 3 bytes per char, so most messages skip encoding.
+        if (message.length() > maxMessageBytes
+                || (message.length() * 3L > maxMessageBytes && message.getBytes(StandardCharsets.UTF_8).length > maxMessageBytes)) {
+            throw new MalformedTradeException("The message is larger than " + maxMessageBytes + " bytes");
         }
         try {
             ingestion.ingest(parser.parse(message, Channel.STREAM));

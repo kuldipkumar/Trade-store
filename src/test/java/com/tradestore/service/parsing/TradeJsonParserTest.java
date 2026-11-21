@@ -60,4 +60,18 @@ class TradeJsonParserTest {
         // Act + Assert
         assertThatThrownBy(() -> parser.parse(body, Channel.REST)).isInstanceOf(MalformedTradeException.class);
     }
+
+    @Test
+    @Tag("US-607.2")
+    void should_ignoreUnknownFields_when_aValidTradeHasExtras() {
+        // Arrange
+        String body = "{\"tradeId\":\"T1\",\"version\":1,\"counterPartyId\":\"CP-1\",\"bookId\":\"B1\","
+                + "\"maturityDate\":\"2027-05-20\",\"desk\":\"FX\",\"tags\":[1,{\"a\":null}]}";
+
+        // Act
+        TradeSubmission parsed = parser.parse(body, Channel.STREAM);
+
+        // Assert: processed as usual; the raw text (extras included) is kept for the audit
+        assertThat(parsed).isEqualTo(new TradeSubmission("T1", 1, "CP-1", "B1", "2027-05-20", Channel.STREAM, body));
+    }
 }

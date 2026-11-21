@@ -122,6 +122,7 @@ class AssignmentScenarioIT {
 
     @Test
     @Order(3)
+    @Tag("US-603.2")
     @Tag("US-107.3")
     void should_rejectT2v1AsLowerVersion_when_T2v2IsStored() {
         // Act + Assert: T2 v1, CP-1, B1, maturity 2027-05-20
@@ -133,6 +134,7 @@ class AssignmentScenarioIT {
 
     @Test
     @Order(4)
+    @Tag("US-603.2")
     @Tag("US-107.4")
     void should_rejectT3AsMaturityInThePast_when_todayIs20261119() {
         // Act + Assert: T3 v3, CP-3, B2, maturity 2026-05-20
@@ -159,6 +161,7 @@ class AssignmentScenarioIT {
 
     @Test
     @Order(6)
+    @Tag("US-603.2")
     @Tag("US-107.5")
     void should_auditEveryOutcomeOfTheScenario_when_itIsComplete() {
         // Assert: 2 ACCEPTED, 2 REJECTED and 2 EXPIRED entries, each for the right trade and reason

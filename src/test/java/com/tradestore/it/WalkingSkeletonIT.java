@@ -48,6 +48,20 @@ class WalkingSkeletonIT {
     }
 
     @Test
+    @Tag("US-604.1")
+    void should_beReadyOnlyWithTheDatabasesAndTheBroker_when_theReadinessProbeIsCalled() {
+        // Act
+        EntityExchangeResult<JsonNode> response = get("/actuator/health/readiness", JsonNode.class);
+
+        // Assert: A-46, readiness covers SQL, NoSQL and the broker
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.OK);
+        JsonNode components = response.getResponseBody().path("components");
+        assertThat(components.path("db").path("status").asString()).isEqualTo("UP");
+        assertThat(components.path("mongo").path("status").asString()).isEqualTo("UP");
+        assertThat(components.path("kafka").path("status").asString()).isEqualTo("UP");
+    }
+
+    @Test
     @Tag("US-603.1")
     void should_applyFlywayBaseline_when_applicationStarts() {
         // Act

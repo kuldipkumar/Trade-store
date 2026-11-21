@@ -7,10 +7,12 @@ import com.tradestore.service.parsing.MalformedTradeException;
 import java.sql.SQLException;
 import java.sql.SQLNonTransientConnectionException;
 import java.sql.SQLTransientConnectionException;
+import java.time.Duration;
 import java.util.List;
 import java.util.function.BiFunction;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
@@ -20,6 +22,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
@@ -46,6 +49,12 @@ public class KafkaConfig {
         return TopicBuilder.name(kafka.topic()).partitions(kafka.partitions()).replicas(kafka.replicationFactor()).build();
     }
 
+    /** Broker reachability, in the readiness group (US-604.1). One admin client, created on first use, closed with the context. */
+    @Bean
+    KafkaHealthIndicator kafkaHealthIndicator(KafkaAdmin kafkaAdmin) {
+        return new KafkaHealthIndicator(() -> Admin.create(kafkaAdmin.getConfigurationProperties()), Duration.ofSeconds(3));
+    }
+
     /** The dead-letter topic (US-302), sized like the inbound topic; records are partitioned by key. */
     @Bean
     NewTopic tradesDeadLetter(TradeStoreProperties properties) {
@@ -64,7 +73,9 @@ public class KafkaConfig {
     DefaultErrorHandler kafkaErrorHandler(KafkaOperations<?, ?> kafka, TradeStoreProperties properties,
                                           AuditEventFactory events, AuditEventStore audit, MeterRegistry registry) {
         String deadLetterTopic = properties.kafka().dltTopic();
-        DeadLetterPublishingRecoverer publisher = new DeadLetterPublishingRecoverer(kafka, deadLetterDestination(deadLetterTopic));
+        DeadLetterPublishingRecoverer publisher = new TruncatingDeadLetterPublisher(kafka,
+                deadLetterDestination(deadLetterTopic), properties.kafka().maxMessageBytes(),
+                properties.audit().maxPayloadChars());
         return errorHandler(new DeadLetterAuditRecoverer(publisher, events, audit, registry, KafkaConfig::isUnreadable),
                 properties.retry(), registry);
     }

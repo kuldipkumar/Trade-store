@@ -92,6 +92,7 @@ class ExpiryIT {
     }
 
     @Test
+    @Tag("US-603.2")
     @Tag("US-202.1")
     void should_expireOnlyTradesMaturedBeforeToday_when_jobRuns() {
         // Act

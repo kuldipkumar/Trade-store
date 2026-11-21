@@ -44,7 +44,6 @@ package "messaging" {
     + errorHandler(...) : DefaultErrorHandler
     + topics() : NewTopics
   }
-  class SizeLimitedJsonDeserializer <<US-607>>
   class DeadLetterAuditRecoverer <<ConsumerRecordRecoverer>> {
     + accept(record, exception)
   }
