@@ -18,6 +18,7 @@ public class TradeQueryService {
 
     private final TradeRepository trades;
     private final int maxPageSize;
+    private final TradeHistoryStore history;
 
     @Autowired
     public TradeQueryService(TradeRepository trades, TradeHistoryStore history, TradeStoreProperties properties) {
@@ -27,6 +28,7 @@ public class TradeQueryService {
     TradeQueryService(TradeRepository trades, TradeHistoryStore history, int maxPageSize) {
         this.trades = trades;
         this.maxPageSize = maxPageSize;
+        this.history = history;
     }
 
     /** One page of trades, sorted by tradeId; the size is capped at max-page-size (US-403, A-52). */
@@ -34,9 +36,18 @@ public class TradeQueryService {
         return trades.findPage(expired, page, Math.min(size, maxPageSize));
     }
 
-    /** Stub: implemented test-first. */
+    /**
+     * Every accepted version, ordered by version and then received time (US-404). Eventually consistent: a
+     * version appears once the outbox relay has copied it to MongoDB (ADR-005).
+     *
+     * @throws TradeNotFoundException if no history exists for this ID
+     */
     public List<TradeHistoryEntry> history(String tradeId) {
-        return null;
+        List<TradeHistoryEntry> entries = history.findByTradeId(tradeId);
+        if (entries.isEmpty()) {
+            throw new TradeNotFoundException(tradeId);
+        }
+        return entries;
     }
 
     /** @throws TradeNotFoundException if no trade is stored with this ID */
