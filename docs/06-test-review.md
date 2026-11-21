@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -37,6 +37,7 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-105.1 | Full | `MandatoryFieldsValidatorTest` (each field named; 64-character limit), `TradeIngestionServiceTest` (rejected and audited) | |
 | US-105.2 | Full | `PositiveVersionValidatorTest`. The rejection path is the same one proven for US-105.1. | |
 | US-105.3 | Full | `MaturityDateFormatValidatorTest`, `MaturityDatesTest` (strict format, impossible dates) | |
+| US-106.1 | Full | `JdbcTradeRepositoryIT`: a deterministic race on real PostgreSQL (v2 waits on v3's row lock, then writes nothing); mutation-verified by removing the version guard | |
 | US-106.2 | Full | `TradeIngestionServiceTest`: re-validates after a lost race and retries once | |
 | US-201.1 | Full | `MaturityNotInPastValidatorTest`, `TradeIngestionServiceTest` (rejected, not written, counted as `MATURITY_IN_PAST`) | |
 | US-201.2 | Full | `MaturityNotInPastValidatorTest`: today and later dates are valid (the boundary) | |
@@ -63,7 +64,6 @@ These criteria belong to stories already started, but no test covers them yet. T
 
 | AC | Gap | Plan |
 |----|-----|------|
-| US-106.1 | Real concurrent writes on PostgreSQL | US-106: Testcontainers concurrency test |
 | US-501.2 | No operation updates or deletes audit entries | US-501: architecture test on the `AuditEventStore` and `TradeHistoryStore` interfaces |
 
 ## Test quality findings
