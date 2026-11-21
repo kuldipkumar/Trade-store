@@ -242,6 +242,7 @@ CREATE TABLE outbox_events (
 | Counter | `trade_outcomes_total{outcome, reason, channel}`: one increment per reason for rejections |
 | Timer | `trade_processing_seconds{channel}`: ingestion use case latency |
 | Counter | `trade_deadletter_total{type=POISON\|FAILED}` |
+| Counter | `trade_retries_total`: stream redeliveries scheduled after a transient failure (each logged at WARN with `position=topic-partition-offset attempt=n of max` and the cause class) |
 | Counter | `trade_deadletter_audit_failures_total`: dead letters whose audit entry could not be written (logged at ERROR with the position; the DLT record remains) |
 | Counter | `trade_job_failures_total{job}`: failed runs of a scheduled job: `expiry` (each logged at ERROR) and `outbox-relay` (each logged at WARN; every `outbox.alert-after-failed-polls` consecutive failures, ERROR with the waiting trade IDs) |
 | Gauges | `trade_outbox_backlog_size`, `trade_outbox_oldest_age_seconds` |

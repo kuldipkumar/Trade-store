@@ -55,6 +55,7 @@ else valid JSON
     TradeIngestionService --> TradeConsumer : throw DataAccessException
     TradeConsumer --> Container : rethrow
     loop up to retry.max-attempts deliveries (default 3), exponential backoff
+      Container -> Container : count trade.retries, WARN position + attempt
       Container -> TradeConsumer : redeliver same record (seek)
     end
     alt a retry succeeds

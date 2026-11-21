@@ -11,6 +11,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
@@ -30,6 +32,8 @@ import org.springframework.util.backoff.ExponentialBackOff;
  */
 @Configuration(proxyBeanMethods = false)
 public class KafkaConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(KafkaConfig.class);
 
     @Bean
     NewTopic tradesInbound(TradeStoreProperties properties) {
@@ -78,6 +82,14 @@ public class KafkaConfig {
             ConversionException.class, MethodArgumentResolutionException.class, NoSuchMethodException.class,
             ClassCastException.class);
 
+    private static Throwable rootCause(Throwable failure) {
+        Throwable t = failure;
+        while (t.getCause() != null && t.getCause() != t) {
+            t = t.getCause();
+        }
+        return t;
+    }
+
     /** A failure that retrying can't fix, anywhere in the cause chain: the message itself is unusable (POISON). */
     static boolean isUnreadable(Throwable failure) {
         for (Throwable t = failure; t != null; t = t.getCause() == t ? null : t.getCause()) {
@@ -96,6 +108,14 @@ public class KafkaConfig {
         backOff.setMaxAttempts(retry.maxAttempts() - 1); // retries after the first delivery
         DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);
         NOT_RETRYABLE.forEach(handler::addNotRetryableExceptions);
+        handler.setRetryListeners((record, failure, attempt) -> {
+            // Called for every failed delivery; count only those that will be redelivered (AGENTS.md section 4).
+            if (!isUnreadable(failure) && attempt < retry.maxAttempts()) {
+                registry.counter("trade.retries").increment();
+                log.warn("Retrying position={}-{}-{} attempt={} of {}: {}", record.topic(), record.partition(),
+                        record.offset(), attempt, retry.maxAttempts(), rootCause(failure).getClass().getName());
+            }
+        });
         return handler;
     }
 }
