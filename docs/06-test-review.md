@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -64,6 +64,8 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-401.4 | Full | `TradeApiIT`: 422 with MATURITY_IN_PAST | |
 | US-401.5 | Full | `TradeApiIT`: invalid fields → 400 listing them; malformed JSON or a wrong JSON type (version 1.9) → 400 MALFORMED_REQUEST, nothing stored; invalid fields plus a lower version → 400 with both reasons (D6); 415 and 405 in the standard shape. `TradeJsonParserTest` (strict types) | |
 | US-401.6 | Full | `TradeApiIT` (1.1 MB body → 413), `RequestSizeLimitFilterTest` (chunked bodies counted while read, through `getReader()` and repeated `getInputStream()` too), `GlobalExceptionHandlerTest` (413 also when wrapped), `TradeStorePropertiesTest` (limit must be positive) | |
+| US-402.1 | Full | `TradeApiIT`: after v1 and v2, GET returns v2 with every field incl. createdDate and expired; `TradeQueryServiceTest` | |
+| US-402.2 | Full | `TradeApiIT`: unknown trade → 404 standard shape; an unknown path is 404 too, not 500; `TradeQueryServiceTest` | |
 | US-404.1 | Partial | `MongoStoresIT`: ordered by version, then received time | `GET /trades/{id}/history`. Closed in **US-404**. |
 | US-501.1 | Partial | `MongoStoresIT`, `AuditEventFactoryTest`, `JdbcOutboxRepositoryIT`, `OutboxRelayServiceTest`, `StoreTradeIT` (all the fields); `TradeApiIT` (the payload is exactly the body the REST client sent) | Proven for the REST channel. Closed by **US-301** (the STREAM channel). |
 | US-501.2 | Full | `AuditTrailImmutabilityTest`: the audit and history ports and their MongoDB implementations offer only insert and read operations (mutation-verified) | |

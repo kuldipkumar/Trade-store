@@ -226,7 +226,7 @@ CREATE TABLE outbox_events (
 | Any `INVALID_FIELD` | `TradeRejectedException` | **400** | Offset committed, no retry | `REJECTED` |
 | `LOWER_VERSION` (and no invalid field) | `LowerVersionException` | **409** | Offset committed, no retry | `REJECTED` |
 | `MATURITY_IN_PAST` only | `TradeRejectedException` | **422** | Offset committed, no retry | `REJECTED` |
-| Unknown trade on the read side | `TradeNotFoundException` | 404 | n/a | n/a |
+| Unknown trade on the read side, or unknown path | `TradeNotFoundException`, `NoResourceFoundException` | 404 | n/a | n/a |
 | Database unavailable (no connection, transient or resource failure) | `CannotCreateTransactionException`, `TransientDataAccessException`, `DataAccessResourceFailureException` | 503, logged | Retry with backoff, then DLT | `FAILED` (Kafka only) |
 | Unsupported content type / method | `HttpMediaTypeNotSupportedException` / `HttpRequestMethodNotSupportedException` | 415 / 405 | n/a | n/a |
 | MongoDB unavailable during relay | `MongoException` | n/a | n/a | Delayed, never lost: rows stay in the outbox |
