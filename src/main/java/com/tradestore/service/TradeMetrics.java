@@ -7,8 +7,13 @@ import com.tradestore.domain.Outcome;
 import com.tradestore.domain.ReasonCode;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import org.springframework.stereotype.Component;
 
-/** Stub: implemented test-first (TradeMetricsTest). */
+/**
+ * Business metrics for trade ingestion (US-604.2, docs/05-lld.md section 8). Exposed by Prometheus as
+ * {@code trade_outcomes_total{outcome, reason, channel}} and {@code trade_processing_seconds{channel}}.
+ */
+@Component
 public class TradeMetrics {
 
     private final MeterRegistry registry;

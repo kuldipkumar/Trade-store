@@ -37,6 +37,7 @@ import com.tradestore.service.validation.MandatoryFieldsValidator;
 import com.tradestore.service.validation.MaturityDateFormatValidator;
 import com.tradestore.service.validation.PositiveVersionValidator;
 import org.junit.jupiter.api.Tag;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.support.TransactionCallback;
@@ -52,11 +53,12 @@ class TradeIngestionServiceTest {
     private final TradeRepository trades = mock(TradeRepository.class);
     private final OutboxRepository outbox = mock(OutboxRepository.class);
     private final RecordingTransactions tx = new RecordingTransactions();
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
     private final TradeIngestionService service = new TradeIngestionService(
             new CompositeTradeValidator(List.of(new MandatoryFieldsValidator(), new PositiveVersionValidator(),
                     new MaturityDateFormatValidator(), new LowerVersionValidator())),
-            trades, outbox, new AuditEventFactory(CLOCK, 10_000), tx, CLOCK);
+            trades, outbox, new AuditEventFactory(CLOCK, 10_000), tx, CLOCK, new TradeMetrics(registry));
 
     /** Runs the callback directly and records whether it completed (i.e. would have committed). */
     static class RecordingTransactions implements TransactionOperations {

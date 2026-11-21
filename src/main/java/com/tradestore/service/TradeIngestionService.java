@@ -37,15 +37,18 @@ public class TradeIngestionService {
     private final AuditEventFactory events;
     private final TransactionOperations transactions;
     private final Clock clock;
+    private final TradeMetrics metrics;
 
     public TradeIngestionService(CompositeTradeValidator validator, TradeRepository trades, OutboxRepository outbox,
-                                 AuditEventFactory events, TransactionOperations transactions, Clock clock) {
+                                 AuditEventFactory events, TransactionOperations transactions, Clock clock,
+                                 TradeMetrics metrics) {
         this.validator = validator;
         this.trades = trades;
         this.outbox = outbox;
         this.events = events;
         this.transactions = transactions;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     /**
