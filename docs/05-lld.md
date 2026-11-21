@@ -147,7 +147,7 @@ CREATE TABLE outbox_events (
 );
 ```
 - The 64-character limit on IDs is enforced by `MandatoryFieldsValidator` as well, so an over-long ID is an `INVALID_FIELD` rejection and never a database error.
-- **MongoDB indexes** are created at startup by `MongoIndexInitializer` (`ensureIndex`, idempotent): `audit_events {eventTimestamp}`, `{outcome, eventTimestamp}`, `{tradeId, eventTimestamp}`; `trade_history {tradeId, version, receivedTimestamp}`.
+- **MongoDB indexes** are created at startup by `MongoIndexInitializer` (`ensureIndex`, idempotent): `audit_events {eventTimestamp, _id}`, `{outcome, eventTimestamp, _id}`, `{tradeId, eventTimestamp, _id}` (ending in `_id` so the report's sort is index-backed; the earlier indexes without `_id` are dropped at startup); `trade_history {tradeId, version, receivedTimestamp}`.
 
 ## 6. Contracts
 
@@ -158,7 +158,7 @@ CREATE TABLE outbox_events (
 | `GET /trades/{tradeId}` | | `200 TradeResponse` | 404 |
 | `GET /trades?expired={bool}&page=0&size=20` | `size` capped at `api.max-page-size` (100); `page ≥ 0`, `size ≥ 1` | `200 PageResponse<TradeResponse>` sorted by `tradeId` (`COLLATE "C"`, code-point order); page and total from one query (`count(*) OVER ()`) | 400 `INVALID_PARAMETER` |
 | `GET /trades/{tradeId}/history` | | `200 [TradeVersionResponse]` sorted by version, then received time | 404 |
-| `GET /reports/audit?from&to&tradeId&outcome&page&size` | `from`/`to`: local dates, inclusive, in the configured zone | `200 AuditReportResponse` (JSON) or `text/csv` (by `Accept`) | 400 |
+| `GET /reports/audit?from&to&tradeId&outcome&page&size` | All optional. `from`/`to`: local dates, inclusive, in the configured zone (queried as `[from 00:00, to+1 00:00)`); `size` default 50, capped at `api.max-page-size`; entries oldest first; `summary` and `totalElements` come from one `$group` aggregation | `200 AuditReportResponse` (JSON) or `text/csv` (by `Accept`) | 400 |
 
 ```jsonc
 // TradeRequest (and the Kafka TradeMessage): unknown fields are ignored
@@ -179,7 +179,8 @@ CREATE TABLE outbox_events (
 { "summary": { "ACCEPTED": 2, "REJECTED": 2, "EXPIRED": 2 },
   "entries": [ { "eventId": "…", "tradeId": "T2", "version": 1, "outcome": "REJECTED",
                  "reasons": [ { "reason": "LOWER_VERSION", "field": "version", "message": "…" } ],
-                 "channel": "REST", "eventTimestamp": "2026-11-19T10:15:30Z", "payload": "{…}" } ],
+                 "channel": "REST", "eventTimestamp": "2026-11-19T10:15:30Z", "payload": "{…}",
+                 "error": null } ],                // error: set for POISON / FAILED only
   "page": 0, "size": 50, "totalElements": 6, "totalPages": 1 }
 
 // ApiErrorResponse (every error)
@@ -246,6 +247,7 @@ CREATE TABLE outbox_events (
 | Counter | `trade_deadletter_audit_failures_total`: dead letters whose audit entry could not be written (logged at ERROR with the position; the DLT record remains) |
 | Counter | `trade_job_failures_total{job}`: failed runs of a scheduled job: `expiry` (each logged at ERROR) and `outbox-relay` (each logged at WARN; every `outbox.alert-after-failed-polls` consecutive failures, ERROR with the waiting trade IDs) |
 | Gauges | `trade_outbox_backlog_size`, `trade_outbox_oldest_age_seconds` |
+| Timer (read side) | Read endpoints (`/trades…`, `/reports/audit`) are measured by Spring's `http_server_requests_seconds{uri,status}`; they have no business outcome to count, so no separate `trade.*` timer is added |
 | Kafka lag | Micrometer's Kafka client metrics (`kafka_consumer_fetch_manager_records_lag_max`) |
 | Health | `readiness` group = `db`, `mongo`, `kafka` (`KafkaHealthIndicator`) (US-604.1); `liveness` = the application state only |
 | Logs | One INFO line per trade (ingestion and expiry, `channel=SCHEDULER` for the latter): `outcome=REJECTED tradeId=T2 version=1 channel=STREAM reasons=[LOWER_VERSION]`. MDC holds `tradeId` and `channel`. No payloads (A-32). |

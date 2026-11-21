@@ -1,0 +1,107 @@
+package com.tradestore.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
+
+import com.tradestore.domain.Outcome;
+import com.tradestore.persistence.AuditEventStore;
+import com.tradestore.persistence.AuditQuery;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+
+/** US-502: the report's date range, totals and page-size cap. */
+class AuditReportServiceTest {
+
+    private static final ZoneId KOLKATA = ZoneId.of("Asia/Kolkata");
+
+    private final AuditEventStore audit = mock(AuditEventStore.class);
+    private final AuditReportService service = new AuditReportService(audit,
+            Clock.fixed(Instant.parse("2026-11-21T10:00:00Z"), KOLKATA), 100);
+
+    @BeforeEach
+    void emptyStore() {
+        when(audit.find(any(), anyInt(), anyInt())).thenReturn(List.of());
+        when(audit.countByOutcome(any())).thenReturn(Map.of());
+    }
+
+    @Test
+    @Tag("US-502.1")
+    void should_queryFromStartOfFromDateUntilStartOfTheDayAfterTo_when_localDatesAreGiven() {
+        // Act
+        service.report(LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 19), "T2", Outcome.REJECTED, 0, 50);
+
+        // Assert: inclusive local dates in the configured zone (A-53), as a half-open instant range
+        AuditQuery expected = new AuditQuery(Instant.parse("2026-10-31T18:30:00Z"), Instant.parse("2026-11-19T18:30:00Z"),
+                "T2", Outcome.REJECTED);
+        verify(audit).find(expected, 0, 50);
+        verify(audit).countByOutcome(expected);
+    }
+
+    @Test
+    @Tag("US-502.3")
+    @Tag("US-502.4")
+    void should_reportTheSummaryAndTotalsOfTheFilteredSet_when_onlyOnePageIsReturned() {
+        // Arrange: 5 matching entries in all
+        when(audit.countByOutcome(any())).thenReturn(Map.of(Outcome.ACCEPTED, 2L, Outcome.REJECTED, 3L));
+
+        // Act
+        AuditReport report = service.report(null, null, null, null, 1, 2);
+
+        // Assert
+        assertThat(report.summary()).isEqualTo(Map.of(Outcome.ACCEPTED, 2L, Outcome.REJECTED, 3L));
+        assertThat(report.totalElements()).isEqualTo(5);
+        assertThat(report.totalPages()).isEqualTo(3);
+        assertThat(report.page()).isEqualTo(1);
+        assertThat(report.size()).isEqualTo(2);
+    }
+
+    @Test
+    @Tag("US-502.4")
+    void should_capThePageSize_when_moreThanTheMaximumIsRequested() {
+        // Act: max-page-size is 100 (A-52: never everything at once)
+        AuditReport report = service.report(null, null, null, null, 0, 5000);
+
+        // Assert
+        verify(audit).find(new AuditQuery(null, null, null, null), 0, 100);
+        assertThat(report.size()).isEqualTo(100);
+    }
+
+    @Test
+    @Tag("US-502.3")
+    void should_listTheSummaryInOutcomeOrder_when_countsArriveInAnyOrder() {
+        // Arrange: the store's map has no defined order
+        Map<Outcome, Long> unordered = new java.util.LinkedHashMap<>();
+        unordered.put(Outcome.EXPIRED, 1L);
+        unordered.put(Outcome.ACCEPTED, 2L);
+        unordered.put(Outcome.REJECTED, 3L);
+        when(audit.countByOutcome(any())).thenReturn(unordered);
+
+        // Act
+        AuditReport report = service.report(null, null, null, null, 0, 10);
+
+        // Assert: stable JSON key order, as in the LLD example
+        assertThat(report.summary().keySet()).containsExactly(Outcome.ACCEPTED, Outcome.REJECTED, Outcome.EXPIRED);
+    }
+
+    @Test
+    @Tag("US-502.2")
+    void should_notFilterOnTradeId_when_itIsBlank() {
+        // Act: GET /reports/audit?tradeId=
+        service.report(null, null, " ", null, 0, 10);
+
+        // Assert
+        verify(audit).find(new AuditQuery(null, null, null, null), 0, 10);
+    }
+}
