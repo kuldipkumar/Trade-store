@@ -73,4 +73,26 @@ class TradeApiIT {
         assertThat(higher.getResponseBody().path("version").asInt()).isEqualTo(2);
         assertThat(higher.getResponseBody().path("maturityDate").asString()).isEqualTo("2099-06-20");
     }
+
+    @Test
+    @Tag("US-401.3")
+    void should_return409WithTheStandardErrorShape_when_aLowerVersionIsSubmitted() {
+        // Arrange
+        post(json(2, "2099-05-20"));
+
+        // Act
+        EntityExchangeResult<JsonNode> response = post(json(1, "2099-05-20"));
+
+        // Assert: {timestamp, status, error, reasons[], path}
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        JsonNode error = response.getResponseBody();
+        assertThat(error.path("timestamp").asString()).isNotBlank();
+        assertThat(error.path("status").asInt()).isEqualTo(409);
+        assertThat(error.path("error").asString()).isEqualTo("Conflict");
+        assertThat(error.path("path").asString()).isEqualTo("/trades");
+        assertThat(error.path("reasons")).hasSize(1);
+        assertThat(error.path("reasons").get(0).path("reason").asString()).isEqualTo("LOWER_VERSION");
+        assertThat(error.path("reasons").get(0).path("field").asString()).isEqualTo("version");
+        assertThat(error.path("reasons").get(0).path("message").asString()).contains("version 1").contains("stored version 2");
+    }
 }
