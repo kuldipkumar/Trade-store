@@ -67,8 +67,8 @@ public class TradeIngestionService {
         Decision decision = transactions.execute(status -> decide(submission, today));
         metrics.recordOutcome(decision.outcome(), decision.reasons(), submission.channel());
         metrics.stopProcessing(timing, submission.channel());
-        log.info("outcome={} tradeId={} version={} channel={}",
-                decision.outcome(), submission.tradeId(), submission.version(), submission.channel());
+        log.info("outcome={} tradeId={} version={} channel={} reasons={}",
+                decision.outcome(), submission.tradeId(), submission.version(), submission.channel(), decision.reasons());
         if (decision.rejection() != null) {
             throw decision.rejection();
         }
