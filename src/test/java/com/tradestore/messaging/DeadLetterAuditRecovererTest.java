@@ -112,4 +112,25 @@ class DeadLetterAuditRecovererTest {
         verifyNoInteractions(audit);
         assertThat(registry.find("trade.deadletter").counter()).isNull();
     }
+
+    @Test
+    @Tag("US-303.2")
+    @Tag("US-604.2")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_auditAndCountAsFailed_when_retriesOfATransientFailureAreExhausted(CapturedOutput output) {
+        // Arrange
+        Exception exhausted = new ListenerExecutionFailedException("listener failed",
+                new DataAccessResourceFailureException("PostgreSQL down"));
+
+        // Act
+        recoverer.accept(record, exhausted);
+
+        // Assert
+        ArgumentCaptor<AuditEvent> event = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(audit).insert(event.capture());
+        assertThat(event.getValue().outcome()).isEqualTo(Outcome.FAILED);
+        assertThat(event.getValue().error()).startsWith(DataAccessResourceFailureException.class.getName());
+        assertThat(registry.counter("trade.deadletter", "type", "FAILED").count()).isEqualTo(1.0);
+        assertThat(output).contains("outcome=FAILED position=trades.inbound-3-42");
+    }
 }
