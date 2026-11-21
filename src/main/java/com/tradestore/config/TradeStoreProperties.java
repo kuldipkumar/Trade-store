@@ -25,8 +25,7 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
                         Expiry.DEFAULT_STARTUP_RETRY_INTERVAL, Expiry.DEFAULT_STARTUP_MAX_ATTEMPTS)
                 : expiry;
         api = api == null ? new Api(Api.DEFAULT_MAX_REQUEST_BYTES, Api.DEFAULT_MAX_PAGE_SIZE) : api;
-        kafka = kafka == null ? new Kafka(Kafka.DEFAULT_TOPIC, Kafka.DEFAULT_PARTITIONS, Kafka.DEFAULT_REPLICATION_FACTOR,
-                Kafka.DEFAULT_DLT_TOPIC) : kafka;
+        kafka = kafka == null ? new Kafka(Kafka.DEFAULT_TOPIC, Kafka.DEFAULT_PARTITIONS, Kafka.DEFAULT_REPLICATION_FACTOR, null) : kafka;
     }
 
     /** @param maxPayloadChars longer payloads are truncated in the audit trail (US-302.2, A-52) */
@@ -93,16 +92,16 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
      * @param partitions        consumers scale up to this count (A-42). Never increase it on a live topic: it
      *                          remaps keys to partitions and can reorder a trade's versions (A-22).
      * @param replicationFactor broker copies of each partition
-     * @param dltTopic          where unprocessable messages are moved, on the same partition number (US-302)
+     * @param dltTopic          where unprocessable messages are moved (US-302); defaults to {@code <topic>.DLT}
      */
     public record Kafka(@DefaultValue("trades.inbound") String topic, @DefaultValue("6") int partitions,
-                        @DefaultValue("1") short replicationFactor, @DefaultValue("trades.inbound.DLT") String dltTopic) {
+                        @DefaultValue("1") short replicationFactor, String dltTopic) {
         static final String DEFAULT_TOPIC = "trades.inbound";
-        static final String DEFAULT_DLT_TOPIC = "trades.inbound.DLT";
         static final int DEFAULT_PARTITIONS = 6;
         static final short DEFAULT_REPLICATION_FACTOR = 1;
 
         public Kafka {
+            dltTopic = dltTopic == null || dltTopic.isBlank() ? topic + ".DLT" : dltTopic;
             if (partitions < 1) {
                 throw new IllegalArgumentException("trade-store.kafka.partitions must be at least 1, was " + partitions);
             }
