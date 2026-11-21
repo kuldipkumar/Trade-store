@@ -62,4 +62,18 @@ class ExpirySchedulerTest {
         // Assert: the cause chain is logged, not only the outer message
         assertThat(output).contains("connection refused");
     }
+
+    @Test
+    @Tag("US-604.3")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_logHowManyTradesExpired_when_theRunSucceeds(CapturedOutput output) {
+        // Arrange
+        when(expiry.expireMaturedTrades()).thenReturn(3);
+
+        // Act
+        scheduler.runScheduled();
+
+        // Assert (05-seq-expiry: log INFO "expired {count} trades")
+        assertThat(output).contains("Expiry run expired 3 trades");
+    }
 }
