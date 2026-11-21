@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 
 import com.tradestore.service.ExpiryService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.sql.SQLException;
+
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,5 +46,20 @@ class ExpirySchedulerTest {
         var failures = registry.find("trade.job.failures").tag("job", "expiry").counter();
         assertThat(failures == null ? 0 : failures.count()).isEqualTo(1.0);
         assertThat(output).contains("ERROR").contains("Expiry run failed");
+    }
+
+    @Test
+    @Tag("US-202.1")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_logTheUnderlyingCause_when_theRunFails(CapturedOutput output) {
+        // Arrange: the database driver's reason is wrapped by Spring's exception
+        when(expiry.expireMaturedTrades()).thenThrow(
+                new DataAccessResourceFailureException("Could not get connection", new SQLException("connection refused")));
+
+        // Act
+        scheduler.runScheduled();
+
+        // Assert: the cause chain is logged, not only the outer message
+        assertThat(output).contains("connection refused");
     }
 }
