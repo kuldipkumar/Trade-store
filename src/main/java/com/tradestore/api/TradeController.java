@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -31,6 +32,20 @@ public class TradeController {
         this.ingestion = ingestion;
         this.parser = parser;
         this.queries = queries;
+    }
+
+    /** A page of trades sorted by tradeId, optionally only expired or only live ones (US-403). */
+    @GetMapping
+    public PageResponse<TradeResponse> list(@RequestParam(required = false) Boolean expired,
+                                            @RequestParam(defaultValue = "0") int page,
+                                            @RequestParam(defaultValue = "20") int size) {
+        if (page < 0) {
+            throw new InvalidRequestParameterException("page", "page must be 0 or greater");
+        }
+        if (size < 1) {
+            throw new InvalidRequestParameterException("size", "size must be 1 or greater");
+        }
+        return PageResponse.from(queries.list(expired, page, size), TradeResponse::from);
     }
 
     /** The latest stored version (US-402); 404 if unknown. */

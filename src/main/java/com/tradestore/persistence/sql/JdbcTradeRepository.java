@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
+import com.tradestore.persistence.PageResult;
 import com.tradestore.persistence.TradeRepository;
 import com.tradestore.persistence.UpsertResult;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -105,5 +106,29 @@ public class JdbcTradeRepository implements TradeRepository {
     public List<Trade> markExpired(LocalDate today, int limit) {
         return jdbc.sql(MARK_EXPIRED_BATCH).param("today", today).param("limit", limit)
                 .query(JdbcTradeRepository::mapTrade).list();
+    }
+
+    @Override
+    public PageResult<Trade> findPage(Boolean expired, int page, int size) {
+        // ":expired IS NULL" makes the filter optional. ORDER BY trade_id COLLATE "C": stable, locale-independent
+        // (code-point) order on every PostgreSQL installation. count(*) OVER () returns the total from the same
+        // statement as the page, so the two always agree (US-403).
+        String where = " WHERE (CAST(:expired AS boolean) IS NULL OR expired = :expired)";
+        List<Counted> rows = jdbc.sql("""
+                        SELECT trade_id, version, counter_party_id, book_id, maturity_date, created_date, expired,
+                               count(*) OVER () AS total
+                          FROM trades""" + where + " ORDER BY trade_id COLLATE \"C\" LIMIT :size OFFSET :offset")
+                .param("expired", expired)
+                .param("size", size)
+                .param("offset", (long) page * size)
+                .query((rs, n) -> new Counted(mapTrade(rs, n), rs.getLong("total")))
+                .list();
+        long total = rows.isEmpty()
+                ? jdbc.sql("SELECT count(*) FROM trades" + where).param("expired", expired).query(Long.class).single()
+                : rows.getFirst().total();
+        return new PageResult<>(rows.stream().map(Counted::trade).toList(), page, size, total);
+    }
+
+    private record Counted(Trade trade, long total) {
     }
 }

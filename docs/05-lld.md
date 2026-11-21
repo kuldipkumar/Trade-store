@@ -157,7 +157,7 @@ CREATE TABLE outbox_events (
 |-----------------|---------|---------|--------|
 | `POST /trades` | `TradeRequest` | `201` new trade, `200` replacement; body `TradeResponse` | 400, 409, 413, 422, 503 |
 | `GET /trades/{tradeId}` | | `200 TradeResponse` | 404 |
-| `GET /trades?expired={bool}&page=0&size=20` | `size` capped at `api.max-page-size` (100) | `200 PageResponse<TradeResponse>` sorted by `tradeId` | 400 |
+| `GET /trades?expired={bool}&page=0&size=20` | `size` capped at `api.max-page-size` (100); `page ≥ 0`, `size ≥ 1` | `200 PageResponse<TradeResponse>` sorted by `tradeId` (`COLLATE "C"`, code-point order); page and total from one query (`count(*) OVER ()`) | 400 `INVALID_PARAMETER` |
 | `GET /trades/{tradeId}/history` | | `200 [TradeVersionResponse]` sorted by version, then received time | 404 |
 | `GET /reports/audit?from&to&tradeId&outcome&page&size` | `from`/`to`: local dates, inclusive, in the configured zone | `200 AuditReportResponse` (JSON) or `text/csv` (by `Accept`) | 400 |
 
@@ -226,6 +226,7 @@ CREATE TABLE outbox_events (
 | Any `INVALID_FIELD` | `TradeRejectedException` | **400** | Offset committed, no retry | `REJECTED` |
 | `LOWER_VERSION` (and no invalid field) | `LowerVersionException` | **409** | Offset committed, no retry | `REJECTED` |
 | `MATURITY_IN_PAST` only | `TradeRejectedException` | **422** | Offset committed, no retry | `REJECTED` |
+| Out-of-range query parameter (page < 0, size < 1) | `InvalidRequestParameterException` | 400 `INVALID_PARAMETER` | n/a | n/a |
 | Unknown trade on the read side, or unknown path | `TradeNotFoundException`, `NoResourceFoundException` | 404 | n/a | n/a |
 | Database unavailable (no connection, transient or resource failure) | `CannotCreateTransactionException`, `TransientDataAccessException`, `DataAccessResourceFailureException` | 503, logged | Retry with backoff, then DLT | `FAILED` (Kafka only) |
 | Unsupported content type / method | `HttpMediaTypeNotSupportedException` / `HttpRequestMethodNotSupportedException` | 415 / 405 | n/a | n/a |

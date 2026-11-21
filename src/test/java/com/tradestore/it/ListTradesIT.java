@@ -1,0 +1,119 @@
+package com.tradestore.it;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import com.tradestore.domain.Trade;
+import com.tradestore.persistence.TradeRepository;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.web.servlet.client.EntityExchangeResult;
+import org.springframework.test.web.servlet.client.RestTestClient;
+import tools.jackson.databind.JsonNode;
+
+/**
+ * US-403: the paged, filterable trade list. ITs share one database, so totals are checked relative to a
+ * baseline taken before this test stores its own trades.
+ */
+@IntegrationTest
+class ListTradesIT {
+
+    private final RestTestClient rest;
+    private final TradeRepository trades;
+    private final JdbcClient jdbc;
+
+    private final String prefix = "L-" + UUID.randomUUID().toString().substring(0, 8) + "-";
+
+    ListTradesIT(RestTestClient rest, TradeRepository trades, JdbcClient jdbc) {
+        this.rest = rest;
+        this.trades = trades;
+        this.jdbc = jdbc;
+    }
+
+    private void store(int count) {
+        for (int i = 0; i < count; i++) {
+            trades.upsertIfNotOlder(new Trade(prefix + i, 1, "CP-1", "B1", LocalDate.of(2099, 1, 1), LocalDate.of(2026, 11, 21), false));
+        }
+    }
+
+    private EntityExchangeResult<JsonNode> list(String query) {
+        return rest.get().uri("/trades" + query).exchange().expectBody(JsonNode.class).returnResult();
+    }
+
+    @Test
+    @Tag("US-403.1")
+    void should_returnOnePageWithPagingMetadata_when_moreTradesThanThePageSizeAreStored() {
+        // Arrange: 25 more trades than before
+        long before = list("?page=0&size=1").getResponseBody().path("totalElements").asLong();
+        store(25);
+
+        // Act
+        EntityExchangeResult<JsonNode> response = list("?page=0&size=10");
+
+        // Assert
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.OK);
+        JsonNode page = response.getResponseBody();
+        assertThat(page.path("content")).hasSize(10);
+        assertThat(page.path("page").asInt()).isZero();
+        assertThat(page.path("size").asInt()).isEqualTo(10);
+        // ITs share one database and other writers may add trades meanwhile: at least ours, and self-consistent
+        long total = page.path("totalElements").asLong();
+        assertThat(total).isGreaterThanOrEqualTo(before + 25);
+        assertThat(page.path("totalPages").asLong()).isEqualTo((total + 9) / 10);
+    }
+
+    @Test
+    @Tag("US-403.2")
+    void should_returnOnlyExpiredTrades_when_filteringOnExpired() {
+        // Arrange: three live trades, one of them then marked expired
+        store(3);
+        jdbc.sql("UPDATE trades SET expired = true WHERE trade_id = ?").param(prefix + 1).update();
+
+        // Act: every page of the expired filter (the shared table may hold many expired trades)
+        List<JsonNode> all = new ArrayList<>();
+        for (int page = 0; ; page++) {
+            EntityExchangeResult<JsonNode> response = list("?expired=true&size=100&page=" + page);
+            assertThat(response.getStatus()).isEqualTo(HttpStatus.OK);
+            response.getResponseBody().path("content").forEach(all::add);
+            if (page + 1 >= response.getResponseBody().path("totalPages").asLong()) {
+                break;
+            }
+        }
+
+        // Assert: every returned trade is expired, ours is among them, our live ones are not
+        assertThat(all).allMatch(t -> t.path("expired").asBoolean());
+        assertThat(all).extracting(t -> t.path("tradeId").asString()).contains(prefix + 1).doesNotContain(prefix + 0, prefix + 2);
+    }
+
+    @Test
+    @Tag("US-403.1")
+    void should_return400InTheStandardShape_when_pageOrSizeIsOutOfRange() {
+        // Act
+        EntityExchangeResult<JsonNode> negativePage = list("?page=-1&size=10");
+        EntityExchangeResult<JsonNode> zeroSize = list("?page=0&size=0");
+
+        // Assert
+        assertThat(negativePage.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(zeroSize.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(negativePage.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("INVALID_PARAMETER");
+    }
+
+    @Test
+    @Tag("US-403.1")
+    void should_return400NotServerError_when_aParameterHasTheWrongType() {
+        // Act
+        EntityExchangeResult<JsonNode> page = list("?page=abc");
+        EntityExchangeResult<JsonNode> expired = list("?expired=maybe");
+
+        // Assert
+        assertThat(page.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(expired.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(page.getResponseBody().path("reasons").get(0).path("field").asString()).isEqualTo("page");
+    }
+}

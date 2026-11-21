@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
+import com.tradestore.persistence.PageResult;
 import com.tradestore.persistence.TradeRepository;
 import com.tradestore.persistence.UpsertResult;
 import org.junit.jupiter.api.Tag;
@@ -267,5 +268,68 @@ class JdbcTradeRepositoryIT {
         assertThat(first).hasSize(2);
         assertThat(second).hasSize(1);
         assertThat(repository.markExpired(y2k, 2)).isEmpty();
+    }
+
+    @Test
+    @Tag("US-403.1")
+    void should_returnAPageSortedByTradeIdWithTheTotal_when_listing() {
+        // Arrange: the shared database already holds other tests' trades, so compare with a baseline
+        long before = repository.findPage(null, 0, 1).totalElements();
+        for (String suffix : List.of("-c", "-a", "-b")) {
+            repository.upsertIfNotOlder(new Trade(tradeId + suffix, 1, "CP-1", "B1", MATURITY, TODAY, false));
+        }
+
+        // Act
+        PageResult<Trade> firstTwo = repository.findPage(null, 0, 2);
+        List<Trade> all = allPages(null);
+
+        // Assert (other writers may add trades meanwhile: at least ours; ordering is covered separately)
+        assertThat(firstTwo.content()).hasSize(2);
+        assertThat(firstTwo.totalElements()).isGreaterThanOrEqualTo(before + 3);
+        assertThat(all).extracting(Trade::tradeId).contains(tradeId + "-a", tradeId + "-b", tradeId + "-c");
+    }
+
+    @Test
+    @Tag("US-403.2")
+    void should_returnOnlyTradesWithTheGivenExpiredFlag_when_filtering() {
+        // Arrange
+        repository.upsertIfNotOlder(new Trade(tradeId + "-live", 1, "CP-1", "B1", MATURITY, TODAY, false));
+        repository.upsertIfNotOlder(new Trade(tradeId + "-gone", 1, "CP-1", "B1", MATURITY, TODAY, false));
+        jdbc.sql("UPDATE trades SET expired = true WHERE trade_id = ?").param(tradeId + "-gone").update();
+
+        // Act
+        List<Trade> expired = allPages(true);
+        List<Trade> live = allPages(false);
+
+        // Assert
+        assertThat(expired).allMatch(Trade::expired).extracting(Trade::tradeId).contains(tradeId + "-gone");
+        assertThat(live).noneMatch(Trade::expired).extracting(Trade::tradeId).contains(tradeId + "-live");
+    }
+
+    @Test
+    @Tag("US-403.1")
+    void should_sortByCodePointIndependentOfTheDatabaseLocale_when_listing() {
+        // Arrange: mixed case, where locale-aware and code-point orders differ ("B" < "a" by code point)
+        for (String suffix : List.of("-a", "-B", "-c")) {
+            repository.upsertIfNotOlder(new Trade(tradeId + suffix, 1, "CP-1", "B1", MATURITY, TODAY, false));
+        }
+
+        // Act: page through everything, keep ours
+        List<String> ours = allPages(null).stream().map(Trade::tradeId).filter(id -> id.startsWith(tradeId)).toList();
+
+        // Assert: stable, locale-independent order
+        assertThat(ours).containsExactly(tradeId + "-B", tradeId + "-a", tradeId + "-c");
+    }
+
+    /** Every page of the list (the shared table can be large), in order. */
+    private List<Trade> allPages(Boolean expired) {
+        List<Trade> all = new java.util.ArrayList<>();
+        for (int page = 0; ; page++) {
+            PageResult<Trade> result = repository.findPage(expired, page, 500);
+            all.addAll(result.content());
+            if (page + 1 >= result.totalPages()) {
+                return all;
+            }
+        }
     }
 }

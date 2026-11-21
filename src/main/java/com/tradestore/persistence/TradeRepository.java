@@ -29,4 +29,7 @@ public interface TradeRepository {
      * back to false (US-204.2). Callers repeat it while it returns a full batch.
      */
     List<Trade> markExpired(LocalDate today, int limit);
+
+    /** One page of trades sorted by tradeId, optionally only expired or only live ones (null = all) (US-403). */
+    PageResult<Trade> findPage(Boolean expired, int page, int size);
 }
