@@ -228,10 +228,11 @@ CREATE TABLE outbox_events (
 | Counter | `trade_outcomes_total{outcome, reason, channel}`: one increment per reason for rejections |
 | Timer | `trade_processing_seconds{channel}`: ingestion use case latency |
 | Counter | `trade_deadletter_total{type=POISON\|FAILED}` |
+| Counter | `trade_job_failures_total{job}`: failed runs of a scheduled job (`expiry`), each also logged at ERROR |
 | Gauges | `trade_outbox_backlog_size`, `trade_outbox_oldest_age_seconds` |
 | Kafka lag | Micrometer's Kafka client metrics (`kafka_consumer_fetch_manager_records_lag_max`) |
 | Health | `readiness` group = `db`, `mongo`, `kafka` (`KafkaHealthIndicator`) (US-604.1); `liveness` = the application state only |
-| Logs | One INFO line per trade: `outcome=REJECTED tradeId=T2 version=1 channel=STREAM reasons=[LOWER_VERSION]`. MDC holds `tradeId` and `channel`. No payloads (A-32). |
+| Logs | One INFO line per trade (ingestion and expiry, `channel=SCHEDULER` for the latter): `outcome=REJECTED tradeId=T2 version=1 channel=STREAM reasons=[LOWER_VERSION]`. MDC holds `tradeId` and `channel`. No payloads (A-32). |
 
 ## 9. Test design (Phase 6 and 7)
 
