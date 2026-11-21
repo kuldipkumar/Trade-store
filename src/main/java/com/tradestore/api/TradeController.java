@@ -1,5 +1,7 @@
 package com.tradestore.api;
 
+import java.util.List;
+
 import com.tradestore.domain.Channel;
 import com.tradestore.domain.Outcome;
 import com.tradestore.service.IngestionResult;
@@ -17,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Trades over REST: submission (US-401) and lookup by ID (US-402). Uses the same ingestion use case as the stream (A-21). The body is read
+ * Trades over REST: submission (US-401), lookup by ID (US-402), list (US-403) and version history (US-404). Uses the same ingestion use case as the stream (A-21). The body is read
  * as text, so the audit trail keeps exactly what the client sent, and parsed strictly by {@link TradeJsonParser}.
  */
 @RestController
@@ -46,6 +48,12 @@ public class TradeController {
             throw new InvalidRequestParameterException("size", "size must be 1 or greater");
         }
         return PageResponse.from(queries.list(expired, page, size), TradeResponse::from);
+    }
+
+    /** Every accepted version, ordered by version then received time (US-404); 404 if none. */
+    @GetMapping("/{tradeId}/history")
+    public List<TradeVersionResponse> history(@PathVariable String tradeId) {
+        return queries.history(tradeId).stream().map(TradeVersionResponse::from).toList();
     }
 
     /** The latest stored version (US-402); 404 if unknown. */
