@@ -7,11 +7,15 @@ import com.tradestore.domain.LowerVersionException;
 import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.TradeRejectedException;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.dao.DataAccessException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
@@ -21,6 +25,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     private final Clock clock;
 
@@ -53,9 +59,14 @@ public class GlobalExceptionHandler {
                 request);
     }
 
-    /** Database unavailable (decision D7): nothing was stored or audited, so the client may retry. */
-    @ExceptionHandler(DataAccessException.class)
-    public ResponseEntity<ApiErrorResponse> unavailable(DataAccessException e, HttpServletRequest request) {
+    /**
+     * Database unavailable (decision D7): no connection, a transient error, or a resource failure. Nothing was
+     * stored or audited, so the client may retry. Logged with its cause.
+     */
+    @ExceptionHandler({CannotCreateTransactionException.class, TransientDataAccessException.class,
+            DataAccessResourceFailureException.class})
+    public ResponseEntity<ApiErrorResponse> unavailable(RuntimeException e, HttpServletRequest request) {
+        log.warn("Trade store unavailable for {} {}", request.getMethod(), request.getRequestURI(), e);
         return error(HttpStatus.SERVICE_UNAVAILABLE, List.of(new ApiErrorResponse.Reason("SERVICE_UNAVAILABLE", null,
                 "The trade store is temporarily unavailable; nothing was stored. Please retry.")), request);
     }
