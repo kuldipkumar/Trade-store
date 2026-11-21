@@ -39,4 +39,20 @@ class AuditCsvWriterTest {
                 + "e1,2026-11-19T10:15:30Z,T1,2,REJECTED,REST,"
                 + "INVALID_FIELD: bookId is required;LOWER_VERSION: version 2 is lower than stored version 3\r\n");
     }
+
+    private static String row(String tradeId, List<Violation> reasons) throws IOException {
+        StringWriter out = new StringWriter();
+        AuditCsvWriter.writeRow(new AuditEvent("e1", tradeId, 1, Outcome.REJECTED, reasons, Channel.REST, AT, null, null), out);
+        return out.toString();
+    }
+
+    @Test
+    @Tag("US-503.1")
+    void should_quoteAField_when_itContainsACommaQuoteOrLineBreak() throws IOException {
+        // Act
+        String line = row("T,1", List.of(Violation.invalidField("bookId", "say \"hi\"\nthen go")));
+
+        // Assert: RFC 4180, quotes doubled
+        assertThat(line).isEqualTo("e1,2026-11-19T10:15:30Z,\"T,1\",1,REJECTED,REST,\"INVALID_FIELD: say \"\"hi\"\"\nthen go\"\r\n");
+    }
 }
