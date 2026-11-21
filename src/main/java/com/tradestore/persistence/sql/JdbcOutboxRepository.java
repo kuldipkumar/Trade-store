@@ -62,6 +62,12 @@ public class JdbcOutboxRepository implements OutboxRepository {
 
     @Override
     public List<String> pendingTradeIds(int limit) {
-        return List.of(); // stub: implemented test-first
+        return jdbc.sql("""
+                        SELECT trade_id FROM outbox_events WHERE trade_id IS NOT NULL
+                         GROUP BY trade_id ORDER BY min(id) LIMIT :limit
+                        """)
+                .param("limit", limit)
+                .query(String.class)
+                .list();
     }
 }

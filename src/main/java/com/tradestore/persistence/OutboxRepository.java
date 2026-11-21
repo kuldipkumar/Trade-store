@@ -18,6 +18,6 @@ public interface OutboxRepository {
 
     void delete(List<String> eventIds);
 
-    /** Stub: implemented test-first. */
+    /** Up to {@code limit} distinct trade IDs with events still waiting to be relayed, oldest first (US-501.3). */
     List<String> pendingTradeIds(int limit);
 }
