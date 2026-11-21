@@ -3,9 +3,9 @@ package com.tradestore.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 
 import com.tradestore.persistence.nosql.MongoAuditEventStore;
@@ -19,12 +19,14 @@ import org.junit.jupiter.api.Test;
  */
 class AuditTrailImmutabilityTest {
 
-    private static final Predicate<String> INSERT_OR_READ =
-            name -> name.equals("insert") || name.startsWith("find") || name.startsWith("count") || name.startsWith("stream");
+    /** Exactly the operations the LLD allows (docs/05-lld.md section 1); anything else is a mutation path. */
+    private static final Set<String> ALLOWED = Set.of("insert", "find", "findByTradeId", "countByOutcome", "stream");
+    private static final Predicate<String> INSERT_OR_READ = ALLOWED::contains;
 
+    /** Public methods, inherited ones included; java.lang.Object's methods are ignored. */
     private static List<String> publicMethods(Class<?> type) {
-        return Arrays.stream(type.getDeclaredMethods())
-                .filter(m -> Modifier.isPublic(m.getModifiers()) && !m.isSynthetic())
+        return Arrays.stream(type.getMethods())
+                .filter(m -> m.getDeclaringClass() != Object.class && !m.isSynthetic() && !m.isBridge())
                 .map(Method::getName)
                 .toList();
     }

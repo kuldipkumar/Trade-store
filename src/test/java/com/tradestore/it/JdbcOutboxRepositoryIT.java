@@ -99,7 +99,7 @@ class JdbcOutboxRepositoryIT {
 
     @Test
     @Tag("US-501.3")
-    void should_nameTheTradesWaitingForTheirAuditEntries_oldestFirstAndOnce() {
+    void should_listEachWaitingTradeOnceOldestFirst_when_eventsAreWaiting() {
         inRolledBackTransaction(() -> {
             // Arrange: two events for one trade, then one for another
             String first = "T-" + UUID.randomUUID();
