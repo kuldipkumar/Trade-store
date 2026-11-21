@@ -270,4 +270,17 @@ class TradeIngestionServiceTest {
         // Assert
         assertThat(timedIngestions("REST")).isEqualTo(1);
     }
+
+    @Test
+    @Tag("US-604.2")
+    void should_timeTheIngestion_when_tradeIsRejected() {
+        // Arrange
+        when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 2, false)));
+
+        // Act
+        assertThatThrownBy(() -> service.ingest(withVersion(1))).isInstanceOf(LowerVersionException.class);
+
+        // Assert
+        assertThat(timedIngestions("REST")).isEqualTo(1);
+    }
 }
