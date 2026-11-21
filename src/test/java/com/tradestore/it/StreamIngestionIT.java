@@ -12,6 +12,8 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.bson.Document;
 import org.junit.jupiter.api.Tag;
+import org.springframework.test.web.servlet.client.RestTestClient;
+import tools.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
@@ -39,8 +41,12 @@ class StreamIngestionIT {
 
     private final String tradeId = "K-" + UUID.randomUUID();
 
+    private final RestTestClient rest;
+
     StreamIngestionIT(KafkaTemplate<String, String> kafka, TradeRepository trades, MongoTemplate mongo,
-                      KafkaListenerEndpointRegistry registry, ConsumerFactory<?, ?> consumerFactory, KafkaAdmin kafkaAdmin) {
+                      KafkaListenerEndpointRegistry registry, ConsumerFactory<?, ?> consumerFactory, KafkaAdmin kafkaAdmin,
+                      RestTestClient rest) {
+        this.rest = rest;
         this.kafkaAdmin = kafkaAdmin;
         this.registry = registry;
         this.consumerFactory = consumerFactory;
@@ -63,6 +69,7 @@ class StreamIngestionIT {
     @Test
     @Tag("US-301.1")
     @Tag("US-501.1")
+    @Tag("US-603.2")
     void should_storeAndAuditATrade_when_itIsPublishedToTheStream() throws Exception {
         // Act
         publish(1);
@@ -75,6 +82,10 @@ class StreamIngestionIT {
             assertThat(entry.getString("outcome")).isEqualTo("ACCEPTED");
             assertThat(entry.getString("channel")).isEqualTo("STREAM");
         });
+        // ... and queryable over REST (US-603.2: stream -> stored -> queryable)
+        JsonNode body = rest.get().uri("/trades/" + tradeId).exchange().expectStatus().isOk()
+                .expectBody(JsonNode.class).returnResult().getResponseBody();
+        assertThat(body.path("version").asInt()).isEqualTo(1);
     }
 
     @Test

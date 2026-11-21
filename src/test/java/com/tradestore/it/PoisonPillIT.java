@@ -24,6 +24,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -45,8 +46,11 @@ class PoisonPillIT {
     private final String poison = "this is not JSON " + key;
     private Consumer<String, String> dltReader;
 
+    private final RestTestClient rest;
+
     PoisonPillIT(KafkaTemplate<String, String> kafka, TradeRepository trades, MongoTemplate mongo,
-                 ConsumerFactory<String, String> consumerFactory) {
+                 ConsumerFactory<String, String> consumerFactory, RestTestClient rest) {
+        this.rest = rest;
         this.kafka = kafka;
         this.trades = trades;
         this.mongo = mongo;
@@ -95,6 +99,7 @@ class PoisonPillIT {
 
     @Test
     @Tag("US-302.1")
+    @Tag("US-603.2")
     void should_deadLetterThePoisonPillAndStillStoreTheNextTrade_when_anUnreadableMessageArrives() throws Exception {
         // Act
         publishPoisonThenValid();
@@ -135,5 +140,20 @@ class PoisonPillIT {
                 .isEqualTo(sent.offset());
         assertThat(header(record, "kafka_dlt-exception-cause-fqcn")).isEqualTo(MalformedTradeException.class.getName());
         assertThat(record.key()).isEqualTo(key);
+    }
+
+    @Test
+    @Tag("US-604.2")
+    void should_exposeTheDeadLetterCounter_when_aMessageHasBeenDeadLettered() throws Exception {
+        // Arrange
+        publishPoisonThenValid();
+        deadLettered();
+
+        // Act
+        String metrics = rest.get().uri("/actuator/prometheus").exchange().expectStatus().isOk()
+                .expectBody(String.class).returnResult().getResponseBody();
+
+        // Assert: alongside the outcome counters and the latency timer (StoreTradeIT)
+        assertThat(metrics).containsPattern("trade_deadletter_total\\{[^}]*type=\"POISON\"");
     }
 }

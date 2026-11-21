@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301; US-304; US-302; US-303; US-502; US-503). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301; US-304; US-302; US-303; US-502; US-503; D9; US-603.2; US-604; US-607). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -89,8 +89,11 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-503.1 | Full | `AuditReportIT` (`Accept: text/csv` → header row and one row per entry, oldest first, quoting, no payload; an invalid range still gets 400), `AuditCsvWriterTest` (header and rows, RFC 4180 quoting, formula cells neutralised), `MongoStoresIT` (`stream` from a cursor), `AuditReportServiceTest` (same filters as the report), `AuditReportControllerTest` (outage fails before download headers; mid-export failure logged and aborted; dead-letter error as the reason) | Known limitation: a client idle for over 10 minutes hits MongoDB's cursor timeout. |
 | US-603.1 | Full | `@IntegrationTest` + `TestcontainersConfiguration`; every `*IT` runs on real Kafka, PostgreSQL and MongoDB | |
 | US-604.3 | Full | `TradeIngestionServiceTest`: one INFO line per trade with outcome, tradeId, version, channel and reasons; a payload marker never appears in the log | MDC context (`tradeId`, `channel`) is added by the channel adapters (US-401/US-301). |
-| US-604.1 | Partial | `WalkingSkeletonIT`: health is UP with db and mongo | `/actuator/health/readiness` including Kafka. Closed in **US-604**. |
-| US-604.2 | Partial | `TradeMetricsTest` (counter per outcome and per rejection reason; latency timer), `TradeIngestionServiceTest` (recorded for stored and rejected trades), `StoreTradeIT` (visible at `/actuator/prometheus`), `DeadLetterAuditRecovererTest` (`trade.deadletter{type=POISON\|FAILED}` recorded) | The dead-letter counter is not yet asserted at `/actuator/prometheus` (US-604). |
+| US-603.2 | Full | Tagged scenarios, all on Testcontainers: `StreamIngestionIT` (stream → stored → audited → `GET /trades/{id}`), `AssignmentScenarioIT` (lower-version and past-maturity rejections, the assignment example and its audit), `PoisonPillIT` (poison pill → DLT), `ExpiryIT` (expiry run). They run on every PR and push to `main` | |
+| US-604.1 | Full | `WalkingSkeletonIT` (`/actuator/health/readiness` UP with `db`, `mongo` and `kafka` components), `KafkaHealthIndicatorTest` (UP with cluster ID and nodes; DOWN when the broker doesn't answer in time) | |
+| US-604.2 | Full | `TradeMetricsTest`, `TradeIngestionServiceTest`, `StoreTradeIT` (outcome counters and latency timer at `/actuator/prometheus`), `PoisonPillIT` (`trade_deadletter_total{type="POISON"}` at `/actuator/prometheus`), `DeadLetterAuditRecovererTest`, `KafkaErrorHandlingTest` (`trade_retries_total`) | |
+| US-607.1 | Full | `TradeConsumerTest` (a message over the limit is malformed and never ingested), `TradeStorePropertiesTest` (`kafka.max-message-bytes` default 1 MB, configurable, positive), `AuditEventFactoryTest` (POISON payload capped), `PoisonPillIT` (malformed → DLT and POISON) | |
+| US-607.2 | Full | `TradeJsonParserTest`: extra fields (scalars, arrays, objects) are ignored and the raw text is kept (mutation-verified) | |
 | A-09 | Full | `LowerVersionValidatorTest`: an expired trade still rejects a lower version | |
 | A-46 (outbox backlog) | Full | `OutboxMetricsTest` (size, oldest age, NaN when the database is down), `JdbcOutboxRepositoryIT` (`backlog`), `StoreTradeIT` (gauges and job-failure counters at `/actuator/prometheus`, mutation-verified) | |
 | A-50 | Full | `TradeStorePropertiesTest`: defaults and overrides | |
