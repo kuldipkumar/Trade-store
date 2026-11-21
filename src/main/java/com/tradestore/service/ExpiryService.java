@@ -9,6 +9,8 @@ import com.tradestore.domain.Outcome;
 import com.tradestore.domain.Trade;
 import com.tradestore.persistence.OutboxRepository;
 import com.tradestore.persistence.TradeRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
 
@@ -19,6 +21,8 @@ import org.springframework.transaction.support.TransactionOperations;
  */
 @Service
 public class ExpiryService {
+
+    private static final Logger log = LoggerFactory.getLogger(ExpiryService.class);
 
     private final TradeRepository trades;
     private final OutboxRepository outbox;
@@ -45,7 +49,11 @@ public class ExpiryService {
             changed.forEach(trade -> outbox.append(events.expired(trade)));
             return changed;
         });
-        expired.forEach(trade -> metrics.recordOutcome(Outcome.EXPIRED, List.of(), Channel.SCHEDULER));
+        for (Trade trade : expired) {
+            metrics.recordOutcome(Outcome.EXPIRED, List.of(), Channel.SCHEDULER);
+            log.info("outcome={} tradeId={} version={} channel={}", Outcome.EXPIRED, trade.tradeId(), trade.version(),
+                    Channel.SCHEDULER);
+        }
         return expired.size();
     }
 }
