@@ -138,10 +138,10 @@ class ParseJavaTestsTest(unittest.TestCase):
             ("com.tradestore.service.TradeIngestionServiceTest", "should_doSomething_when_untagged", []),
         ])
 
-    def test_should_listProductionClassesUsedByEachTest_when_bodyOrFieldsReferenceThem(self):
-        # Fields of the test class count for every method; the method body adds its own references.
-        self.assertEqual(self.tests[0].code, ["Trade", "TradeIngestionService"])
-        self.assertEqual(self.tests[1].code, ["LowerVersionValidator", "TradeIngestionService"])
+    def test_should_listProductionClassesUsedByEachTest_when_bodyOrUsedFieldsReferenceThem(self):
+        # A field's type counts only for the methods whose body uses that field (review of PR #53).
+        self.assertEqual(self.tests[0].code, ["Trade", "TradeIngestionService"])  # uses field `service`
+        self.assertEqual(self.tests[1].code, ["LowerVersionValidator"])  # does not use `service`
 
 
 class MultiLineAnnotationTest(unittest.TestCase):
