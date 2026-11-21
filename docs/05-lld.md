@@ -210,7 +210,8 @@ CREATE TABLE outbox_events (
 | `kafka.partitions` / `kafka.replication-factor` / `kafka.concurrency` | `6` / `1` / `3` | A-42 |
 | `kafka.max-message-bytes` | `1048576` | US-607.1 |
 | `retry.max-attempts` / `retry.initial-interval` / `retry.multiplier` / `retry.max-interval` | `3` / `1s` / `2.0` / `10s` | US-303.3 |
-| `expiry.cron` / `expiry.run-at-startup` / `expiry.batch-size` | `0 5 0 * * *` / `true` / `1000` | US-202.4, US-203 |
+| `expiry.cron` / `expiry.batch-size` | `0 5 0 * * *` / `1000` | US-202.4 |
+| `expiry.run-at-startup` / `expiry.startup-retry-interval` / `expiry.startup-max-attempts` | `true` / `1m` / `10` | US-203 |
 | `outbox.poll-interval` / `outbox.batch-size` | `1s` / `500` | ADR-005 |
 | `audit.max-payload-chars` | `10000` | US-302.2 |
 | `api.max-request-bytes` / `api.max-page-size` | `1048576` / `100` | US-401.6, US-403 |

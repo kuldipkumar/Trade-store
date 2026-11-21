@@ -29,6 +29,9 @@ class TradeStorePropertiesTest {
         assertThat(properties.outbox().pollInterval()).isEqualTo(Duration.ofSeconds(1));
         assertThat(properties.outbox().batchSize()).isEqualTo(500);
         assertThat(properties.expiry().batchSize()).isEqualTo(1000);
+        assertThat(properties.expiry().runAtStartup()).isTrue();
+        assertThat(properties.expiry().startupRetryInterval()).isEqualTo(Duration.ofMinutes(1));
+        assertThat(properties.expiry().startupMaxAttempts()).isEqualTo(10);
     }
 
     @Test
@@ -40,7 +43,10 @@ class TradeStorePropertiesTest {
                 "trade-store.audit.max-payload-chars", "256",
                 "trade-store.outbox.poll-interval", "250ms",
                 "trade-store.outbox.batch-size", "50",
-                "trade-store.expiry.batch-size", "200"));
+                "trade-store.expiry.batch-size", "200",
+                "trade-store.expiry.run-at-startup", "false",
+                "trade-store.expiry.startup-retry-interval", "30s",
+                "trade-store.expiry.startup-max-attempts", "3"));
 
         // Assert
         assertThat(properties.timeZone()).isEqualTo("Asia/Kolkata");
@@ -48,5 +54,8 @@ class TradeStorePropertiesTest {
         assertThat(properties.outbox().pollInterval()).isEqualTo(Duration.ofMillis(250));
         assertThat(properties.outbox().batchSize()).isEqualTo(50);
         assertThat(properties.expiry().batchSize()).isEqualTo(200);
+        assertThat(properties.expiry().runAtStartup()).isFalse();
+        assertThat(properties.expiry().startupRetryInterval()).isEqualTo(Duration.ofSeconds(30));
+        assertThat(properties.expiry().startupMaxAttempts()).isEqualTo(3);
     }
 }

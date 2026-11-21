@@ -10,6 +10,7 @@ import java.util.UUID;
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
 import com.tradestore.persistence.TradeRepository;
+import com.tradestore.scheduler.ExpiryScheduler;
 import com.tradestore.service.ExpiryService;
 import org.bson.Document;
 import org.junit.jupiter.api.AfterEach;
@@ -36,13 +37,16 @@ class ExpiryIT {
     private final MongoTemplate mongo;
     private final JdbcClient jdbc;
     private final MutableClock clock;
+    private final ExpiryScheduler scheduler;
 
     private final String prefix = "T-" + UUID.randomUUID().toString().substring(0, 8);
     private final String maturedYesterday = prefix + "-18";
     private final String maturesToday = prefix + "-19";
     private final String maturesTomorrow = prefix + "-20";
 
-    ExpiryIT(ExpiryService expiry, TradeRepository trades, MongoTemplate mongo, JdbcClient jdbc, MutableClock clock) {
+    ExpiryIT(ExpiryService expiry, TradeRepository trades, MongoTemplate mongo, JdbcClient jdbc, MutableClock clock,
+             ExpiryScheduler scheduler) {
+        this.scheduler = scheduler;
         this.expiry = expiry;
         this.trades = trades;
         this.mongo = mongo;
@@ -120,5 +124,19 @@ class ExpiryIT {
         assertThat(outboxRows(maturedYesterday)).isZero();
         assertThat(expiredAuditEntries(maturedYesterday)).isEqualTo(1);
         assertThat(expired(maturedYesterday)).isTrue();
+    }
+
+    @Test
+    @Tag("US-203.1")
+    void should_expireTradesMaturedDuringDowntime_when_theServiceStarts() {
+        // Act: the startup hook, as after a restart over midnight (called directly: firing a second
+        // ApplicationReadyEvent into the shared context would re-run every other ready listener)
+        scheduler.onApplicationReady();
+
+        // Assert: expired shortly after startup, on the task scheduler, without waiting for the cron (A-18, A-51)
+        await().atMost(RELAY_TIMEOUT).untilAsserted(() -> assertThat(expired(maturedYesterday)).isTrue());
+        assertThat(expired(maturesToday)).isFalse();
+        assertThat(expired(maturesTomorrow)).isFalse();
+        await().atMost(RELAY_TIMEOUT).untilAsserted(() -> assertThat(expiredAuditEntries(maturedYesterday)).isEqualTo(1));
     }
 }
