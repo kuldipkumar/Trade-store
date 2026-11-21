@@ -4,8 +4,11 @@ import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.persistence.AuditEventStore;
 import com.tradestore.service.AuditEventFactory;
 import com.tradestore.service.parsing.MalformedTradeException;
+import java.util.function.BiFunction;
+
 import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -49,9 +52,12 @@ public class KafkaConfig {
     DefaultErrorHandler kafkaErrorHandler(KafkaOperations<?, ?> kafka, TradeStoreProperties properties,
                                           AuditEventFactory events, AuditEventStore audit, MeterRegistry registry) {
         String deadLetterTopic = properties.kafka().dltTopic();
-        DeadLetterPublishingRecoverer publisher = new DeadLetterPublishingRecoverer(kafka,
-                (record, e) -> new TopicPartition(deadLetterTopic, record.partition()));
+        DeadLetterPublishingRecoverer publisher = new DeadLetterPublishingRecoverer(kafka, deadLetterDestination(deadLetterTopic));
         return errorHandler(new DeadLetterAuditRecoverer(publisher, events, audit, registry));
+    }
+
+    static BiFunction<ConsumerRecord<?, ?>, Exception, TopicPartition> deadLetterDestination(String topic) {
+        return (record, e) -> new TopicPartition(topic, record.partition());
     }
 
     DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer) {

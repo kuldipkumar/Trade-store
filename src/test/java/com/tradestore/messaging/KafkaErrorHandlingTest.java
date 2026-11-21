@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import com.tradestore.service.parsing.MalformedTradeException;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -49,5 +50,19 @@ class KafkaErrorHandlingTest {
         // Assert: redelivered after a backoff; nothing is dropped
         assertThat(handled).isFalse();
         verify(recoverer, never()).accept(any(), any());
+    }
+
+    @Test
+    @Tag("US-302.1")
+    void should_letKafkaChooseTheDeadLetterPartition_when_aMessageIsDeadLettered() {
+        // Arrange: inbound partition 9 may not exist on the dead-letter topic (code review of PR #61)
+        ConsumerRecord<String, String> onPartition9 = new ConsumerRecord<>("trades.inbound", 9, 7L, "T1", "{bad");
+
+        // Act
+        TopicPartition destination = KafkaConfig.deadLetterDestination("trades.inbound.DLT")
+                .apply(onPartition9, new RuntimeException());
+
+        // Assert: a negative partition makes the producer choose one by key, so it always exists
+        assertThat(destination).isEqualTo(new TopicPartition("trades.inbound.DLT", -1));
     }
 }
