@@ -164,4 +164,18 @@ class TradeStorePropertiesTest {
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause().hasMessageContaining("must be at least 1");
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"trade-store.retry.initial-interval=0ms", "trade-store.retry.initial-interval=-1ms",
+            "trade-store.retry.max-interval=500ms"})
+    @Tag("US-303.3")
+    void should_failAtStartup_when_aRetryIntervalIsNotPositiveOrMaxIsBelowInitial(String setting) {
+        // Arrange: a negative interval stops retrying, zero hammers the database; default initial is 1s
+        String[] pair = setting.split("=");
+
+        // Act + Assert
+        assertThatThrownBy(() -> bind(Map.of(pair[0], pair[1])))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause().hasMessageContaining("trade-store.retry.");
+    }
 }
