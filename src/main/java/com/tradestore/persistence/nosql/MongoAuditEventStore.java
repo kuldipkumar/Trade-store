@@ -1,6 +1,7 @@
 package com.tradestore.persistence.nosql;
 
 import java.util.Date;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,6 +16,7 @@ import org.bson.Document;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
@@ -62,7 +64,12 @@ public class MongoAuditEventStore implements AuditEventStore {
 
     @Override
     public Map<Outcome, Long> countByOutcome(AuditQuery query) {
-        return Map.of();
+        Aggregation aggregation = Aggregation.newAggregation(Aggregation.match(matching(query)),
+                Aggregation.group("outcome").count().as("count"));
+        Map<Outcome, Long> counts = new EnumMap<>(Outcome.class);
+        mongo.aggregate(aggregation, COLLECTION, Document.class).forEach(group ->
+                counts.put(Outcome.valueOf(group.getString("_id")), ((Number) group.get("count")).longValue()));
+        return counts;
     }
 
     private static Criteria matching(AuditQuery query) {
