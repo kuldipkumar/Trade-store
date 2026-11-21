@@ -27,4 +27,7 @@ public interface TradeRepository {
      * it again changes nothing (idempotent, US-202.2). It never sets expired back to false (US-204.2).
      */
     List<Trade> markExpired(LocalDate today);
+
+    /** Stub: implemented test-first. Like {@link #markExpired(LocalDate)}, but at most {@code limit} trades. */
+    List<Trade> markExpired(LocalDate today, int limit);
 }

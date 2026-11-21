@@ -94,4 +94,9 @@ public class JdbcTradeRepository implements TradeRepository {
     public List<Trade> markExpired(LocalDate today) {
         return jdbc.sql(MARK_EXPIRED).param("today", today).query(JdbcTradeRepository::mapTrade).list();
     }
+
+    @Override
+    public List<Trade> markExpired(LocalDate today, int limit) {
+        return List.of(); // stub: implemented test-first
+    }
 }

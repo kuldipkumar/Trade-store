@@ -248,4 +248,24 @@ class JdbcTradeRepositoryIT {
         assertThat(second).extracting(Trade::tradeId).doesNotContain(tradeId);
         assertThat(repository.findById(tradeId).orElseThrow().expired()).isTrue();
     }
+
+    @Test
+    @Tag("US-202.1")
+    void should_expireAtMostTheBatchSize_when_moreTradesHaveMatured() {
+        // Arrange: three trades matured in 1999, a period no other test uses
+        LocalDate y2k = LocalDate.of(2000, 1, 1);
+        for (int day = 29; day <= 31; day++) {
+            repository.upsertIfNotOlder(new Trade(tradeId + "-" + day, 1, "CP-1", "B1", LocalDate.of(1999, 12, day),
+                    LocalDate.of(1999, 1, 1), false));
+        }
+
+        // Act
+        List<Trade> first = repository.markExpired(y2k, 2);
+        List<Trade> second = repository.markExpired(y2k, 2);
+
+        // Assert: bounded batches, so a large backlog never locks every matured trade at once
+        assertThat(first).hasSize(2);
+        assertThat(second).hasSize(1);
+        assertThat(repository.markExpired(y2k, 2)).isEmpty();
+    }
 }
