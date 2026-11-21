@@ -57,6 +57,17 @@ class TradeStorePropertiesTest {
     }
 
     @Test
+    @Tag("US-302.3")
+    @Tag("A-50")
+    void should_deriveTheDeadLetterTopicFromTheInboundTopic_when_onlyTheTopicIsConfigured() {
+        // Act
+        TradeStoreProperties properties = bind(Map.of("trade-store.kafka.topic", "orders.trades"));
+
+        // Assert: never shares another deployment's dead letters (code review of PR #61)
+        assertThat(properties.kafka().dltTopic()).isEqualTo("orders.trades.DLT");
+    }
+
+    @Test
     @Tag("A-50")
     void should_useConfiguredValues_when_propertiesAreSet() {
         // Act
