@@ -2,6 +2,7 @@ package com.tradestore.persistence.sql;
 
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.tradestore.domain.AuditEvent;
@@ -74,6 +75,9 @@ public class JdbcOutboxRepository implements OutboxRepository {
 
     @Override
     public OutboxBacklog backlog() {
-        return new OutboxBacklog(0, java.util.Optional.empty()); // stub: implemented test-first
+        return jdbc.sql("SELECT count(*) AS size, min(created_at) AS oldest FROM outbox_events")
+                .query((rs, n) -> new OutboxBacklog(rs.getLong("size"),
+                        Optional.ofNullable(rs.getTimestamp("oldest")).map(Timestamp::toInstant)))
+                .single();
     }
 }

@@ -21,6 +21,6 @@ public interface OutboxRepository {
     /** Up to {@code limit} distinct trade IDs with events still waiting to be relayed, oldest first (US-501.3). */
     List<String> pendingTradeIds(int limit);
 
-    /** Stub: implemented test-first. */
+    /** How many events wait to be relayed, and the oldest one's time (A-46: the backlog gauges). */
     OutboxBacklog backlog();
 }
