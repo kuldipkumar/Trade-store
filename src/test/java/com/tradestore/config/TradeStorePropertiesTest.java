@@ -77,4 +77,14 @@ class TradeStorePropertiesTest {
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause().hasMessageContaining("alert-after-failed-polls must be at least 1");
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1"})
+    @Tag("US-401.6")
+    void should_failAtStartup_when_maxRequestBytesIsNotPositive(String value) {
+        // Act + Assert: otherwise every non-empty body (or every body) would get 413
+        assertThatThrownBy(() -> bind(Map.of("trade-store.api.max-request-bytes", value)))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause().hasMessageContaining("max-request-bytes must be positive");
+    }
 }
