@@ -2,15 +2,21 @@ package com.tradestore.scheduler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import java.util.List;
 
 import com.tradestore.persistence.OutboxRepository;
 import com.tradestore.service.OutboxRelayService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 
 /** The scheduled relay runs a batch on every poll and survives failures, so the next poll retries (CR-6). */
@@ -58,5 +64,23 @@ class OutboxRelaySchedulerTest {
 
         // Assert
         assertThat(failedPolls()).isEqualTo(2.0);
+    }
+
+    @Test
+    @Tag("US-501.3")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_logAnOutageAtErrorWithTheWaitingTrades_when_pollsKeepFailing(CapturedOutput output) {
+        // Arrange: threshold 3
+        when(relay.relayBatch()).thenThrow(new DataAccessResourceFailureException("MongoDB down"));
+        when(outbox.pendingTradeIds(anyInt())).thenReturn(List.of("T1", "T2"));
+
+        // Act + Assert: no ERROR yet after two failed polls
+        scheduler.poll();
+        scheduler.poll();
+        assertThat(output).doesNotContain("ERROR");
+
+        // Act + Assert: the third consecutive failure is an outage, named with the affected trades
+        scheduler.poll();
+        assertThat(output).contains("ERROR").contains("3 consecutive polls").contains("[T1, T2]");
     }
 }
