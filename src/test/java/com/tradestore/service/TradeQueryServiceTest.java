@@ -6,10 +6,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import com.tradestore.domain.Trade;
 import com.tradestore.domain.TradeNotFoundException;
+import com.tradestore.persistence.PageResult;
 import com.tradestore.persistence.TradeRepository;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -18,7 +20,7 @@ import org.junit.jupiter.api.Test;
 class TradeQueryServiceTest {
 
     private final TradeRepository trades = mock(TradeRepository.class);
-    private final TradeQueryService service = new TradeQueryService(trades);
+    private final TradeQueryService service = new TradeQueryService(trades, 100);
 
     @Test
     @Tag("US-402.1")
@@ -39,5 +41,30 @@ class TradeQueryServiceTest {
 
         // Act + Assert
         assertThatThrownBy(() -> service.get("T9")).isInstanceOf(TradeNotFoundException.class).hasMessageContaining("T9");
+    }
+
+    @Test
+    @Tag("US-403.1")
+    void should_capThePageSize_when_aClientAsksForMoreThanTheMaximum() {
+        // Arrange
+        PageResult<Trade> page = new PageResult<>(List.of(), 0, 100, 0);
+        when(trades.findPage(null, 0, 100)).thenReturn(page);
+
+        // Act (A-52: results are paged; one request cannot pull the whole table)
+        PageResult<Trade> result = service.list(null, 0, 5000);
+
+        // Assert
+        assertThat(result).isSameAs(page);
+    }
+
+    @Test
+    @Tag("US-403.2")
+    void should_passTheExpiredFilterThrough_when_listing() {
+        // Arrange
+        PageResult<Trade> page = new PageResult<>(List.of(), 1, 10, 0);
+        when(trades.findPage(true, 1, 10)).thenReturn(page);
+
+        // Act + Assert
+        assertThat(service.list(true, 1, 10)).isSameAs(page);
     }
 }
