@@ -24,7 +24,9 @@ package "api" {
     + unavailable(connection/transient/resource failure) : 503 (D7)
     + mediaType(...) : 415
     + method(...) : 405
-    + unexpected(Exception) : 500
+    + notFound(TradeNotFoundException) : 404
+    + noRoute(NoResourceFoundException) : 404
+    + unexpected(Exception) : Spring client errors keep their 4xx; else 500
   }
   class TradeJsonParser {
     + parse(body : String, channel) : TradeSubmission

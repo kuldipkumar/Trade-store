@@ -19,7 +19,7 @@ import org.springframework.test.web.servlet.client.EntityExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import tools.jackson.databind.JsonNode;
 
-/** US-401: submitting a trade over REST, against the running application and real databases. */
+/** US-401 and US-402: submitting and reading trades over REST, against the running application and real databases. */
 @IntegrationTest
 class TradeApiIT {
 
@@ -245,5 +245,80 @@ class TradeApiIT {
         assertThat(response.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("MALFORMED_REQUEST");
         assertThat(trades.findById(tradeId)).isEmpty();
+    }
+
+    private EntityExchangeResult<JsonNode> get(String path) {
+        return rest.get().uri(path).exchange().expectBody(JsonNode.class).returnResult();
+    }
+
+    @Test
+    @Tag("US-402.1")
+    void should_return200WithTheLatestVersionAndAllFields_when_theTradeIsStored() {
+        // Arrange: v1 then v2
+        post(json(1, "2099-05-20"));
+        post(json(2, "2099-06-20"));
+
+        // Act
+        EntityExchangeResult<JsonNode> response = get("/trades/" + tradeId);
+
+        // Assert: v2, including createdDate and expired
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.OK);
+        JsonNode trade = response.getResponseBody();
+        assertThat(trade.path("tradeId").asString()).isEqualTo(tradeId);
+        assertThat(trade.path("version").asInt()).isEqualTo(2);
+        assertThat(trade.path("maturityDate").asString()).isEqualTo("2099-06-20");
+        assertThat(trade.path("createdDate").asString()).isEqualTo(LocalDate.now(clock).toString());
+        assertThat(trade.has("expired")).isTrue();
+        assertThat(trade.path("expired").asBoolean()).isFalse();
+    }
+
+    @Test
+    @Tag("US-402.2")
+    void should_return404WithTheStandardErrorShape_when_noTradeIsStored() {
+        // Act
+        EntityExchangeResult<JsonNode> response = get("/trades/" + tradeId);
+
+        // Assert
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        JsonNode error = response.getResponseBody();
+        assertThat(error.path("status").asInt()).isEqualTo(404);
+        assertThat(error.path("path").asString()).isEqualTo("/trades/" + tradeId);
+        assertThat(error.path("reasons").get(0).path("reason").asString()).isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    @Tag("US-402.2")
+    void should_return404NotServerError_when_thePathDoesNotExist() {
+        // Act: the catch-all 500 handler must not swallow Spring's "no such route"
+        EntityExchangeResult<JsonNode> response = get("/no-such-path");
+
+        // Assert
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    @Tag("US-402.1")
+    void should_return406NotServerError_when_theClientAcceptsOnlyXml() {
+        // Arrange
+        post(json(1, "2099-05-20"));
+
+        // Act
+        var response = rest.get().uri("/trades/" + tradeId).accept(MediaType.APPLICATION_XML).exchange()
+                .returnResult(String.class);
+
+        // Assert: a client error, not a 500
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.NOT_ACCEPTABLE);
+    }
+
+    @Test
+    @Tag("US-402.2")
+    void should_return404_when_anUnknownPathIsPosted() {
+        // Act
+        EntityExchangeResult<JsonNode> response = rest.post().uri("/no-such-path").contentType(MediaType.APPLICATION_JSON)
+                .body("{}").exchange().expectBody(JsonNode.class).returnResult();
+
+        // Assert: not 405 from the static-resource handler
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 }

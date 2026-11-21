@@ -106,4 +106,52 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().path()).isEqualTo("/trades");
         assertThat(response.getBody().reasons().getFirst().message()).doesNotContain("bug");
     }
+
+    @Test
+    @Tag("US-402.1")
+    void should_notTalkAboutStoring_when_aReadFindsTheDatabaseUnavailable() {
+        // Act
+        ResponseEntity<ApiErrorResponse> response = handler.unavailable(new DataAccessResourceFailureException("down"),
+                new MockHttpServletRequest("GET", "/trades/T1"));
+
+        // Assert
+        assertThat(response.getBody().reasons().getFirst().message()).doesNotContain("stored").contains("retry");
+    }
+
+    @Test
+    @Tag("US-402.2")
+    void should_notEchoTheRequestedId_when_aTradeIsNotFound() {
+        // Act
+        ResponseEntity<ApiErrorResponse> response = handler.notFound(
+                new com.tradestore.domain.TradeNotFoundException("<script>x</script>"), new MockHttpServletRequest("GET", "/trades/x"));
+
+        // Assert: the ID is not reflected in the message (it only appears in path)
+        assertThat(response.getBody().reasons().getFirst().message()).doesNotContain("<script>");
+    }
+
+    @Test
+    @Tag("US-402.1")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_keepSpringsClientErrorStatusWithoutLoggingAnError_when_noAcceptableRepresentationExists(CapturedOutput output) {
+        // Act
+        ResponseEntity<ApiErrorResponse> response = handler.unexpected(
+                new org.springframework.web.HttpMediaTypeNotAcceptableException("No acceptable representation"), request);
+
+        // Assert: 406, no JSON body forced on a client that cannot accept it, and no false ERROR
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_ACCEPTABLE);
+        assertThat(response.getBody()).isNull();
+        assertThat(output).doesNotContain("ERROR");
+    }
+
+    @Test
+    @Tag("US-401.5")
+    void should_returnTheStatusSpringAssigns_when_aRequestParameterIsMissing() {
+        // Act
+        ResponseEntity<ApiErrorResponse> response = handler.unexpected(
+                new org.springframework.web.bind.MissingServletRequestParameterException("page", "int"), request);
+
+        // Assert: a 4xx in the standard shape, not a 500
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().status()).isEqualTo(400);
+    }
 }
