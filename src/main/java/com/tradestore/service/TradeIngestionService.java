@@ -17,6 +17,7 @@ import com.tradestore.persistence.UpsertResult;
 import com.tradestore.service.validation.CompositeTradeValidator;
 import com.tradestore.service.validation.MaturityDates;
 import com.tradestore.service.validation.ValidationContext;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
 
@@ -56,6 +57,7 @@ public class TradeIngestionService {
      * @throws TradeRejectedException (or its subclass LowerVersionException) after the rejection is recorded
      */
     public IngestionResult ingest(TradeSubmission submission) {
+        Timer.Sample timing = metrics.startProcessing();
         LocalDate today = LocalDate.now(clock);
         Decision decision = transactions.execute(status -> decide(submission, today));
         if (decision.rejection() != null) {
@@ -63,6 +65,7 @@ public class TradeIngestionService {
             throw decision.rejection();
         }
         metrics.recordOutcome(decision.result().outcome(), List.of(), submission.channel());
+        metrics.stopProcessing(timing, submission.channel());
         return decision.result();
     }
 
