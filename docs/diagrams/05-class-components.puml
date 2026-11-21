@@ -13,8 +13,8 @@ package "api" {
     + history(tradeId) : List<TradeVersionResponse>
   }
   class AuditReportController {
-    + reportJson(query : AuditQuery, page, size) : AuditReportResponse
-    + reportCsv(query : AuditQuery, out : OutputStream)
+    + report(from, to, tradeId, outcome, page, size) : AuditReportResponse
+    + reportCsv(...)  <<US-503>>
   }
   class GlobalExceptionHandler <<@RestControllerAdvice>> {
     + rejected(TradeRejectedException) : 400 | 409 | 422 (D6)
@@ -67,8 +67,8 @@ package "service" {
     + relayBatch() : int
   }
   class AuditReportService {
-    + report(query : AuditQuery, page, size) : AuditReport
-    + stream(query : AuditQuery) : Stream<AuditEvent>
+    + report(from : LocalDate, to : LocalDate, tradeId, outcome, page, size) : AuditReport
+    + stream(query : AuditQuery) : Stream<AuditEvent>  <<US-503>>
   }
   class AuditEventFactory {
     + stored(trade, outcome, s) : AuditEvent
@@ -113,9 +113,9 @@ package "persistence" {
   OutboxRepository ..> OutboxBacklog
   interface AuditEventStore {
     + insert(event : AuditEvent)
-    + find(query : AuditQuery, page, size) : Page<AuditEvent>
+    + find(query : AuditQuery, page, size) : List<AuditEvent>
     + countByOutcome(query : AuditQuery) : Map<Outcome, Long>
-    + stream(query : AuditQuery) : Stream<AuditEvent>
+    + stream(query : AuditQuery) : Stream<AuditEvent>  <<US-503>>
   }
   interface TradeHistoryStore {
     + insert(entry : TradeHistoryEntry)

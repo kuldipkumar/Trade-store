@@ -247,6 +247,7 @@ CREATE TABLE outbox_events (
 | Counter | `trade_deadletter_audit_failures_total`: dead letters whose audit entry could not be written (logged at ERROR with the position; the DLT record remains) |
 | Counter | `trade_job_failures_total{job}`: failed runs of a scheduled job: `expiry` (each logged at ERROR) and `outbox-relay` (each logged at WARN; every `outbox.alert-after-failed-polls` consecutive failures, ERROR with the waiting trade IDs) |
 | Gauges | `trade_outbox_backlog_size`, `trade_outbox_oldest_age_seconds` |
+| Timer (read side) | Read endpoints (`/trades…`, `/reports/audit`) are measured by Spring's `http_server_requests_seconds{uri,status}`; they have no business outcome to count, so no separate `trade.*` timer is added |
 | Kafka lag | Micrometer's Kafka client metrics (`kafka_consumer_fetch_manager_records_lag_max`) |
 | Health | `readiness` group = `db`, `mongo`, `kafka` (`KafkaHealthIndicator`) (US-604.1); `liveness` = the application state only |
 | Logs | One INFO line per trade (ingestion and expiry, `channel=SCHEDULER` for the latter): `outcome=REJECTED tradeId=T2 version=1 channel=STREAM reasons=[LOWER_VERSION]`. MDC holds `tradeId` and `channel`. No payloads (A-32). |

@@ -46,21 +46,23 @@ else none
 end
 
 == GET /reports/audit?from&to&tradeId&outcome ==
-Client -> AuditReportController : report (local dates converted to UTC instants in the configured zone)
+Client -> AuditReportController : report(from, to, tradeId, outcome, page, size)
 alt Accept: application/json (default)
-  AuditReportController -> AuditReportService : report(query, page, size)
-  AuditReportService -> AuditEventStore : find(query, page, size)  (index-backed, sorted by eventTimestamp)
-  AuditReportService -> AuditEventStore : countByOutcome(query)  (aggregation $match + $group)
+  AuditReportController -> AuditReportController : PageParameters.validate, year range, from <= to
+  AuditReportController -> AuditReportService : report(from, to, tradeId, outcome, page, size)
+  AuditReportService -> AuditReportService : local dates -> AuditQuery [from 00:00, to+1 00:00) in the zone;\nsize capped at api.max-page-size; blank tradeId = no filter
+  AuditReportService -> AuditEventStore : countByOutcome(query)  ($match + $group: summary and total)
+  AuditReportService -> AuditEventStore : find(query, page, size)  (sorted by eventTimestamp, _id from an index)
   AuditReportController --> Client : 200 AuditReportResponse {summary, entries, page metadata}
 else Accept: text/csv (US-503)
-  AuditReportController -> AuditReportService : stream(query)
+  AuditReportController -> AuditReportService : stream(...)  (US-503, planned)
   AuditReportService -> AuditEventStore : stream(query)  (MongoDB cursor, not loaded into memory: US-502.4)
   loop each event
     AuditReportController -> AuditCsvWriter : writeRow(event, out)
   end
   AuditReportController --> Client : 200 text/csv (header row + one row per entry)
-else invalid filter (e.g. from > to, unknown outcome)
-  AuditReportController --> GlobalExceptionHandler : IllegalArgumentException / binding error
+else invalid parameter (page < 0, size < 1, from > to, year outside 1-9999, bad date or outcome)
+  AuditReportController --> GlobalExceptionHandler : InvalidRequestParameterException / type mismatch
   GlobalExceptionHandler --> Client : 400
 end
 
