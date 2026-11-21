@@ -5,6 +5,8 @@ import com.tradestore.persistence.AuditEventStore;
 import com.tradestore.service.AuditEventFactory;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.ListenerExecutionFailedException;
 
@@ -13,6 +15,8 @@ import org.springframework.kafka.listener.ListenerExecutionFailedException;
  * (US-302, ADR-005 section 3).
  */
 public class DeadLetterAuditRecoverer implements ConsumerRecordRecoverer {
+
+    private static final Logger log = LoggerFactory.getLogger(DeadLetterAuditRecoverer.class);
 
     private final ConsumerRecordRecoverer publisher;
     private final AuditEventFactory events;
@@ -33,7 +37,12 @@ public class DeadLetterAuditRecoverer implements ConsumerRecordRecoverer {
         Throwable cause = exception instanceof ListenerExecutionFailedException && exception.getCause() != null
                 ? exception.getCause() : exception;
         String position = record.topic() + "-" + record.partition() + "-" + record.offset();
-        audit.insert(events.deadLettered(position, Outcome.POISON,
-                record.value() == null ? null : record.value().toString(), cause.toString()));
+        try {
+            audit.insert(events.deadLettered(position, Outcome.POISON,
+                    record.value() == null ? null : record.value().toString(), cause.toString()));
+        } catch (RuntimeException auditFailed) {
+            log.error("Dead-lettered message {} could not be audited; the dead-letter topic holds it: {}", position,
+                    auditFailed.toString());
+        }
     }
 }
