@@ -13,7 +13,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties("trade-store")
 public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @DefaultValue Outbox outbox,
-                                   @DefaultValue Expiry expiry, @DefaultValue Api api, @DefaultValue Kafka kafka) {
+                                   @DefaultValue Expiry expiry, @DefaultValue Api api, @DefaultValue Kafka kafka,
+                                   @DefaultValue Retry retry) {
 
     public TradeStoreProperties {
         audit = audit == null ? new Audit(Audit.DEFAULT_MAX_PAYLOAD_CHARS) : audit;
@@ -25,6 +26,8 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
                         Expiry.DEFAULT_STARTUP_RETRY_INTERVAL, Expiry.DEFAULT_STARTUP_MAX_ATTEMPTS)
                 : expiry;
         api = api == null ? new Api(Api.DEFAULT_MAX_REQUEST_BYTES, Api.DEFAULT_MAX_PAGE_SIZE) : api;
+        retry = retry == null ? new Retry(Retry.DEFAULT_MAX_ATTEMPTS, Retry.DEFAULT_INITIAL_INTERVAL,
+                Retry.DEFAULT_MULTIPLIER, Retry.DEFAULT_MAX_INTERVAL) : retry;
         kafka = kafka == null ? new Kafka(Kafka.DEFAULT_TOPIC, Kafka.DEFAULT_PARTITIONS, Kafka.DEFAULT_REPLICATION_FACTOR, null) : kafka;
     }
 
@@ -107,6 +110,38 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
             }
             if (replicationFactor < 1) {
                 throw new IllegalArgumentException("trade-store.kafka.replication-factor must be at least 1, was " + replicationFactor);
+            }
+        }
+    }
+
+    /**
+     * Redelivery of a stream message after a transient failure (US-303.3, A-50).
+     *
+     * @param maxAttempts     deliveries in total, the first included; then the message is dead-lettered as FAILED
+     * @param initialInterval wait before the first retry
+     * @param multiplier      each wait is this many times the previous one
+     * @param maxInterval     the longest wait
+     */
+    public record Retry(@DefaultValue("3") int maxAttempts, @DefaultValue("1s") Duration initialInterval,
+                        @DefaultValue("2.0") double multiplier, @DefaultValue("10s") Duration maxInterval) {
+        static final int DEFAULT_MAX_ATTEMPTS = 3;
+        static final Duration DEFAULT_INITIAL_INTERVAL = Duration.ofSeconds(1);
+        static final double DEFAULT_MULTIPLIER = 2.0;
+        static final Duration DEFAULT_MAX_INTERVAL = Duration.ofSeconds(10);
+
+        public Retry {
+            if (maxAttempts < 1) {
+                throw new IllegalArgumentException("trade-store.retry.max-attempts must be at least 1, was " + maxAttempts);
+            }
+            if (multiplier < 1) {
+                throw new IllegalArgumentException("trade-store.retry.multiplier must be at least 1, was " + multiplier);
+            }
+            if (!initialInterval.isPositive()) {
+                throw new IllegalArgumentException("trade-store.retry.initial-interval must be positive, was " + initialInterval);
+            }
+            if (maxInterval.compareTo(initialInterval) < 0) {
+                throw new IllegalArgumentException("trade-store.retry.max-interval must be at least initial-interval ("
+                        + initialInterval + "), was " + maxInterval);
             }
         }
     }

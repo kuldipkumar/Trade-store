@@ -1,5 +1,5 @@
 @startuml 05-seq-stream-ingestion
-title Kafka ingestion: happy path, business rejection, poison pill, transient failure\n(implemented: happy path, rejection, poison pill to the DLT; retry limit and FAILED: US-303; size limit: US-607)
+title Kafka ingestion: happy path, business rejection, poison pill, transient failure\n(implemented, except the size limit: US-607)
 
 autonumber
 queue "trades.inbound" as Topic
@@ -54,7 +54,8 @@ else valid JSON
   else transient failure, e.g. DataAccessException (US-303)
     TradeIngestionService --> TradeConsumer : throw DataAccessException
     TradeConsumer --> Container : rethrow
-    loop up to max-attempts (default 3), exponential backoff
+    loop up to retry.max-attempts deliveries (default 3), exponential backoff
+      Container -> Container : count trade.retries, WARN position + attempt
       Container -> TradeConsumer : redeliver same record (seek)
     end
     alt a retry succeeds

@@ -68,6 +68,20 @@ class TradeStorePropertiesTest {
     }
 
     @Test
+    @Tag("US-303.3")
+    void should_useTheDocumentedRetryDefaultsAndConfiguredValues_when_bound() {
+        // Act
+        TradeStoreProperties.Retry defaults = bind(Map.of()).retry();
+        TradeStoreProperties.Retry configured = bind(Map.of("trade-store.retry.max-attempts", "5",
+                "trade-store.retry.initial-interval", "200ms", "trade-store.retry.multiplier", "3",
+                "trade-store.retry.max-interval", "30s")).retry();
+
+        // Assert
+        assertThat(defaults).isEqualTo(new TradeStoreProperties.Retry(3, Duration.ofSeconds(1), 2.0, Duration.ofSeconds(10)));
+        assertThat(configured).isEqualTo(new TradeStoreProperties.Retry(5, Duration.ofMillis(200), 3.0, Duration.ofSeconds(30)));
+    }
+
+    @Test
     @Tag("A-50")
     void should_useConfiguredValues_when_propertiesAreSet() {
         // Act
@@ -136,5 +150,32 @@ class TradeStorePropertiesTest {
         assertThatThrownBy(() -> bind(Map.of(property, "0")))
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause().hasMessageContaining("must be at least 1");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"trade-store.retry.max-attempts=0", "trade-store.retry.multiplier=0.5"})
+    @Tag("US-303.3")
+    void should_failAtStartup_when_aRetrySettingIsBelowOne(String setting) {
+        // Arrange
+        String[] pair = setting.split("=");
+
+        // Act + Assert: zero attempts would drop messages unseen; a multiplier below 1 shrinks the backoff
+        assertThatThrownBy(() -> bind(Map.of(pair[0], pair[1])))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause().hasMessageContaining("must be at least 1");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"trade-store.retry.initial-interval=0ms", "trade-store.retry.initial-interval=-1ms",
+            "trade-store.retry.max-interval=500ms"})
+    @Tag("US-303.3")
+    void should_failAtStartup_when_aRetryIntervalIsNotPositiveOrMaxIsBelowInitial(String setting) {
+        // Arrange: a negative interval stops retrying, zero hammers the database; default initial is 1s
+        String[] pair = setting.split("=");
+
+        // Act + Assert
+        assertThatThrownBy(() -> bind(Map.of(pair[0], pair[1])))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause().hasMessageContaining("trade-store.retry.");
     }
 }

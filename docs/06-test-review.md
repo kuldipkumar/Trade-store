@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301; US-304; US-302). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301; US-304; US-302; US-303). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -61,7 +61,9 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-301.2 | Full | `StreamIngestionIT`: v1, v2, v3 keyed by tradeId → v3 stored, no REJECTED | |
 | US-301.3 | Full | `StreamIngestionIT`: no auto-commit; the container commits after the listener returns (mutation-verified) | |
 | US-302.1 | Full | `PoisonPillIT` (non-JSON then a valid trade on the same key, real Kafka: the trade is stored and the pill is on `trades.inbound.DLT`), `KafkaErrorHandlingTest` (malformed → recovered at once, no retries), `DeadLetterAuditRecovererTest` (published first; a failed publish propagates and nothing is audited, mutation-verified; counted and logged at WARN without the payload), `TradeConsumerTest` (empty message is malformed) | Known limitation: the DLT holds the value as the listener read it (UTF-8 text); bytes that aren't valid UTF-8 are not preserved exactly. |
-| US-303.1 | Partial | `KafkaErrorHandlingTest` (a transient database failure is retried, not recovered) | End to end with a failing store: **US-303**. |
+| US-303.1 | Full | `RetryThenDeadLetterIT` (real Kafka; the SQL store is a spy failing twice: stored on the third delivery, nothing on the DLT), `KafkaErrorHandlingTest` (a transient failure is retried, not recovered) | |
+| US-303.2 | Full | `RetryThenDeadLetterIT` (store keeps failing: exactly 3 upsert attempts, one DLT record with the cause header, FAILED audit with the error, nothing stored), `KafkaErrorHandlingTest` (recovered on the third failure), `DeadLetterAuditRecovererTest` (FAILED audit, `trade.deadletter{type=FAILED}`, WARN line) | |
+| US-303.3 | Full | `TradeStorePropertiesTest` (`retry.*` defaults 3 / 1 s / 2.0 / 10 s, override, max-attempts and multiplier below 1 refused), `KafkaErrorHandlingTest` (the handler uses the configured attempts), `RetryThenDeadLetterIT` (runs with a 100 ms backoff from properties) | |
 | US-304.1 | Full | `StreamIngestionIT` (a lower version consumed → exactly one REJECTED, stays one; v2 still stored), `TradeConsumerTest` | |
 | US-302.2 | Full | `PoisonPillIT` (POISON entry in MongoDB with the payload, the exception and channel STREAM), `DeadLetterAuditRecovererTest` (keyed `topic-partition-offset`, the unwrapped cause; a MongoDB failure is logged at ERROR and counted, not thrown), `AuditEventFactoryTest` (payload and error capped), `MongoStoresIT` (the `error` field is stored) | |
 | US-302.3 | Full | `PoisonPillIT`: the DLT record's `kafka_dlt-original-topic`, `-partition` and `-offset` equal the send's metadata, `-exception-cause-fqcn` is `MalformedTradeException`, the key is kept; `KafkaErrorHandlingTest` (partition chosen by key); `TradeStorePropertiesTest` (`kafka.dlt-topic` default `<topic>.DLT`, override) | |
@@ -83,7 +85,7 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-603.1 | Full | `@IntegrationTest` + `TestcontainersConfiguration`; every `*IT` runs on real Kafka, PostgreSQL and MongoDB | |
 | US-604.3 | Full | `TradeIngestionServiceTest`: one INFO line per trade with outcome, tradeId, version, channel and reasons; a payload marker never appears in the log | MDC context (`tradeId`, `channel`) is added by the channel adapters (US-401/US-301). |
 | US-604.1 | Partial | `WalkingSkeletonIT`: health is UP with db and mongo | `/actuator/health/readiness` including Kafka. Closed in **US-604**. |
-| US-604.2 | Partial | `TradeMetricsTest` (counter per outcome and per rejection reason; latency timer), `TradeIngestionServiceTest` (recorded for stored and rejected trades), `StoreTradeIT` (visible at `/actuator/prometheus`) | The FAILED dead-letter count (US-303). POISON is counted (`DeadLetterAuditRecovererTest`). |
+| US-604.2 | Partial | `TradeMetricsTest` (counter per outcome and per rejection reason; latency timer), `TradeIngestionServiceTest` (recorded for stored and rejected trades), `StoreTradeIT` (visible at `/actuator/prometheus`), `DeadLetterAuditRecovererTest` (`trade.deadletter{type=POISON\|FAILED}` recorded) | The dead-letter counter is not yet asserted at `/actuator/prometheus` (US-604). |
 | A-09 | Full | `LowerVersionValidatorTest`: an expired trade still rejects a lower version | |
 | A-46 (outbox backlog) | Full | `OutboxMetricsTest` (size, oldest age, NaN when the database is down), `JdbcOutboxRepositoryIT` (`backlog`), `StoreTradeIT` (gauges and job-failure counters at `/actuator/prometheus`, mutation-verified) | |
 | A-50 | Full | `TradeStorePropertiesTest`: defaults and overrides | |
@@ -116,3 +118,15 @@ These criteria belong to stories already started, but no test covers them yet. T
 |--------|---------|
 | **A (chosen)** | Reword US-501.3: *"the audit write is retried until it succeeds; an outage longer than N polls is logged at ERROR with the affected trade IDs, and the outbox backlog gauges (US-604) show it"*. Implement it test-first in US-501. |
 | B | Keep the wording and add an ERROR log with trade IDs on every failed poll (noisy during an outage). |
+
+## Decision D9 (open: needs a product decision, raised 2026-11-21)
+
+**D9 (US-303 retry window).** C-28/A-28 agreed on "3 attempts with exponential backoff", which is what's implemented: 1 s, then 2 s. A database outage longer than about 3 s therefore dead-letters every trade consumed during it as `FAILED`. Replaying the DLT later can turn those into `LOWER_VERSION` rejections if newer versions of the same trade were stored in the meantime. The `/code-review` of PR #62 flagged this against the story's goal that brief outages don't lose trades.
+
+| Option | What it means | Trade-off |
+|---|---|---|
+| **A. Keep the default, configurable (current)** | 3 deliveries, 1 s ×2 up to 10 s. Operators can raise `trade-store.retry.max-attempts` | Matches the agreed assumption. Short window by default |
+| B. Longer default window | For example 10 deliveries up to 30 s (about 3–4 minutes in total) | Covers a database restart. A partition waits longer behind a message that will never succeed |
+| C. Never dead-letter connection failures | Retry `DataAccessResourceFailureException` and `CannotCreateTransactionException` indefinitely (as before US-303); other errors keep the limit | No trade is lost to an outage, and ordering is kept. A long outage stalls the stream, but that is visible in lag and `trade_retries_total` |
+
+**Recommendation: C.** It is the only option that keeps every trade and the per-key ordering through an outage. The limit still applies to failures that aren't about connectivity. Option A stays in place until you decide.

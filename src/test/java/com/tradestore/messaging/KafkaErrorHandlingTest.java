@@ -6,12 +6,24 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.time.Duration;
+import java.util.stream.Stream;
+
+import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.service.parsing.MalformedTradeException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.kafka.support.serializer.DeserializationException;
+import org.springframework.messaging.converter.MessageConversionException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
@@ -22,7 +34,9 @@ import org.springframework.kafka.listener.MessageListenerContainer;
 class KafkaErrorHandlingTest {
 
     private final ConsumerRecordRecoverer recoverer = mock(ConsumerRecordRecoverer.class);
-    private final DefaultErrorHandler handler = new KafkaConfig().errorHandler(recoverer);
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    private final DefaultErrorHandler handler = new KafkaConfig().errorHandler(recoverer,
+            new TradeStoreProperties.Retry(3, Duration.ofMillis(1), 2.0, Duration.ofMillis(2)), registry);
     private final ConsumerRecord<String, String> record = new ConsumerRecord<>("trades.inbound", 0, 42L, "T1", "{bad");
 
     private boolean fail(Exception cause) {
@@ -42,6 +56,17 @@ class KafkaErrorHandlingTest {
     }
 
     @Test
+    @Tag("US-302.1")
+    void should_recoverAtOnceWithoutRetries_when_anIllegalArgumentIsThrown() {
+        // Act: the same input would fail the same way on every retry (LLD section 6.2, ADR-002)
+        boolean handled = fail(new IllegalArgumentException("unusable value"));
+
+        // Assert
+        assertThat(handled).isTrue();
+        verify(recoverer).accept(any(), any());
+    }
+
+    @Test
     @Tag("US-303.1")
     void should_retryNotRecover_when_theDatabaseIsBrieflyUnavailable() {
         // Act
@@ -50,6 +75,25 @@ class KafkaErrorHandlingTest {
         // Assert: redelivered after a backoff; nothing is dropped
         assertThat(handled).isFalse();
         verify(recoverer, never()).accept(any(), any());
+    }
+
+    @Test
+    @Tag("US-303.2")
+    @Tag("US-303.3")
+    void should_recoverOnTheConfiguredAttempt_when_aTransientFailurePersists() {
+        // Arrange
+        DataAccessResourceFailureException down = new DataAccessResourceFailureException("PostgreSQL down");
+
+        // Act: max-attempts 3 = the first delivery and two retries
+        boolean first = fail(down);
+        boolean second = fail(down);
+        boolean third = fail(down);
+
+        // Assert
+        assertThat(first).isFalse();
+        assertThat(second).isFalse();
+        assertThat(third).isTrue();
+        verify(recoverer).accept(any(), any());
     }
 
     @Test
@@ -64,5 +108,51 @@ class KafkaErrorHandlingTest {
 
         // Assert: a negative partition makes the producer choose one by key, so it always exists
         assertThat(destination).isEqualTo(new TopicPartition("trades.inbound.DLT", -1));
+    }
+
+    static Stream<Exception> notRetryable() {
+        return Stream.of(new MalformedTradeException("not JSON"), new IllegalArgumentException("bad value"),
+                new DeserializationException("too large", new byte[0], false, new IllegalStateException()),
+                new MessageConversionException("cannot convert"),
+                new RuntimeException("wrapped", new MalformedTradeException("not JSON")));
+    }
+
+    @ParameterizedTest
+    @MethodSource("notRetryable")
+    @Tag("US-302.2")
+    void should_classifyAsUnreadable_when_theFailureIsNeverRetried(Exception failure) {
+        // Act + Assert: the same set the handler recovers at once, so the audit says POISON, not FAILED
+        assertThat(KafkaConfig.isUnreadable(failure)).isTrue();
+    }
+
+    @Test
+    @Tag("US-303.2")
+    void should_notClassifyAsUnreadable_when_theFailureIsTransient() {
+        // Act + Assert
+        assertThat(KafkaConfig.isUnreadable(new DataAccessResourceFailureException("PostgreSQL down"))).isFalse();
+    }
+
+    @Test
+    @Tag("US-303.1")
+    @Tag("US-604.2")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_countAndLogEachRetry_when_aTransientFailureIsRedelivered(CapturedOutput output) {
+        // Act
+        fail(new DataAccessResourceFailureException("PostgreSQL restarting"));
+
+        // Assert: AGENTS.md section 4, every retry is visible (code review of PR #62)
+        assertThat(registry.counter("trade.retries").count()).isEqualTo(1.0);
+        assertThat(output).contains("WARN").contains("position=trades.inbound-0-42 attempt=1")
+                .contains("DataAccessResourceFailureException").doesNotContain("{bad");
+    }
+
+    @Test
+    @Tag("US-302.1")
+    void should_notCountARetry_when_theFailureIsNotRetryable() {
+        // Act
+        fail(new MalformedTradeException("not JSON"));
+
+        // Assert
+        assertThat(registry.find("trade.retries").counter()).isNull();
     }
 }

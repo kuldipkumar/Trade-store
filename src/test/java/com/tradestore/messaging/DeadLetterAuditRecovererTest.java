@@ -43,8 +43,8 @@ class DeadLetterAuditRecovererTest {
     private final AuditEventStore audit = mock(AuditEventStore.class);
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final DeadLetterAuditRecoverer recoverer = new DeadLetterAuditRecoverer(publisher,
-            new AuditEventFactory(Clock.fixed(NOW, ZoneOffset.UTC), new TradeStoreProperties(null, null, null, null, null, null)),
-            audit, registry);
+            new AuditEventFactory(Clock.fixed(NOW, ZoneOffset.UTC), new TradeStoreProperties(null, null, null, null, null, null, null)),
+            audit, registry, KafkaConfig::isUnreadable);
 
     private final ConsumerRecord<String, String> record = new ConsumerRecord<>("trades.inbound", 3, 42L, "T1", "{bad");
     private final Exception failure = new ListenerExecutionFailedException("listener failed",
@@ -111,5 +111,26 @@ class DeadLetterAuditRecovererTest {
         assertThatThrownBy(() -> recoverer.accept(record, failure)).isInstanceOf(KafkaException.class);
         verifyNoInteractions(audit);
         assertThat(registry.find("trade.deadletter").counter()).isNull();
+    }
+
+    @Test
+    @Tag("US-303.2")
+    @Tag("US-604.2")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_auditAndCountAsFailed_when_retriesOfATransientFailureAreExhausted(CapturedOutput output) {
+        // Arrange
+        Exception exhausted = new ListenerExecutionFailedException("listener failed",
+                new DataAccessResourceFailureException("PostgreSQL down"));
+
+        // Act
+        recoverer.accept(record, exhausted);
+
+        // Assert
+        ArgumentCaptor<AuditEvent> event = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(audit).insert(event.capture());
+        assertThat(event.getValue().outcome()).isEqualTo(Outcome.FAILED);
+        assertThat(event.getValue().error()).startsWith(DataAccessResourceFailureException.class.getName());
+        assertThat(registry.counter("trade.deadletter", "type", "FAILED").count()).isEqualTo(1.0);
+        assertThat(output).contains("outcome=FAILED position=trades.inbound-3-42");
     }
 }

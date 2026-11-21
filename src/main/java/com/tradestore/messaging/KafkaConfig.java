@@ -4,12 +4,15 @@ import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.persistence.AuditEventStore;
 import com.tradestore.service.AuditEventFactory;
 import com.tradestore.service.parsing.MalformedTradeException;
+import java.util.List;
 import java.util.function.BiFunction;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
@@ -17,6 +20,10 @@ import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.converter.ConversionException;
+import org.springframework.kafka.support.serializer.DeserializationException;
+import org.springframework.messaging.converter.MessageConversionException;
+import org.springframework.messaging.handler.invocation.MethodArgumentResolutionException;
 import org.springframework.util.backoff.ExponentialBackOff;
 
 /**
@@ -25,6 +32,8 @@ import org.springframework.util.backoff.ExponentialBackOff;
  */
 @Configuration(proxyBeanMethods = false)
 public class KafkaConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(KafkaConfig.class);
 
     @Bean
     NewTopic tradesInbound(TradeStoreProperties properties) {
@@ -42,15 +51,17 @@ public class KafkaConfig {
     /**
      * The listener's error handler (ADR-002). A malformed message is never retried (A-27): it is published to the
      * dead-letter topic with Spring's diagnostic headers and audited as POISON (US-302). Anything else, for
-     * example the database briefly unavailable, is redelivered with exponential backoff (1 s, doubling to 10 s)
-     * until it succeeds, so no trade is dropped; the partition waits meanwhile. US-303 adds a retry limit.
+     * example the database briefly unavailable, is redelivered with exponential backoff (default 1 s, doubling
+     * to 10 s) up to {@code trade-store.retry.max-attempts} deliveries (default 3); the partition waits meanwhile.
+     * Then it is dead-lettered and audited as FAILED (US-303).
      */
     @Bean
     DefaultErrorHandler kafkaErrorHandler(KafkaOperations<?, ?> kafka, TradeStoreProperties properties,
                                           AuditEventFactory events, AuditEventStore audit, MeterRegistry registry) {
         String deadLetterTopic = properties.kafka().dltTopic();
         DeadLetterPublishingRecoverer publisher = new DeadLetterPublishingRecoverer(kafka, deadLetterDestination(deadLetterTopic));
-        return errorHandler(new DeadLetterAuditRecoverer(publisher, events, audit, registry));
+        return errorHandler(new DeadLetterAuditRecoverer(publisher, events, audit, registry, KafkaConfig::isUnreadable),
+                properties.retry(), registry);
     }
 
     /**
@@ -61,11 +72,50 @@ public class KafkaConfig {
         return (record, e) -> new TopicPartition(topic, -1);
     }
 
-    DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer) {
-        ExponentialBackOff backOff = new ExponentialBackOff(1_000, 2.0);
-        backOff.setMaxInterval(10_000);
+    /** Ours, added to the handler's not-retryable list (LLD section 6.2). */
+    private static final List<Class<? extends Exception>> NOT_RETRYABLE =
+            List.of(MalformedTradeException.class, IllegalArgumentException.class);
+
+    /** Ours plus DefaultErrorHandler's built-in not-retryable exceptions: all are recovered at once. */
+    private static final List<Class<? extends Throwable>> UNREADABLE = List.of(MalformedTradeException.class,
+            IllegalArgumentException.class, DeserializationException.class, MessageConversionException.class,
+            ConversionException.class, MethodArgumentResolutionException.class, NoSuchMethodException.class,
+            ClassCastException.class);
+
+    private static Throwable rootCause(Throwable failure) {
+        Throwable t = failure;
+        while (t.getCause() != null && t.getCause() != t) {
+            t = t.getCause();
+        }
+        return t;
+    }
+
+    /** A failure that retrying can't fix, anywhere in the cause chain: the message itself is unusable (POISON). */
+    static boolean isUnreadable(Throwable failure) {
+        for (Throwable t = failure; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            Throwable current = t;
+            if (UNREADABLE.stream().anyMatch(type -> type.isInstance(current))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer, TradeStoreProperties.Retry retry,
+                                     MeterRegistry registry) {
+        ExponentialBackOff backOff = new ExponentialBackOff(retry.initialInterval().toMillis(), retry.multiplier());
+        backOff.setMaxInterval(retry.maxInterval().toMillis());
+        backOff.setMaxAttempts(retry.maxAttempts() - 1); // retries after the first delivery
         DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);
-        handler.addNotRetryableExceptions(MalformedTradeException.class);
+        NOT_RETRYABLE.forEach(handler::addNotRetryableExceptions);
+        handler.setRetryListeners((record, failure, attempt) -> {
+            // Called for every failed delivery; count only those that will be redelivered (AGENTS.md section 4).
+            if (!isUnreadable(failure) && attempt < retry.maxAttempts()) {
+                registry.counter("trade.retries").increment();
+                log.warn("Retrying position={}-{}-{} attempt={} of {}: {}", record.topic(), record.partition(),
+                        record.offset(), attempt, retry.maxAttempts(), rootCause(failure).getClass().getName());
+            }
+        });
         return handler;
     }
 }
