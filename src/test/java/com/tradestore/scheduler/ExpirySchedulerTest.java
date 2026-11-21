@@ -1,13 +1,19 @@
 package com.tradestore.scheduler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.tradestore.service.ExpiryService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 /** US-202: the scheduled expiry run. */
 class ExpirySchedulerTest {
@@ -24,5 +30,19 @@ class ExpirySchedulerTest {
 
         // Assert
         verify(expiry).expireMaturedTrades();
+    }
+
+    @Test
+    @Tag("US-202.1")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_countAndLogTheFailureWithoutThrowing_when_theRunFails(CapturedOutput output) {
+        // Arrange
+        when(expiry.expireMaturedTrades()).thenThrow(new DataAccessResourceFailureException("PostgreSQL down"));
+
+        // Act + Assert: the next run (or a restart) catches up, so the scheduler keeps going
+        assertThatCode(scheduler::runScheduled).doesNotThrowAnyException();
+        var failures = registry.find("trade.job.failures").tag("job", "expiry").counter();
+        assertThat(failures == null ? 0 : failures.count()).isEqualTo(1.0);
+        assertThat(output).contains("ERROR").contains("Expiry run failed");
     }
 }
