@@ -1,6 +1,9 @@
 package com.tradestore.messaging;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -20,6 +23,10 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.mockito.ArgumentCaptor;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.ListenerExecutionFailedException;
@@ -62,5 +69,17 @@ class DeadLetterAuditRecovererTest {
         assertThat(event.getValue()).isEqualTo(new AuditEvent("trades.inbound-3-42", null, null, Outcome.POISON,
                 List.of(), Channel.STREAM, NOW, "{bad", null,
                 "com.tradestore.service.parsing.MalformedTradeException: The body is not valid JSON"));
+    }
+
+    @Test
+    @Tag("US-302.2")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_logAtErrorWithoutThrowing_when_theAuditCannotBeWritten(CapturedOutput output) {
+        // Arrange: MongoDB is down; the dead-letter record is already the durable copy (ADR-005 section 3)
+        doThrow(new DataAccessResourceFailureException("MongoDB down")).when(audit).insert(any());
+
+        // Act + Assert: throwing would make the container redeliver and dead-letter the message again
+        assertThatCode(() -> recoverer.accept(record, failure)).doesNotThrowAnyException();
+        assertThat(output).contains("ERROR").contains("trades.inbound-3-42").doesNotContain("{bad");
     }
 }
