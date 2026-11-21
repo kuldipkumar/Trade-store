@@ -24,7 +24,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.kafka.support.serializer.DeserializationException;
 import org.springframework.messaging.converter.MessageConversionException;
+import java.sql.SQLException;
+
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.transaction.CannotCreateTransactionException;
@@ -161,9 +164,32 @@ class KafkaErrorHandlingTest {
     }
 
     static Stream<Exception> connectionFailures() {
-        return Stream.of(new DataAccessResourceFailureException("PostgreSQL down"),
-                new CannotCreateTransactionException("no connection"), new QueryTimeoutException("timed out"),
-                new RuntimeException("wrapped", new DataAccessResourceFailureException("PostgreSQL down")));
+        DataAccessResourceFailureException lost = new DataAccessResourceFailureException("I/O error",
+                new SQLException("connection lost", "08006"));
+        return Stream.of(lost, new CannotCreateTransactionException("no connection"),
+                new CannotGetJdbcConnectionException("pool exhausted"),
+                new DataAccessResourceFailureException("restarting", new SQLException("admin shutdown", "57P01")),
+                new RuntimeException("wrapped", lost),
+                // Precedence: an outage wins over a not-retryable type deeper in the chain (code review of PR #65)
+                new CannotCreateTransactionException("no connection", new IllegalArgumentException("bad url")));
+    }
+
+    static Stream<Exception> boundedFailures() {
+        return Stream.of(new QueryTimeoutException("statement timeout", new SQLException("canceled", "57014")),
+                new DataAccessResourceFailureException("program limit", new SQLException("too complex", "54000")),
+                new InvalidDataAccessResourceUsageException("relation missing"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("boundedFailures")
+    @Tag("US-303.2")
+    void should_deadLetterOnTheThirdAttempt_when_theDatabaseIsUpButTheSameErrorRepeats(Exception failure) {
+        // Act + Assert: these fail the same way every time with a healthy database, so they must not block the
+        // partition forever (code review of PR #65)
+        assertThat(fail(failure)).isFalse();
+        assertThat(fail(failure)).isFalse();
+        assertThat(fail(failure)).isTrue();
+        verify(recoverer).accept(any(), any());
     }
 
     @ParameterizedTest

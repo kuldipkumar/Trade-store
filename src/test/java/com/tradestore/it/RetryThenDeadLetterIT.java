@@ -9,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -78,8 +79,10 @@ class RetryThenDeadLetterIT {
             if (trade.tradeId().equals(broken)) {
                 throw new InvalidDataAccessResourceUsageException("relation \"trades\" does not exist");
             }
-            if (trade.tradeId().equals(flaky) && flakyFailures.getAndIncrement() < 2) {
-                throw new DataAccessResourceFailureException("PostgreSQL restarting");
+            if (trade.tradeId().equals(flaky) && flakyFailures.getAndIncrement() < 5) {
+                // More failures than max-attempts (3): an outage is waited out, never dead-lettered (D9 option C)
+                throw new DataAccessResourceFailureException("PostgreSQL restarting",
+                        new SQLException("terminating connection due to administrator command", "57P01"));
             }
             return invocation.callRealMethod();
         }).when(trades).upsertIfNotOlder(any());
@@ -125,13 +128,14 @@ class RetryThenDeadLetterIT {
 
     @Test
     @Tag("US-303.1")
-    void should_storeTheTradeAfterRetriesWithoutDeadLettering_when_theStoreFailsTwiceThenRecovers() throws Exception {
+    void should_storeTheTradeAfterRetriesWithoutDeadLettering_when_theDatabaseIsUnreachableForLongerThanTheRetryLimit()
+            throws Exception {
         // Act
         publish(flaky);
 
-        // Assert: stored on the third attempt; nothing on the dead-letter topic
+        // Assert: stored on the sixth attempt; nothing on the dead-letter topic
         await().atMost(TIMEOUT).untilAsserted(() -> assertThat(trades.findById(flaky)).contains(new StoredTrade(flaky, 1, false)));
-        verify(trades, times(3)).upsertIfNotOlder(argThat(t -> t.tradeId().equals(flaky)));
+        verify(trades, times(6)).upsertIfNotOlder(argThat(t -> t.tradeId().equals(flaky)));
         assertThat(deadLetters(flaky, Duration.ofSeconds(3))).isEmpty();
     }
 
