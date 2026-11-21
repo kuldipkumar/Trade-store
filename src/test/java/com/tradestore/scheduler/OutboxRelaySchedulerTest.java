@@ -5,7 +5,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.tradestore.persistence.OutboxRepository;
 import com.tradestore.service.OutboxRelayService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -14,7 +16,9 @@ import org.springframework.dao.DataAccessResourceFailureException;
 class OutboxRelaySchedulerTest {
 
     private final OutboxRelayService relay = mock(OutboxRelayService.class);
-    private final OutboxRelayScheduler scheduler = new OutboxRelayScheduler(relay);
+    private final OutboxRepository outbox = mock(OutboxRepository.class);
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    private final OutboxRelayScheduler scheduler = new OutboxRelayScheduler(relay, outbox, registry, 3);
 
     @Test
     @Tag("US-101.3")
