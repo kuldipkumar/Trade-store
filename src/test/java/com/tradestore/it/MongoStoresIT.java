@@ -199,7 +199,8 @@ class MongoStoresIT {
         List<String> historyIndexes = mongo.indexOps("trade_history").getIndexInfo().stream().map(IndexInfo::getName).toList();
 
         // Assert (A-52)
-        assertThat(auditIndexes).contains("eventTimestamp", "outcome_eventTimestamp", "tradeId_eventTimestamp");
+        assertThat(auditIndexes).contains("eventTimestamp_id", "outcome_eventTimestamp_id", "tradeId_eventTimestamp_id")
+                .doesNotContain("eventTimestamp", "outcome_eventTimestamp", "tradeId_eventTimestamp");
         assertThat(historyIndexes).contains("tradeId_version_receivedTimestamp");
     }
 }

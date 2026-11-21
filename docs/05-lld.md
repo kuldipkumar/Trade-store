@@ -147,7 +147,7 @@ CREATE TABLE outbox_events (
 );
 ```
 - The 64-character limit on IDs is enforced by `MandatoryFieldsValidator` as well, so an over-long ID is an `INVALID_FIELD` rejection and never a database error.
-- **MongoDB indexes** are created at startup by `MongoIndexInitializer` (`ensureIndex`, idempotent): `audit_events {eventTimestamp}`, `{outcome, eventTimestamp}`, `{tradeId, eventTimestamp}`; `trade_history {tradeId, version, receivedTimestamp}`.
+- **MongoDB indexes** are created at startup by `MongoIndexInitializer` (`ensureIndex`, idempotent): `audit_events {eventTimestamp, _id}`, `{outcome, eventTimestamp, _id}`, `{tradeId, eventTimestamp, _id}` (ending in `_id` so the report's sort is index-backed; the earlier indexes without `_id` are dropped at startup); `trade_history {tradeId, version, receivedTimestamp}`.
 
 ## 6. Contracts
 
