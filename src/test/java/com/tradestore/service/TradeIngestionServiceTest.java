@@ -251,4 +251,23 @@ class TradeIngestionServiceTest {
         assertThat(outcomes("REJECTED", "INVALID_FIELD")).isEqualTo(1.0);
         assertThat(outcomes("REJECTED", "LOWER_VERSION")).isEqualTo(1.0);
     }
+
+    private long timedIngestions(String channel) {
+        var timer = registry.find("trade.processing").tag("channel", channel).timer();
+        return timer == null ? 0 : timer.count();
+    }
+
+    @Test
+    @Tag("US-604.2")
+    void should_timeTheIngestion_when_tradeIsStored() {
+        // Arrange
+        when(trades.findById("T1")).thenReturn(Optional.empty());
+        when(trades.upsertIfNotOlder(any())).thenReturn(UpsertResult.INSERTED);
+
+        // Act
+        service.ingest(validSubmission());
+
+        // Assert
+        assertThat(timedIngestions("REST")).isEqualTo(1);
+    }
 }
