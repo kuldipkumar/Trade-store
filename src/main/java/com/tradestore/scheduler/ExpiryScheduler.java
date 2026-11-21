@@ -21,6 +21,7 @@ public class ExpiryScheduler {
 
     private final ExpiryService expiry;
     private final Counter failures;
+    private final boolean runAtStartup;
 
     @Autowired
     public ExpiryScheduler(ExpiryService expiry, MeterRegistry registry, TradeStoreProperties properties) {
@@ -30,11 +31,14 @@ public class ExpiryScheduler {
     ExpiryScheduler(ExpiryService expiry, MeterRegistry registry, boolean runAtStartup) {
         this.expiry = expiry;
         this.failures = registry.counter("trade.job.failures", "job", "expiry");
+        this.runAtStartup = runAtStartup;
     }
 
     /** Catches up once at startup, so trades that matured while the service was down are not left stale (US-203). */
     public void onApplicationReady() {
-        runScheduled();
+        if (runAtStartup) {
+            runScheduled();
+        }
     }
 
     /** Default: daily at 00:05 in the configured zone, or the server's zone if none is set (A-18, US-205). */
