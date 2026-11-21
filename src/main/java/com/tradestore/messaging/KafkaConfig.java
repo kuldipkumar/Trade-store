@@ -50,7 +50,7 @@ public class KafkaConfig {
                                           AuditEventFactory events, AuditEventStore audit, MeterRegistry registry) {
         String deadLetterTopic = properties.kafka().dltTopic();
         DeadLetterPublishingRecoverer publisher = new DeadLetterPublishingRecoverer(kafka, deadLetterDestination(deadLetterTopic));
-        return errorHandler(new DeadLetterAuditRecoverer(publisher, events, audit, registry));
+        return errorHandler(new DeadLetterAuditRecoverer(publisher, events, audit, registry), properties.retry());
     }
 
     /**
@@ -61,7 +61,7 @@ public class KafkaConfig {
         return (record, e) -> new TopicPartition(topic, -1);
     }
 
-    DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer) {
+    DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer, TradeStoreProperties.Retry retry) {
         ExponentialBackOff backOff = new ExponentialBackOff(1_000, 2.0);
         backOff.setMaxInterval(10_000);
         DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);

@@ -6,6 +6,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.time.Duration;
+
+import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.service.parsing.MalformedTradeException;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -22,7 +25,8 @@ import org.springframework.kafka.listener.MessageListenerContainer;
 class KafkaErrorHandlingTest {
 
     private final ConsumerRecordRecoverer recoverer = mock(ConsumerRecordRecoverer.class);
-    private final DefaultErrorHandler handler = new KafkaConfig().errorHandler(recoverer);
+    private final DefaultErrorHandler handler = new KafkaConfig().errorHandler(recoverer,
+            new TradeStoreProperties.Retry(3, Duration.ofMillis(1), 2.0, Duration.ofMillis(2)));
     private final ConsumerRecord<String, String> record = new ConsumerRecord<>("trades.inbound", 0, 42L, "T1", "{bad");
 
     private boolean fail(Exception cause) {
@@ -50,6 +54,25 @@ class KafkaErrorHandlingTest {
         // Assert: redelivered after a backoff; nothing is dropped
         assertThat(handled).isFalse();
         verify(recoverer, never()).accept(any(), any());
+    }
+
+    @Test
+    @Tag("US-303.2")
+    @Tag("US-303.3")
+    void should_recoverOnTheConfiguredAttempt_when_aTransientFailurePersists() {
+        // Arrange
+        DataAccessResourceFailureException down = new DataAccessResourceFailureException("PostgreSQL down");
+
+        // Act: max-attempts 3 = the first delivery and two retries
+        boolean first = fail(down);
+        boolean second = fail(down);
+        boolean third = fail(down);
+
+        // Assert
+        assertThat(first).isFalse();
+        assertThat(second).isFalse();
+        assertThat(third).isTrue();
+        verify(recoverer).accept(any(), any());
     }
 
     @Test
