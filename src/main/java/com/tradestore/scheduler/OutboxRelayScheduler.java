@@ -19,6 +19,9 @@ public class OutboxRelayScheduler {
 
     private final OutboxRelayService relay;
     private final Counter failedPolls;
+    private final OutboxRepository outbox;
+    private final int alertAfterFailedPolls;
+    private int consecutiveFailures;
 
     @Autowired
     public OutboxRelayScheduler(OutboxRelayService relay, OutboxRepository outbox, MeterRegistry registry,
@@ -30,6 +33,8 @@ public class OutboxRelayScheduler {
                          int alertAfterFailedPolls) {
         this.relay = relay;
         this.failedPolls = registry.counter("trade.job.failures", "job", "outbox-relay");
+        this.outbox = outbox;
+        this.alertAfterFailedPolls = alertAfterFailedPolls;
     }
 
     @Scheduled(fixedDelayString = "${trade-store.outbox.poll-interval:1s}")
@@ -38,6 +43,11 @@ public class OutboxRelayScheduler {
             relay.relayBatch();
         } catch (RuntimeException e) {
             failedPolls.increment();
+            consecutiveFailures++;
+            if (consecutiveFailures == alertAfterFailedPolls) {
+                log.error("Audit relay has failed for {} consecutive polls; outcomes are kept in the outbox and retried. "
+                        + "Trades waiting for their audit entries: {}", consecutiveFailures, outbox.pendingTradeIds(20));
+            }
             log.warn("Outbox relay failed; events stay in the outbox and are retried on the next poll: {}", e.toString());
         }
     }
