@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.tradestore.domain.LowerVersionException;
 import com.tradestore.domain.ReasonCode;
+import com.tradestore.domain.TradeNotFoundException;
 import com.tradestore.domain.TradeRejectedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -19,6 +20,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Maps exceptions to the one API error shape (docs/05-lld.md section 7). A rejected trade lists every reason;
@@ -78,6 +80,20 @@ public class GlobalExceptionHandler {
         log.warn("Trade store unavailable for {} {}", request.getMethod(), request.getRequestURI(), e);
         return error(HttpStatus.SERVICE_UNAVAILABLE, List.of(new ApiErrorResponse.Reason("SERVICE_UNAVAILABLE", null,
                 "The trade store is temporarily unavailable; nothing was stored. Please retry.")), request);
+    }
+
+    /** An unknown trade (US-402.2, US-404.2). */
+    @ExceptionHandler(TradeNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> notFound(TradeNotFoundException e, HttpServletRequest request) {
+        return error(HttpStatus.NOT_FOUND, List.of(new ApiErrorResponse.Reason("NOT_FOUND", "tradeId", e.getMessage())),
+                request);
+    }
+
+    /** An unknown path: 404, not the catch-all 500. */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiErrorResponse> noRoute(NoResourceFoundException e, HttpServletRequest request) {
+        return error(HttpStatus.NOT_FOUND, List.of(new ApiErrorResponse.Reason("NOT_FOUND", null,
+                "No endpoint " + request.getMethod() + " " + request.getRequestURI())), request);
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
