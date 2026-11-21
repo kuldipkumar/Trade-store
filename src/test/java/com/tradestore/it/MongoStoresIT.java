@@ -12,7 +12,9 @@ import com.tradestore.domain.Channel;
 import com.tradestore.domain.Outcome;
 import com.tradestore.domain.Trade;
 import com.tradestore.domain.TradeHistoryEntry;
+import com.tradestore.domain.Violation;
 import com.tradestore.persistence.AuditEventStore;
+import com.tradestore.persistence.AuditQuery;
 import com.tradestore.persistence.TradeHistoryStore;
 import org.bson.Document;
 import org.junit.jupiter.api.Tag;
@@ -79,6 +81,31 @@ class MongoStoresIT {
         assertThat(doc).isNotNull();
         assertThat(doc.getString("outcome")).isEqualTo("POISON");
         assertThat(doc.getString("error")).isEqualTo("MalformedTradeException: not JSON");
+    }
+
+    private AuditEvent audited(Outcome outcome, String at) {
+        List<Violation> reasons = outcome == Outcome.REJECTED ? List.of(Violation.invalidField("bookId", "required")) : List.of();
+        return new AuditEvent(UUID.randomUUID().toString(), tradeId, 1, outcome, reasons, Channel.REST,
+                Instant.parse(at), "{}", null);
+    }
+
+    @Test
+    @Tag("US-502.1")
+    @Tag("US-502.2")
+    void should_findEntriesInTheRangeOldestFirst_when_filteringOnTradeIdAndTime() {
+        // Arrange
+        AuditEvent before = audited(Outcome.ACCEPTED, "2026-11-01T09:59:59Z");
+        AuditEvent first = audited(Outcome.ACCEPTED, "2026-11-01T10:00:00Z");
+        AuditEvent second = audited(Outcome.REJECTED, "2026-11-01T11:00:00Z");
+        AuditEvent atUntil = audited(Outcome.ACCEPTED, "2026-11-01T12:00:00Z");
+        List.of(second, atUntil, before, first).forEach(auditEvents::insert);
+
+        // Act: [from, until)
+        List<AuditEvent> found = auditEvents.find(new AuditQuery(Instant.parse("2026-11-01T10:00:00Z"),
+                Instant.parse("2026-11-01T12:00:00Z"), tradeId, null), 0, 10);
+
+        // Assert: read back as written (the audit document holds no trade snapshot)
+        assertThat(found).containsExactly(first, second);
     }
 
     @Test

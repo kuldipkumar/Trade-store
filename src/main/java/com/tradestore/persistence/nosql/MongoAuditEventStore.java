@@ -1,9 +1,11 @@
 package com.tradestore.persistence.nosql;
 
 import java.util.Date;
+import java.util.List;
 
 import com.tradestore.domain.AuditEvent;
 import com.tradestore.persistence.AuditEventStore;
+import com.tradestore.persistence.AuditQuery;
 import org.bson.Document;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -41,5 +43,10 @@ public class MongoAuditEventStore implements AuditEventStore {
         } catch (DuplicateKeyException alreadyRecorded) {
             // Relayed before a crash: the entry already exists (ADR-005), so this is success.
         }
+    }
+
+    @Override
+    public List<AuditEvent> find(AuditQuery query, int page, int size) {
+        return List.of();
     }
 }
