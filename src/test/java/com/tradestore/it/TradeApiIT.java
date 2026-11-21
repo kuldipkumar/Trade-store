@@ -1,13 +1,18 @@
 package com.tradestore.it;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import com.tradestore.persistence.TradeRepository;
+import org.bson.Document;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.client.EntityExchangeResult;
@@ -20,12 +25,16 @@ class TradeApiIT {
 
     private final RestTestClient rest;
     private final Clock clock;
+    private final MongoTemplate mongo;
+    private final TradeRepository trades;
 
     private final String tradeId = "R-" + UUID.randomUUID();
 
-    TradeApiIT(RestTestClient rest, Clock clock) {
+    TradeApiIT(RestTestClient rest, Clock clock, MongoTemplate mongo, TradeRepository trades) {
+        this.trades = trades;
         this.rest = rest;
         this.clock = clock;
+        this.mongo = mongo;
     }
 
     private String json(int version, String maturity) {
@@ -203,5 +212,38 @@ class TradeApiIT {
         // Assert
         assertThat(response.getStatus()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
         assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("METHOD_NOT_ALLOWED");
+    }
+
+    @Test
+    @Tag("US-501.1")
+    void should_auditExactlyTheBodyTheClientSent_when_aTradeIsSubmitted() {
+        // Arrange: an unknown field that the API ignores, but the audit trail must keep
+        String body = """
+                {"tradeId":"%s","version":1,"counterPartyId":"CP-1","bookId":"B1","maturityDate":"2099-05-20","note":"kept"}"""
+                .formatted(tradeId);
+
+        // Act
+        post(body);
+
+        // Assert: the payload is the original body, not a re-serialized request
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            Document entry = mongo.getCollection("audit_events").find(new Document("tradeId", tradeId)).first();
+            assertThat(entry).isNotNull();
+            assertThat(entry.getString("payload")).isEqualTo(body);
+        });
+    }
+
+    @Test
+    @Tag("US-401.5")
+    void should_return400AndStoreNothing_when_versionIsNotAWholeNumber() {
+        // Act: Jackson would otherwise coerce 1.9 to 1
+        EntityExchangeResult<JsonNode> response = post("""
+                {"tradeId":"%s","version":1.9,"counterPartyId":"CP-1","bookId":"B1","maturityDate":"2099-05-20"}
+                """.formatted(tradeId));
+
+        // Assert (decisions D2/D3: a wrong JSON type is a malformed request)
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("MALFORMED_REQUEST");
+        assertThat(trades.findById(tradeId)).isEmpty();
     }
 }
