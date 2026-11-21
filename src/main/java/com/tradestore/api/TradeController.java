@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Trade submission over REST (US-401). Uses the same ingestion use case as the stream (A-21). The body is read
+ * Trades over REST: submission (US-401) and lookup by ID (US-402). Uses the same ingestion use case as the stream (A-21). The body is read
  * as text, so the audit trail keeps exactly what the client sent, and parsed strictly by {@link TradeJsonParser}.
  */
 @RestController

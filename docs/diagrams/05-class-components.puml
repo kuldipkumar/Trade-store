@@ -26,7 +26,7 @@ package "api" {
     + method(...) : 405
     + notFound(TradeNotFoundException) : 404
     + noRoute(NoResourceFoundException) : 404
-    + unexpected(Exception) : 500
+    + unexpected(Exception) : Spring client errors keep their 4xx; else 500
   }
   class TradeJsonParser {
     + parse(body : String, channel) : TradeSubmission

@@ -230,6 +230,7 @@ CREATE TABLE outbox_events (
 | Database unavailable (no connection, transient or resource failure) | `CannotCreateTransactionException`, `TransientDataAccessException`, `DataAccessResourceFailureException` | 503, logged | Retry with backoff, then DLT | `FAILED` (Kafka only) |
 | Unsupported content type / method | `HttpMediaTypeNotSupportedException` / `HttpRequestMethodNotSupportedException` | 415 / 405 | n/a | n/a |
 | MongoDB unavailable during relay | `MongoException` | n/a | n/a | Delayed, never lost: rows stay in the outbox |
+| Other Spring MVC client errors (406, missing parameter, …) | `ErrorResponse` exceptions | their own 4xx (406 without a body), logged at DEBUG | n/a | n/a |
 | Anything else, including permanent database errors | `Exception` | 500 `INTERNAL_ERROR` (generic message, logged with stack trace) | Retry, then DLT | `FAILED` |
 
 **Status precedence when a trade breaks several rules:** 400 (the request itself must be fixed) > 409 > 422. The response always lists **all** reasons.

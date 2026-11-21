@@ -19,7 +19,7 @@ import org.springframework.test.web.servlet.client.EntityExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import tools.jackson.databind.JsonNode;
 
-/** US-401: submitting a trade over REST, against the running application and real databases. */
+/** US-401 and US-402: submitting and reading trades over REST, against the running application and real databases. */
 @IntegrationTest
 class TradeApiIT {
 
