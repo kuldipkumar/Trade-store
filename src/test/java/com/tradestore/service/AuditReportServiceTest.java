@@ -13,7 +13,9 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
+import com.tradestore.domain.AuditEvent;
 import com.tradestore.domain.Outcome;
 import com.tradestore.persistence.AuditEventStore;
 import com.tradestore.persistence.AuditQuery;
@@ -103,5 +105,23 @@ class AuditReportServiceTest {
 
         // Assert
         verify(audit).find(new AuditQuery(null, null, null, null), 0, 10);
+    }
+
+    @Test
+    @Tag("US-503.1")
+    void should_streamWithTheSameFilters_when_exportingTheReport() {
+        // Arrange
+        AuditQuery expected = new AuditQuery(Instant.parse("2026-10-31T18:30:00Z"), Instant.parse("2026-11-19T18:30:00Z"),
+                "T2", Outcome.REJECTED);
+        when(audit.stream(expected)).thenReturn(Stream.empty());
+
+        // Act
+        try (Stream<AuditEvent> events = service.stream(LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 19), "T2",
+                Outcome.REJECTED)) {
+            events.count();
+        }
+
+        // Assert
+        verify(audit).stream(expected);
     }
 }

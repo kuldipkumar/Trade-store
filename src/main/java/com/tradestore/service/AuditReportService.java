@@ -4,8 +4,10 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import com.tradestore.config.TradeStoreProperties;
+import com.tradestore.domain.AuditEvent;
 import com.tradestore.domain.Outcome;
 import com.tradestore.persistence.AuditEventStore;
 import com.tradestore.persistence.AuditQuery;
@@ -45,5 +47,10 @@ public class AuditReportService {
         long total = summary.values().stream().mapToLong(Long::longValue).sum();
         return new AuditReport(summary, audit.find(query, page, pageSize), page, pageSize, total,
                 (total + pageSize - 1) / pageSize);
+    }
+
+    /** Every matching entry, oldest first, read lazily (US-503); the caller must close the stream. */
+    public Stream<AuditEvent> stream(LocalDate from, LocalDate to, String tradeId, Outcome outcome) {
+        return Stream.empty();
     }
 }
