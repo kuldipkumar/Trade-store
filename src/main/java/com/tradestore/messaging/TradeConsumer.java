@@ -1,6 +1,6 @@
 package com.tradestore.messaging;
 
-import com.tradestore.api.TradeJsonParser;
+import com.tradestore.service.parsing.TradeJsonParser;
 import com.tradestore.domain.Channel;
 import com.tradestore.service.TradeIngestionService;
 import org.springframework.kafka.annotation.KafkaListener;

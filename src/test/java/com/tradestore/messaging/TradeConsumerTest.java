@@ -3,7 +3,7 @@ package com.tradestore.messaging;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-import com.tradestore.api.TradeJsonParser;
+import com.tradestore.service.parsing.TradeJsonParser;
 import com.tradestore.domain.Channel;
 import com.tradestore.domain.TradeSubmission;
 import com.tradestore.service.TradeIngestionService;
