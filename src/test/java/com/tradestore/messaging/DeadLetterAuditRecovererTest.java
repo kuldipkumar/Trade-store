@@ -84,6 +84,7 @@ class DeadLetterAuditRecovererTest {
         // Act + Assert: throwing would make the container redeliver and dead-letter the message again
         assertThatCode(() -> recoverer.accept(record, failure)).doesNotThrowAnyException();
         assertThat(output).contains("ERROR").contains("trades.inbound-3-42").doesNotContain("{bad");
+        assertThat(registry.counter("trade.deadletter.audit.failures").count()).isEqualTo(1.0);
     }
 
     @Test
