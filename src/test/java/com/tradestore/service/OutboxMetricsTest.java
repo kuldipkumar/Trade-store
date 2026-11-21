@@ -2,6 +2,8 @@ package com.tradestore.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
@@ -16,6 +18,9 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 
 /** A-46 / docs/05-lld.md section 8: the outbox backlog gauges. */
@@ -67,5 +72,33 @@ class OutboxMetricsTest {
         // Act + Assert
         assertThat(gauge("trade.outbox.backlog.size")).isNaN();
         assertThat(gauge("trade.outbox.oldest.age")).isNaN();
+    }
+
+    @Test
+    @Tag("A-46")
+    void should_queryTheBacklogOncePerScrape_when_bothGaugesAreRead() {
+        // Arrange
+        when(outbox.backlog()).thenReturn(new OutboxBacklog(5, Optional.of(NOW.minusSeconds(90))));
+
+        // Act: one scrape reads both gauges (same instant)
+        gauge("trade.outbox.backlog.size");
+        gauge("trade.outbox.oldest.age");
+
+        // Assert: one query, so both values come from the same moment
+        verify(outbox, times(1)).backlog();
+    }
+
+    @Test
+    @Tag("A-46")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_logWhyTheBacklogIsUnknown_when_theQueryFails(CapturedOutput output) {
+        // Arrange
+        when(outbox.backlog()).thenThrow(new DataAccessResourceFailureException("permission denied for outbox_events"));
+
+        // Act
+        gauge("trade.outbox.backlog.size");
+
+        // Assert
+        assertThat(output).contains("Outbox backlog could not be read").contains("permission denied for outbox_events");
     }
 }
