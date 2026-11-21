@@ -12,7 +12,12 @@ public class ClockConfig {
 
     @Bean
     public Clock clock(TradeStoreProperties properties) {
+        return Clock.system(zoneOf(properties));
+    }
+
+    /** The configured zone (A-16), or the server's default zone when none is set. */
+    public static ZoneId zoneOf(TradeStoreProperties properties) {
         String zone = properties.timeZone();
-        return Clock.system(zone == null || zone.isBlank() ? ZoneId.systemDefault() : ZoneId.of(zone));
+        return zone == null || zone.isBlank() ? ZoneId.systemDefault() : ZoneId.of(zone);
     }
 }

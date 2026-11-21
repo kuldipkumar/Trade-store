@@ -2,6 +2,8 @@ package com.tradestore.persistence.sql;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import com.tradestore.domain.StoredTrade;
@@ -34,6 +36,23 @@ public class JdbcTradeRepository implements TradeRepository {
     private static final String SELECT_TRADE = """
             SELECT trade_id, version, counter_party_id, book_id, maturity_date, created_date, expired
               FROM trades WHERE trade_id = :tradeId
+            """;
+
+
+    // One bounded batch (uses idx_trades_unexpired_maturity; "<" keeps a trade maturing today live, A-17).
+    // Rows locked by another transaction (e.g. a concurrent replacement) are skipped and
+    // picked up by a later batch or run, so expiry never waits on, or blocks, ingestion for long.
+    private static final String MARK_EXPIRED_BATCH = """
+            WITH due AS (
+                SELECT trade_id FROM trades
+                 WHERE maturity_date < :today AND expired = false
+                 ORDER BY maturity_date, trade_id
+                 LIMIT :limit
+                   FOR UPDATE SKIP LOCKED)
+            UPDATE trades t SET expired = true, updated_at = now()
+              FROM due
+             WHERE t.trade_id = due.trade_id
+            RETURNING t.trade_id, t.version, t.counter_party_id, t.book_id, t.maturity_date, t.created_date, t.expired
             """;
 
     private final JdbcClient jdbc;
@@ -79,5 +98,12 @@ public class JdbcTradeRepository implements TradeRepository {
                 rs.getObject("maturity_date", java.time.LocalDate.class),
                 rs.getObject("created_date", java.time.LocalDate.class),
                 rs.getBoolean("expired"));
+    }
+
+
+    @Override
+    public List<Trade> markExpired(LocalDate today, int limit) {
+        return jdbc.sql(MARK_EXPIRED_BATCH).param("today", today).param("limit", limit)
+                .query(JdbcTradeRepository::mapTrade).list();
     }
 }

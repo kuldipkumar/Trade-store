@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.domain.AuditEvent;
+import com.tradestore.domain.Channel;
 import com.tradestore.domain.Outcome;
 import com.tradestore.domain.Trade;
 import com.tradestore.domain.TradeSubmission;
@@ -39,6 +40,12 @@ public class AuditEventFactory {
     public AuditEvent rejected(TradeSubmission submission, List<Violation> violations) {
         return new AuditEvent(newId(), submission.tradeId(), submission.version(), Outcome.REJECTED, violations,
                 submission.channel(), clock.instant(), cap(submission.rawPayload()), null);
+    }
+
+    /** An EXPIRED trade, from the expiry job: channel SCHEDULER, no payload (A-20, decision D4). */
+    public AuditEvent expired(Trade trade) {
+        return new AuditEvent(newId(), trade.tradeId(), trade.version(), Outcome.EXPIRED, List.of(), Channel.SCHEDULER,
+                clock.instant(), null, trade);
     }
 
     private String cap(String payload) {

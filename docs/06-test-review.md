@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -43,6 +43,10 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-201.2 | Full | `MaturityNotInPastValidatorTest`: today and later dates are valid (the boundary) | |
 | US-201.3 | Full | `TradeIngestionServiceTest`: v2 with past maturity is rejected and no write is attempted, so v1 stays | |
 | US-201.4 | Full | `TradeIngestionServiceTest` (one `LowerVersionException` carrying both reasons), `ValidatorWiringTest` (order in the real context), `TradeRejectedExceptionTest` | |
+| US-202.1 | Full | `ExpiryIT` (real databases, today pinned to 2026-11-19: only the trade maturing on the 18th expires), `JdbcTradeRepositoryIT`, `ExpirySchedulerTest` | |
+| US-202.2 | Full | `ExpiryIT` (a second run leaves no outbox rows and exactly one EXPIRED audit entry), `JdbcTradeRepositoryIT` | |
+| US-202.3 | Full | `ExpiryIT` (EXPIRED entry in MongoDB through the relay), `ExpiryServiceTest`, `AuditEventFactoryTest` | |
+| US-202.4 | Full | `ExpiryScheduleConfigTest`: default `0 5 0 * * *`, an overridden cron, and the configured zone (00:05 in Kolkata = 18:35 UTC) | |
 | US-204.1 | Partial | `JdbcTradeRepositoryIT`: the upsert clears `expired` | Service-level flow (expired v1 → v2 with maturity 2027-01-01 is stored with expired = N). Closed in **US-204**. |
 | US-205.1 | Full | `ClockConfigTest` | |
 | US-205.2 | Full | `TradeIngestionServiceTest`: at 01:30 on 19 Nov in Asia/Kolkata (still 18 Nov in UTC) a trade maturing on 18 Nov is rejected; mutation-verified against a UTC "today" | |
@@ -74,7 +78,7 @@ These criteria belong to stories already started, but no test covers them yet. T
 | Q2 | Integration tests used field `@Autowired` (AGENTS.md §8: constructor injection only) | Fixed: `junit-platform.properties` plus constructors |
 | Q3 | `ClockConfigTest` checked two inputs in one test (AGENTS.md §5: one behaviour per test) | Fixed: parameterized test |
 | Q4 | Inline fully-qualified class names in three tests | Fixed: imports |
-| Q5 | The end-to-end tests use the real system clock, which is fine for now. US-107 and US-202 need to move "today" (to 2027-05-21). | Open: add a test-only adjustable `Clock` bean with US-107 / US-202. |
+| Q5 | The end-to-end tests used the real system clock; US-107 and US-202 need to move "today". | Fixed in US-202: `MutableClock`, a `@Primary` test bean that tests pin and reset. |
 | Q6 | The traceability parser missed tests with multi-line annotations | Fixed test-first (`MultiLineAnnotationTest`) |
 
 ## Decision D8 (accepted: option A, 2026-11-20)

@@ -28,6 +28,7 @@ class TradeStorePropertiesTest {
         assertThat(properties.audit().maxPayloadChars()).isEqualTo(10_000);
         assertThat(properties.outbox().pollInterval()).isEqualTo(Duration.ofSeconds(1));
         assertThat(properties.outbox().batchSize()).isEqualTo(500);
+        assertThat(properties.expiry().batchSize()).isEqualTo(1000);
     }
 
     @Test
@@ -38,12 +39,14 @@ class TradeStorePropertiesTest {
                 "trade-store.time-zone", "Asia/Kolkata",
                 "trade-store.audit.max-payload-chars", "256",
                 "trade-store.outbox.poll-interval", "250ms",
-                "trade-store.outbox.batch-size", "50"));
+                "trade-store.outbox.batch-size", "50",
+                "trade-store.expiry.batch-size", "200"));
 
         // Assert
         assertThat(properties.timeZone()).isEqualTo("Asia/Kolkata");
         assertThat(properties.audit().maxPayloadChars()).isEqualTo(256);
         assertThat(properties.outbox().pollInterval()).isEqualTo(Duration.ofMillis(250));
         assertThat(properties.outbox().batchSize()).isEqualTo(50);
+        assertThat(properties.expiry().batchSize()).isEqualTo(200);
     }
 }

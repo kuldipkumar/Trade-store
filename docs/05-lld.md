@@ -101,7 +101,17 @@ RETURNING (xmax = 0) AS inserted;
 - An identical redelivery is a `REPLACED` that resets only `created_date` (US-103.2, A-24).
 
 ### 4.2 Expiry (US-202)
-`UPDATE trades SET expired = true, updated_at = now() WHERE maturity_date < :today AND expired = false RETURNING *`. Each returned row becomes an `EXPIRED` outbox event in the same transaction. It is idempotent and safe across several instances, because row locks mean each trade expires once.
+In bounded batches (`trade-store.expiry.batch-size`, default 1000), one transaction per batch, repeated while a batch comes back full:
+```sql
+WITH due AS (SELECT trade_id FROM trades
+              WHERE maturity_date < :today AND expired = false
+              ORDER BY maturity_date, trade_id LIMIT :limit
+                FOR UPDATE SKIP LOCKED)
+UPDATE trades t SET expired = true, updated_at = now() FROM due
+ WHERE t.trade_id = due.trade_id
+RETURNING t.*;
+```
+Each returned row becomes an `EXPIRED` outbox event in the same transaction. Batching keeps a large backlog (for example the startup catch-up after downtime) from locking every matured trade at once; `SKIP LOCKED` lets expiry and ingestion, or several instances, run side by side. It is idempotent: already-expired rows are never returned. (Changed from a single unbounded `UPDATE` after the US-202 code review.)
 
 ### 4.3 Outbox relay (ADR-005)
 Claim with `SELECT … ORDER BY id LIMIT :batch FOR UPDATE SKIP LOCKED`. Then insert into MongoDB with `_id = eventId` (a duplicate key counts as success), then `DELETE … WHERE event_id = ANY(:ids)`, then commit. If MongoDB fails, the transaction rolls back and the rows stay for the next poll.
@@ -200,7 +210,7 @@ CREATE TABLE outbox_events (
 | `kafka.partitions` / `kafka.replication-factor` / `kafka.concurrency` | `6` / `1` / `3` | A-42 |
 | `kafka.max-message-bytes` | `1048576` | US-607.1 |
 | `retry.max-attempts` / `retry.initial-interval` / `retry.multiplier` / `retry.max-interval` | `3` / `1s` / `2.0` / `10s` | US-303.3 |
-| `expiry.cron` / `expiry.run-at-startup` | `0 5 0 * * *` / `true` | US-202.4, US-203 |
+| `expiry.cron` / `expiry.run-at-startup` / `expiry.batch-size` | `0 5 0 * * *` / `true` / `1000` | US-202.4, US-203 |
 | `outbox.poll-interval` / `outbox.batch-size` | `1s` / `500` | ADR-005 |
 | `audit.max-payload-chars` | `10000` | US-302.2 |
 | `api.max-request-bytes` / `api.max-page-size` | `1048576` / `100` | US-401.6, US-403 |
@@ -228,10 +238,11 @@ CREATE TABLE outbox_events (
 | Counter | `trade_outcomes_total{outcome, reason, channel}`: one increment per reason for rejections |
 | Timer | `trade_processing_seconds{channel}`: ingestion use case latency |
 | Counter | `trade_deadletter_total{type=POISON\|FAILED}` |
+| Counter | `trade_job_failures_total{job}`: failed runs of a scheduled job (`expiry`), each also logged at ERROR |
 | Gauges | `trade_outbox_backlog_size`, `trade_outbox_oldest_age_seconds` |
 | Kafka lag | Micrometer's Kafka client metrics (`kafka_consumer_fetch_manager_records_lag_max`) |
 | Health | `readiness` group = `db`, `mongo`, `kafka` (`KafkaHealthIndicator`) (US-604.1); `liveness` = the application state only |
-| Logs | One INFO line per trade: `outcome=REJECTED tradeId=T2 version=1 channel=STREAM reasons=[LOWER_VERSION]`. MDC holds `tradeId` and `channel`. No payloads (A-32). |
+| Logs | One INFO line per trade (ingestion and expiry, `channel=SCHEDULER` for the latter): `outcome=REJECTED tradeId=T2 version=1 channel=STREAM reasons=[LOWER_VERSION]`. MDC holds `tradeId` and `channel`. No payloads (A-32). |
 
 ## 9. Test design (Phase 6 and 7)
 

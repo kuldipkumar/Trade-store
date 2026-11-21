@@ -1,5 +1,7 @@
 package com.tradestore.persistence;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import com.tradestore.domain.StoredTrade;
@@ -18,4 +20,13 @@ public interface TradeRepository {
      * statement (ADR-003). Returns {@link UpsertResult#STALE} without writing if a higher version is stored.
      */
     UpsertResult upsertIfNotOlder(Trade trade);
+
+
+    /**
+     * Marks up to {@code limit} unexpired trades whose maturity date is before {@code today} as expired, and
+     * returns the trades it changed (A-17, US-202). Rows locked by another transaction are skipped. Already
+     * expired trades are never returned, so repeating it changes nothing (US-202.2), and it never sets expired
+     * back to false (US-204.2). Callers repeat it while it returns a full batch.
+     */
+    List<Trade> markExpired(LocalDate today, int limit);
 }

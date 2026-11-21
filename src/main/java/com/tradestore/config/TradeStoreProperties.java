@@ -12,11 +12,13 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param timeZone the zone that defines "today" (A-16); empty means the server's default zone
  */
 @ConfigurationProperties("trade-store")
-public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @DefaultValue Outbox outbox) {
+public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @DefaultValue Outbox outbox,
+                                   @DefaultValue Expiry expiry) {
 
     public TradeStoreProperties {
         audit = audit == null ? new Audit(Audit.DEFAULT_MAX_PAYLOAD_CHARS) : audit;
         outbox = outbox == null ? new Outbox(Outbox.DEFAULT_POLL_INTERVAL, Outbox.DEFAULT_BATCH_SIZE) : outbox;
+        expiry = expiry == null ? new Expiry(Expiry.DEFAULT_BATCH_SIZE) : expiry;
     }
 
     /** @param maxPayloadChars longer payloads are truncated in the audit trail (US-302.2, A-52) */
@@ -31,5 +33,13 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
     public record Outbox(@DefaultValue("1s") Duration pollInterval, @DefaultValue("500") int batchSize) {
         static final Duration DEFAULT_POLL_INTERVAL = Duration.ofSeconds(1);
         static final int DEFAULT_BATCH_SIZE = 500;
+    }
+
+    /**
+     * @param batchSize maximum trades expired per transaction, so a large backlog (e.g. after downtime) never
+     *                  locks every matured trade at once (US-202, US-203)
+     */
+    public record Expiry(@DefaultValue("1000") int batchSize) {
+        static final int DEFAULT_BATCH_SIZE = 1000;
     }
 }
