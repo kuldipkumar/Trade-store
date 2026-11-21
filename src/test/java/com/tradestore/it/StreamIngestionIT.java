@@ -8,11 +8,15 @@ import java.util.UUID;
 
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.persistence.TradeRepository;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.bson.Document;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.ContainerProperties;
 
 /**
  * US-301: trades published to the stream are stored and audited with the same rules as REST (A-21), against
@@ -27,10 +31,15 @@ class StreamIngestionIT {
     private final KafkaTemplate<String, String> kafka;
     private final TradeRepository trades;
     private final MongoTemplate mongo;
+    private final KafkaListenerEndpointRegistry registry;
+    private final ConsumerFactory<?, ?> consumerFactory;
 
     private final String tradeId = "K-" + UUID.randomUUID();
 
-    StreamIngestionIT(KafkaTemplate<String, String> kafka, TradeRepository trades, MongoTemplate mongo) {
+    StreamIngestionIT(KafkaTemplate<String, String> kafka, TradeRepository trades, MongoTemplate mongo,
+                      KafkaListenerEndpointRegistry registry, ConsumerFactory<?, ?> consumerFactory) {
+        this.registry = registry;
+        this.consumerFactory = consumerFactory;
         this.kafka = kafka;
         this.trades = trades;
         this.mongo = mongo;
@@ -78,5 +87,19 @@ class StreamIngestionIT {
             assertThat(audit("ACCEPTED") + audit("REPLACED")).isEqualTo(3);
         });
         assertThat(audit("REJECTED")).isZero();
+    }
+
+    @Test
+    @Tag("US-301.3")
+    void should_commitOffsetsOnlyAfterProcessing_when_theListenerContainerRuns() {
+        // Act
+        var container = registry.getAllListenerContainers().iterator().next();
+        var consumerConfig = consumerFactory.getConfigurationProperties();
+
+        // Assert: no background auto-commit; the container commits after the listener returns, so a message
+        // being processed when the service stops is delivered again after restart (A-43)
+        assertThat(consumerConfig.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG)).isIn(false, "false");
+        assertThat(container.getContainerProperties().getAckMode())
+                .isIn(ContainerProperties.AckMode.BATCH, ContainerProperties.AckMode.RECORD);
     }
 }
