@@ -40,6 +40,13 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
     public record Outbox(@DefaultValue("1s") Duration pollInterval, @DefaultValue("500") int batchSize,
                          @DefaultValue("30") int alertAfterFailedPolls) {
         static final int DEFAULT_ALERT_AFTER_FAILED_POLLS = 30;
+
+        public Outbox {
+            if (alertAfterFailedPolls < 1) {
+                throw new IllegalArgumentException(
+                        "trade-store.outbox.alert-after-failed-polls must be at least 1, was " + alertAfterFailedPolls);
+            }
+        }
         static final Duration DEFAULT_POLL_INTERVAL = Duration.ofSeconds(1);
         static final int DEFAULT_BATCH_SIZE = 500;
     }
