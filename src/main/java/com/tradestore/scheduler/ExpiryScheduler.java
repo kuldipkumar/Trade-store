@@ -32,8 +32,9 @@ public class ExpiryScheduler {
         this.failures = registry.counter("trade.job.failures", "job", "expiry");
     }
 
-    /** Stub: implemented test-first (US-203). */
+    /** Catches up once at startup, so trades that matured while the service was down are not left stale (US-203). */
     public void onApplicationReady() {
+        runScheduled();
     }
 
     /** Default: daily at 00:05 in the configured zone, or the server's zone if none is set (A-18, US-205). */
