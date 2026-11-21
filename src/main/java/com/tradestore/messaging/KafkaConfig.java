@@ -67,7 +67,7 @@ public class KafkaConfig {
         backOff.setMaxInterval(retry.maxInterval().toMillis());
         backOff.setMaxAttempts(retry.maxAttempts() - 1); // retries after the first delivery
         DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);
-        handler.addNotRetryableExceptions(MalformedTradeException.class);
+        handler.addNotRetryableExceptions(MalformedTradeException.class, IllegalArgumentException.class);
         return handler;
     }
 }
