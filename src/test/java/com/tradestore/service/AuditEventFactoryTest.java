@@ -98,4 +98,15 @@ class AuditEventFactoryTest {
         assertThat(event).usingRecursiveComparison().ignoringFields("eventId").isEqualTo(
                 new AuditEvent(null, "T1", 2, Outcome.EXPIRED, List.of(), Channel.SCHEDULER, NOW, null, trade));
     }
+
+    @Test
+    @Tag("US-302.2")
+    void should_keyTheEventByPositionAndKeepTheError_when_aMessageIsDeadLettered() {
+        // Act
+        AuditEvent event = factory.deadLettered("trades.inbound-0-42", Outcome.POISON, "not json", "Malformed: x");
+
+        // Assert: no trade identity is trusted from an unreadable message
+        assertThat(event).isEqualTo(new AuditEvent("trades.inbound-0-42", null, null, Outcome.POISON, List.of(),
+                Channel.STREAM, NOW, "not json", null, "Malformed: x"));
+    }
 }

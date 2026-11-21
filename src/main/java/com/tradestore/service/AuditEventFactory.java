@@ -48,6 +48,15 @@ public class AuditEventFactory {
                 clock.instant(), null, trade);
     }
 
+    /**
+     * A message moved to the dead-letter topic (US-302, US-303): it has no trusted trade identity, so the event is
+     * keyed by its position, {@code topic-partition-offset}, which makes a repeated recovery idempotent (D5).
+     */
+    public AuditEvent deadLettered(String position, Outcome outcome, String payload, String error) {
+        return new AuditEvent(position, null, null, outcome, List.of(), Channel.STREAM, clock.instant(), payload, null,
+                error);
+    }
+
     private String cap(String payload) {
         return payload == null || payload.length() <= maxPayloadChars ? payload : payload.substring(0, maxPayloadChars);
     }
