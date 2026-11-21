@@ -77,4 +77,31 @@ class AuditReportServiceTest {
         verify(audit).find(new AuditQuery(null, null, null, null), 0, 100);
         assertThat(report.size()).isEqualTo(100);
     }
+
+    @Test
+    @Tag("US-502.3")
+    void should_listTheSummaryInOutcomeOrder_when_countsArriveInAnyOrder() {
+        // Arrange: the store's map has no defined order
+        Map<Outcome, Long> unordered = new java.util.LinkedHashMap<>();
+        unordered.put(Outcome.EXPIRED, 1L);
+        unordered.put(Outcome.ACCEPTED, 2L);
+        unordered.put(Outcome.REJECTED, 3L);
+        when(audit.countByOutcome(any())).thenReturn(unordered);
+
+        // Act
+        AuditReport report = service.report(null, null, null, null, 0, 10);
+
+        // Assert: stable JSON key order, as in the LLD example
+        assertThat(report.summary().keySet()).containsExactly(Outcome.ACCEPTED, Outcome.REJECTED, Outcome.EXPIRED);
+    }
+
+    @Test
+    @Tag("US-502.2")
+    void should_notFilterOnTradeId_when_itIsBlank() {
+        // Act: GET /reports/audit?tradeId=
+        service.report(null, null, " ", null, 0, 10);
+
+        // Assert
+        verify(audit).find(new AuditQuery(null, null, null, null), 0, 10);
+    }
 }
