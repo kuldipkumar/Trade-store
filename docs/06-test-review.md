@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -28,6 +28,7 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-102.1 | Full | `JdbcTradeRepositoryIT` (CP-2 stored), `TradeIngestionServiceTest` (REPLACED), `LowerVersionValidatorTest` | |
 | US-102.2 | Full | `StoreTradeIT`: v1 then v3 stores v3, outcome REPLACED (mutation-verified) | |
 | US-102.3 | Full | `StoreTradeIT`: v1 then v2 accepted, history holds both in version order through the real relay (mutation-verified); `MongoStoresIT`, `OutboxRelayServiceTest` | |
+| US-103.2 | Full | `StoreTradeIT`: the same v2 delivered twice gives REPLACED, no error, and an unchanged record (mutation-verified) | |
 | US-103.1 | Full | `JdbcTradeRepositoryIT` (same version replaces, createdDate reset), `TradeIngestionServiceTest` (REPLACED) | The test changes the counterparty where the criterion changes the book. Both are overwritten by the same statement, so this is equivalent. |
 | US-104.1 | Full | `TradeRejectedExceptionTest`, `LowerVersionValidatorTest`, `TradeIngestionServiceTest`, `StoreTradeIT` (message names both versions) | |
 | US-104.2 | Full | `TradeIngestionServiceTest` (no write attempted), `JdbcTradeRepositoryIT` (the guard holds), `StoreTradeIT` (still v2) | |
@@ -62,7 +63,6 @@ These criteria belong to stories already started, but no test covers them yet. T
 
 | AC | Gap | Plan |
 |----|-----|------|
-| US-103.2 | An identical redelivery: REPLACED, no error | US-103: test first (characterization) |
 | US-106.1 | Real concurrent writes on PostgreSQL | US-106: Testcontainers concurrency test |
 | US-501.2 | No operation updates or deletes audit entries | US-501: architecture test on the `AuditEventStore` and `TradeHistoryStore` interfaces |
 
