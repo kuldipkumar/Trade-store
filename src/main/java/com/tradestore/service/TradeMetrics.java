@@ -6,6 +6,7 @@ import com.tradestore.domain.Channel;
 import com.tradestore.domain.Outcome;
 import com.tradestore.domain.ReasonCode;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 
 /** Stub: implemented test-first (TradeMetricsTest). */
 public class TradeMetrics {
@@ -22,5 +23,14 @@ public class TradeMetrics {
             registry.counter("trade.outcomes", "outcome", outcome.name(), "reason", reason, "channel", channel.name())
                     .increment();
         }
+    }
+
+    /** Stub: implemented test-first. */
+    public Timer.Sample startProcessing() {
+        return Timer.start(registry);
+    }
+
+    /** Stub: implemented test-first. */
+    public void stopProcessing(Timer.Sample sample, Channel channel) {
     }
 }
