@@ -38,14 +38,9 @@ public class JdbcTradeRepository implements TradeRepository {
               FROM trades WHERE trade_id = :tradeId
             """;
 
-    // Uses the partial index idx_trades_unexpired_maturity; "<" keeps a trade maturing today live (A-17).
-    private static final String MARK_EXPIRED = """
-            UPDATE trades SET expired = true, updated_at = now()
-             WHERE maturity_date < :today AND expired = false
-            RETURNING trade_id, version, counter_party_id, book_id, maturity_date, created_date, expired
-            """;
 
-    // One bounded batch: rows locked by another transaction (e.g. a concurrent replacement) are skipped and
+    // One bounded batch (uses idx_trades_unexpired_maturity; "<" keeps a trade maturing today live, A-17).
+    // Rows locked by another transaction (e.g. a concurrent replacement) are skipped and
     // picked up by a later batch or run, so expiry never waits on, or blocks, ingestion for long.
     private static final String MARK_EXPIRED_BATCH = """
             WITH due AS (
@@ -105,10 +100,6 @@ public class JdbcTradeRepository implements TradeRepository {
                 rs.getBoolean("expired"));
     }
 
-    @Override
-    public List<Trade> markExpired(LocalDate today) {
-        return jdbc.sql(MARK_EXPIRED).param("today", today).query(JdbcTradeRepository::mapTrade).list();
-    }
 
     @Override
     public List<Trade> markExpired(LocalDate today, int limit) {

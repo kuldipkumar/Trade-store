@@ -224,7 +224,7 @@ class JdbcTradeRepositoryIT {
         repository.upsertIfNotOlder(new Trade(live, 1, "CP-1", "B1", TODAY, TODAY.minusDays(30), false));
 
         // Act
-        List<Trade> expired = repository.markExpired(TODAY);
+        List<Trade> expired = repository.markExpired(TODAY, 1000);
 
         // Assert: the returned row is the stored trade, now expired; the one maturing today is untouched
         assertThat(expired).filteredOn(t -> t.tradeId().startsWith(tradeId)).singleElement().satisfies(t -> {
@@ -239,10 +239,10 @@ class JdbcTradeRepositoryIT {
     void should_returnNothing_when_expiryRunsAgainOnAnAlreadyExpiredTrade() {
         // Arrange
         repository.upsertIfNotOlder(new Trade(tradeId, 1, "CP-1", "B1", TODAY.minusDays(1), TODAY.minusDays(30), false));
-        repository.markExpired(TODAY);
+        repository.markExpired(TODAY, 1000);
 
         // Act
-        List<Trade> second = repository.markExpired(TODAY);
+        List<Trade> second = repository.markExpired(TODAY, 1000);
 
         // Assert
         assertThat(second).extracting(Trade::tradeId).doesNotContain(tradeId);

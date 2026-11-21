@@ -21,13 +21,12 @@ public interface TradeRepository {
      */
     UpsertResult upsertIfNotOlder(Trade trade);
 
-    /**
-     * Marks every unexpired trade whose maturity date is before {@code today} as expired, in one statement,
-     * and returns the trades it changed (A-17, US-202). Already-expired trades are never returned, so running
-     * it again changes nothing (idempotent, US-202.2). It never sets expired back to false (US-204.2).
-     */
-    List<Trade> markExpired(LocalDate today);
 
-    /** Stub: implemented test-first. Like {@link #markExpired(LocalDate)}, but at most {@code limit} trades. */
+    /**
+     * Marks up to {@code limit} unexpired trades whose maturity date is before {@code today} as expired, and
+     * returns the trades it changed (A-17, US-202). Rows locked by another transaction are skipped. Already
+     * expired trades are never returned, so repeating it changes nothing (US-202.2), and it never sets expired
+     * back to false (US-204.2). Callers repeat it while it returns a full batch.
+     */
     List<Trade> markExpired(LocalDate today, int limit);
 }
