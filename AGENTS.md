@@ -83,6 +83,13 @@ For **each story**, in this order:
 
 Repeat until all of that story's acceptance criteria are covered. Commits should show the TDD rhythm.
 
+**Branch, pull request and peer review (every story):**
+1. Work on a feature branch `story/US-xxx-short-name`, never directly on `main`.
+2. Open a pull request to `main`; CI must be green.
+3. A **Senior Engineer review** is posted on the pull request using the checklist in `docs/review-checklist.md`, ending in a verdict: **Approve**, **Approve with notes**, or **Changes requested**.
+4. Merge (merge commit, so the TDD history stays visible) only on Approve / Approve with notes. **Changes requested** is fixed on the branch and re-reviewed; anything that needs a product or design decision is flagged to the human first.
+5. After the merge, record a **milestone** (story, date, PR, criteria, tests, review verdict) in `docs/milestones.md` and on the milestone page.
+
 ### Phase 7: Integration and Regression
 - Use Testcontainers for real infrastructure (database, message broker), not in-memory fakes.
 - The regression suite runs on every pull request and on every push to `main`.
@@ -230,7 +237,9 @@ The last column is mandatory. It records human judgment over the AI's output.
 - [ ] No critical or blocker vulnerabilities
 - [ ] PlantUML diagrams created or updated in the same commit, and rendering successfully in CI
 - [ ] Docs updated if the design changed
+- [ ] Senior Engineer review posted on the pull request, verdict Approve (or Approve with notes)
 - [ ] Prompt(s) logged in `PROMPTS.md`
+- [ ] Milestone recorded after the merge
 
 ---
 
