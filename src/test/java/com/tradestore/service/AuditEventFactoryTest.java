@@ -82,4 +82,20 @@ class AuditEventFactoryTest {
         // Assert
         assertThat(first.eventId()).isNotEqualTo(second.eventId());
     }
+
+    @Test
+    @Tag("US-202.3")
+    void should_describeTheExpiredTrade_when_aTradeExpires() {
+        // Arrange
+        Trade trade = new Trade("T1", 2, "CP-1", "B1", LocalDate.of(2026, 11, 18), LocalDate.of(2026, 10, 1), true);
+
+        // Act
+        AuditEvent event = factory.expired(trade);
+
+        // Assert (A-20; channel SCHEDULER per docs/05-lld.md decision D4)
+        assertThat(event).isNotNull();
+        assertThat(UUID.fromString(event.eventId())).isNotNull();
+        assertThat(event).usingRecursiveComparison().ignoringFields("eventId").isEqualTo(
+                new AuditEvent(null, "T1", 2, Outcome.EXPIRED, List.of(), Channel.SCHEDULER, NOW, null, trade));
+    }
 }

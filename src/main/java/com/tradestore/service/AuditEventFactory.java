@@ -41,6 +41,11 @@ public class AuditEventFactory {
                 submission.channel(), clock.instant(), cap(submission.rawPayload()), null);
     }
 
+    /** Stub: implemented test-first. */
+    public AuditEvent expired(Trade trade) {
+        return null;
+    }
+
     private String cap(String payload) {
         return payload == null || payload.length() <= maxPayloadChars ? payload : payload.substring(0, maxPayloadChars);
     }
