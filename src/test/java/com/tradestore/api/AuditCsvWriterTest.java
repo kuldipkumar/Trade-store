@@ -32,11 +32,11 @@ class AuditCsvWriterTest {
         // Arrange
         AuditEvent event = new AuditEvent("e1", "T1", 2, Outcome.REJECTED,
                 List.of(Violation.invalidField("bookId", "bookId is required"), Violation.lowerVersion(2, 3)),
-                Channel.REST, AT, "{\\"secret\\":1}", null);
+                Channel.REST, AT, "{\"secret\":1}", null);
 
         // Act + Assert: reasons joined with ';', payload left out
-        assertThat(csv(event)).isEqualTo("eventId,eventTimestamp,tradeId,version,outcome,channel,reasons\\r\\n"
+        assertThat(csv(event)).isEqualTo("eventId,eventTimestamp,tradeId,version,outcome,channel,reasons\r\n"
                 + "e1,2026-11-19T10:15:30Z,T1,2,REJECTED,REST,"
-                + "INVALID_FIELD: bookId is required;LOWER_VERSION: version 2 is lower than stored version 3\\r\\n");
+                + "INVALID_FIELD: bookId is required;LOWER_VERSION: version 2 is lower than stored version 3\r\n");
     }
 }
