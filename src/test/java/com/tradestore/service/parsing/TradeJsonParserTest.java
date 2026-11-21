@@ -1,4 +1,4 @@
-package com.tradestore.api;
+package com.tradestore.service.parsing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

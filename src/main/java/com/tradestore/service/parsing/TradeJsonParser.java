@@ -1,4 +1,4 @@
-package com.tradestore.api;
+package com.tradestore.service.parsing;
 
 import com.tradestore.domain.Channel;
 import com.tradestore.domain.TradeSubmission;

@@ -7,6 +7,7 @@ import com.tradestore.domain.LowerVersionException;
 import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.TradeNotFoundException;
 import com.tradestore.domain.TradeRejectedException;
+import com.tradestore.service.parsing.MalformedTradeException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -38,11 +38,10 @@ Base package: `com.tradestore`. The structure follows AGENTS.md §7. Services de
 | `persistence` | `TradeRepository`, `OutboxRepository`, `AuditEventStore`, `TradeHistoryStore` | Ports (interfaces). |
 | `persistence.sql` | `JdbcTradeRepository`, `JdbcOutboxRepository` | `JdbcClient` adapters ([ADR-008](adr/008-plain-jdbc-for-postgresql.md)). |
 | `persistence.nosql` | `MongoAuditEventStore`, `MongoTradeHistoryStore` | `MongoTemplate` adapters. Insert-only. A duplicate key counts as success. |
-| `messaging` | `TradeConsumer` | `@KafkaListener`: maps `TradeMessage` to `TradeSubmission`, calls the service, catches business rejections. |
-| | `TradeMessage` (record) | Kafka value DTO. `@JsonIgnoreProperties(ignoreUnknown = true)` (US-607.2). |
+| `messaging` | `TradeConsumer` | `@KafkaListener` on `trades.inbound`: reads the message as **text**, parses it with the shared strict `TradeJsonParser` (raw text kept for the audit), calls the ingestion service. *Simplification of the original design (US-301): no custom deserializer; unparseable messages surface as `MalformedTradeException` in the listener and become poison pills in US-302.* |
 | | `SizeLimitedJsonDeserializer` | Rejects payloads over `kafka.max-message-bytes` before parsing. Wrapped by `ErrorHandlingDeserializer`. |
 | | `DeadLetterAuditRecoverer` | Publishes to the dead-letter topic (delegating to `DeadLetterPublishingRecoverer`), then writes the `POISON`/`FAILED` audit entry. |
-| | `KafkaConfig` | Topics (`NewTopic`), consumer factory, `DefaultErrorHandler` (backoff, non-retryable exceptions). |
+| | `KafkaConfig` | Topics (`NewTopic`: `trades.inbound`, partitions and replication from configuration, default 6/1); the error handling follows in US-302/303. |
 | | `KafkaHealthIndicator` | `describeCluster` with a timeout; part of the readiness group (US-604.1). |
 | `api` | `TradeController`, `AuditReportController` | HTTP endpoints (§6.1). |
 | | `TradeJsonParser`, `MalformedTradeException` | Strict trade JSON: text fields must be JSON strings, `version` a whole number; nothing is coerced. The original text is kept as the audit payload. Shared by REST (and the stream, US-301). |

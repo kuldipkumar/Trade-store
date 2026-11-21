@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -57,6 +57,9 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-204.2 | Full | `ExpiryIT`: an expired trade stays expired after the job runs, even if its maturity is not yet past (mutation-verified) | |
 | US-205.1 | Full | `ClockConfigTest` | |
 | US-205.2 | Full | `TradeIngestionServiceTest`: at 01:30 on 19 Nov in Asia/Kolkata (still 18 Nov in UTC) a trade maturing on 18 Nov is rejected; mutation-verified against a UTC "today" | |
+| US-301.1 | Full | `StreamIngestionIT` (published → stored and audited as STREAM, real Kafka), `TradeConsumerTest` | |
+| US-301.2 | Full | `StreamIngestionIT`: v1, v2, v3 keyed by tradeId → v3 stored, no REJECTED | |
+| US-301.3 | Full | `StreamIngestionIT`: no auto-commit; the container commits after the listener returns (mutation-verified) | |
 | US-302.2 | Partial | `AuditEventFactoryTest`: the payload is capped at the configured size | The POISON entry itself. Closed in **US-302**. |
 | US-401.1 | Full | `TradeApiIT` (201 with the stored trade); `GlobalExceptionHandlerTest` (503 when the database is down, decision D7) | |
 | US-401.2 | Full | `TradeApiIT`: same and higher version → 200 with the stored trade | |
@@ -70,7 +73,7 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-403.2 | Full | `ListTradesIT` (`?expired=true` returns only expired trades, ours included, our live ones excluded), `JdbcTradeRepositoryIT` | |
 | US-404.1 | Full | `TradeApiIT` (v1 then v2 → [1, 2] with outcome, channel and received time; v1, v1 again, v2 → ordered by version then received time; through the real relay), `TradeQueryServiceTest`, `MongoStoresIT` | Eventually consistent: a version appears once relayed (ADR-005); a stored trade not yet relayed returns `[]`. Known limitation: history is not paged (it grows only with replacements). |
 | US-404.2 | Full | `TradeApiIT` (no history → 404 standard shape), `TradeQueryServiceTest` | |
-| US-501.1 | Partial | `MongoStoresIT`, `AuditEventFactoryTest`, `JdbcOutboxRepositoryIT`, `OutboxRelayServiceTest`, `StoreTradeIT` (all the fields); `TradeApiIT` (the payload is exactly the body the REST client sent) | Proven for the REST channel. Closed by **US-301** (the STREAM channel). |
+| US-501.1 | Full | `MongoStoresIT`, `AuditEventFactoryTest`, `JdbcOutboxRepositoryIT`, `OutboxRelayServiceTest`, `StoreTradeIT` (all the fields); `TradeApiIT` (REST: the payload is exactly the body sent); `StreamIngestionIT` (STREAM channel) | |
 | US-501.2 | Full | `AuditTrailImmutabilityTest`: the audit and history ports and their MongoDB implementations offer only insert and read operations (mutation-verified) | |
 | US-501.3 | Full | `OutboxRelayServiceTest` (failed batch kept), `OutboxRelaySchedulerTest` (each failure counted; ERROR with waiting trade IDs every N consecutive failures; reset on success), `JdbcOutboxRepositoryIT` (`pendingTradeIds`) | |
 | US-603.1 | Full | `@IntegrationTest` + `TestcontainersConfiguration`; every `*IT` runs on real Kafka, PostgreSQL and MongoDB | |

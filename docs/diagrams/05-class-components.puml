@@ -43,7 +43,7 @@ package "api" {
 
 package "messaging" {
   class TradeConsumer {
-    + onMessage(record : ConsumerRecord<String, TradeMessage>)
+    + onMessage(message : String)
   }
   class KafkaConfig {
     + errorHandler(...) : DefaultErrorHandler
@@ -160,6 +160,7 @@ TradeController --> TradeQueryService
 AuditReportController --> AuditReportService
 AuditReportController --> AuditCsvWriter
 TradeConsumer --> TradeIngestionService
+TradeConsumer --> TradeJsonParser
 KafkaConfig ..> DeadLetterAuditRecoverer
 DeadLetterAuditRecoverer --> AuditEventStore
 DeadLetterAuditRecoverer --> AuditEventFactory
