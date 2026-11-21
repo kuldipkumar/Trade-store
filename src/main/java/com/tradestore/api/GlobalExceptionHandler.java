@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -155,7 +156,8 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ApiErrorResponse> error(HttpStatus status, List<ApiErrorResponse.Reason> reasons,
                                                    HttpServletRequest request) {
-        return ResponseEntity.status(status).body(new ApiErrorResponse(clock.instant(), status.value(),
+        // Content type preset: errors are always JSON, even when the client asked for CSV (US-503).
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(new ApiErrorResponse(clock.instant(), status.value(),
                 status.getReasonPhrase(), reasons, request.getRequestURI()));
     }
 }

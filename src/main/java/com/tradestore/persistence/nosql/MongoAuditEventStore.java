@@ -4,6 +4,7 @@ import java.util.Date;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import com.tradestore.domain.AuditEvent;
 import com.tradestore.domain.Channel;
@@ -26,6 +27,9 @@ import org.springframework.stereotype.Repository;
 public class MongoAuditEventStore implements AuditEventStore {
 
     static final String COLLECTION = "audit_events";
+
+    /** Served by the audit indexes, which all end with (eventTimestamp, _id). */
+    private static final Sort REPORT_ORDER = Sort.by("eventTimestamp", "_id");
 
     private final MongoTemplate mongo;
 
@@ -57,7 +61,7 @@ public class MongoAuditEventStore implements AuditEventStore {
 
     @Override
     public List<AuditEvent> find(AuditQuery query, int page, int size) {
-        Query mongoQuery = Query.query(matching(query)).with(Sort.by("eventTimestamp", "_id"))
+        Query mongoQuery = Query.query(matching(query)).with(REPORT_ORDER)
                 .skip((long) page * size).limit(size);
         return mongo.find(mongoQuery, Document.class, COLLECTION).stream().map(MongoAuditEventStore::toEvent).toList();
     }
@@ -70,6 +74,12 @@ public class MongoAuditEventStore implements AuditEventStore {
         mongo.aggregate(aggregation, COLLECTION, Document.class).forEach(group ->
                 counts.put(Outcome.valueOf(group.getString("_id")), ((Number) group.get("count")).longValue()));
         return counts;
+    }
+
+    @Override
+    public Stream<AuditEvent> stream(AuditQuery query) {
+        return mongo.stream(Query.query(matching(query)).with(REPORT_ORDER), Document.class, COLLECTION)
+                .map(MongoAuditEventStore::toEvent);
     }
 
     private static Criteria matching(AuditQuery query) {
