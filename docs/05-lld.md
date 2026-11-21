@@ -234,6 +234,8 @@ CREATE TABLE outbox_events (
 | Other Spring MVC client errors (406, missing parameter, …) | `ErrorResponse` exceptions | their own 4xx (406 without a body), logged at DEBUG | n/a | n/a |
 | Anything else, including permanent database errors | `Exception` | 500 `INTERNAL_ERROR` (generic message, logged with stack trace) | Retry, then DLT | `FAILED` |
 
+Error bodies are always `application/json` (the content type is preset), so a client that asked for `text/csv` still gets its 400 instead of a 500.
+
 **Status precedence when a trade breaks several rules:** 400 (the request itself must be fixed) > 409 > 422. The response always lists **all** reasons.
 
 ## 8. Observability (US-604)
