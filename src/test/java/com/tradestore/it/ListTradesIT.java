@@ -3,6 +3,8 @@ package com.tradestore.it;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import com.tradestore.domain.Trade;
@@ -60,8 +62,10 @@ class ListTradesIT {
         assertThat(page.path("content")).hasSize(10);
         assertThat(page.path("page").asInt()).isZero();
         assertThat(page.path("size").asInt()).isEqualTo(10);
-        assertThat(page.path("totalElements").asLong()).isEqualTo(before + 25);
-        assertThat(page.path("totalPages").asLong()).isEqualTo((before + 25 + 9) / 10);
+        // ITs share one database and other writers may add trades meanwhile: at least ours, and self-consistent
+        long total = page.path("totalElements").asLong();
+        assertThat(total).isGreaterThanOrEqualTo(before + 25);
+        assertThat(page.path("totalPages").asLong()).isEqualTo((total + 9) / 10);
     }
 
     @Test
@@ -71,14 +75,20 @@ class ListTradesIT {
         store(3);
         jdbc.sql("UPDATE trades SET expired = true WHERE trade_id = ?").param(prefix + 1).update();
 
-        // Act
-        EntityExchangeResult<JsonNode> response = list("?expired=true&page=0&size=100");
+        // Act: every page of the expired filter (the shared table may hold many expired trades)
+        List<JsonNode> all = new ArrayList<>();
+        for (int page = 0; ; page++) {
+            EntityExchangeResult<JsonNode> response = list("?expired=true&size=100&page=" + page);
+            assertThat(response.getStatus()).isEqualTo(HttpStatus.OK);
+            response.getResponseBody().path("content").forEach(all::add);
+            if (page + 1 >= response.getResponseBody().path("totalPages").asLong()) {
+                break;
+            }
+        }
 
-        // Assert: every returned trade is expired, and ours is among them; our live ones are not
-        assertThat(response.getStatus()).isEqualTo(HttpStatus.OK);
-        JsonNode content = response.getResponseBody().path("content");
-        assertThat(content.findValues("expired")).allMatch(JsonNode::asBoolean);
-        assertThat(content.findValuesAsString("tradeId")).contains(prefix + 1).doesNotContain(prefix + 0, prefix + 2);
+        // Assert: every returned trade is expired, ours is among them, our live ones are not
+        assertThat(all).allMatch(t -> t.path("expired").asBoolean());
+        assertThat(all).extracting(t -> t.path("tradeId").asString()).contains(prefix + 1).doesNotContain(prefix + 0, prefix + 2);
     }
 
     @Test

@@ -280,15 +280,13 @@ class JdbcTradeRepositoryIT {
         }
 
         // Act
-        PageResult<Trade> all = repository.findPage(null, 0, 1000);
         PageResult<Trade> firstTwo = repository.findPage(null, 0, 2);
+        List<Trade> all = allPages(null);
 
-        // Assert
-        assertThat(all.totalElements()).isEqualTo(before + 3);
-        assertThat(all.content()).extracting(Trade::tradeId).isSorted()
-                .contains(tradeId + "-a", tradeId + "-b", tradeId + "-c");
+        // Assert (other writers may add trades meanwhile: at least ours; ordering is covered separately)
         assertThat(firstTwo.content()).hasSize(2);
-        assertThat(firstTwo.totalElements()).isEqualTo(before + 3);
+        assertThat(firstTwo.totalElements()).isGreaterThanOrEqualTo(before + 3);
+        assertThat(all).extracting(Trade::tradeId).contains(tradeId + "-a", tradeId + "-b", tradeId + "-c");
     }
 
     @Test
@@ -300,12 +298,12 @@ class JdbcTradeRepositoryIT {
         jdbc.sql("UPDATE trades SET expired = true WHERE trade_id = ?").param(tradeId + "-gone").update();
 
         // Act
-        PageResult<Trade> expired = repository.findPage(true, 0, 1000);
-        PageResult<Trade> live = repository.findPage(false, 0, 1000);
+        List<Trade> expired = allPages(true);
+        List<Trade> live = allPages(false);
 
         // Assert
-        assertThat(expired.content()).allMatch(Trade::expired).extracting(Trade::tradeId).contains(tradeId + "-gone");
-        assertThat(live.content()).noneMatch(Trade::expired).extracting(Trade::tradeId).contains(tradeId + "-live");
+        assertThat(expired).allMatch(Trade::expired).extracting(Trade::tradeId).contains(tradeId + "-gone");
+        assertThat(live).noneMatch(Trade::expired).extracting(Trade::tradeId).contains(tradeId + "-live");
     }
 
     @Test
@@ -317,16 +315,21 @@ class JdbcTradeRepositoryIT {
         }
 
         // Act: page through everything, keep ours
-        List<String> ours = new java.util.ArrayList<>();
-        for (int page = 0; ; page++) {
-            PageResult<Trade> result = repository.findPage(null, page, 500);
-            result.content().stream().map(Trade::tradeId).filter(id -> id.startsWith(tradeId)).forEach(ours::add);
-            if (page + 1 >= result.totalPages()) {
-                break;
-            }
-        }
+        List<String> ours = allPages(null).stream().map(Trade::tradeId).filter(id -> id.startsWith(tradeId)).toList();
 
         // Assert: stable, locale-independent order
         assertThat(ours).containsExactly(tradeId + "-B", tradeId + "-a", tradeId + "-c");
+    }
+
+    /** Every page of the list (the shared table can be large), in order. */
+    private List<Trade> allPages(Boolean expired) {
+        List<Trade> all = new java.util.ArrayList<>();
+        for (int page = 0; ; page++) {
+            PageResult<Trade> result = repository.findPage(expired, page, 500);
+            all.addAll(result.content());
+            if (page + 1 >= result.totalPages()) {
+                return all;
+            }
+        }
     }
 }
