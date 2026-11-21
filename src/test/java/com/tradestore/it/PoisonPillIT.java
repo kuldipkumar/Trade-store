@@ -3,6 +3,7 @@ package com.tradestore.it;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -12,9 +13,11 @@ import java.util.UUID;
 
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.persistence.TradeRepository;
+import com.tradestore.service.parsing.MalformedTradeException;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.header.Header;
 import org.bson.Document;
 import org.junit.jupiter.api.AfterEach;
@@ -64,11 +67,12 @@ class PoisonPillIT {
     }
 
     /** Publishes the poison pill and then a valid trade with the same key (same partition, A-22). */
-    private void publishPoisonThenValid() throws Exception {
-        kafka.send(TOPIC, key, poison).get();
+    private RecordMetadata publishPoisonThenValid() throws Exception {
+        RecordMetadata sent = kafka.send(TOPIC, key, poison).get().getRecordMetadata();
         kafka.send(TOPIC, key, """
                 {"tradeId":"%s","version":1,"counterPartyId":"CP-1","bookId":"B1","maturityDate":"2099-05-20"}"""
                 .formatted(key)).get();
+        return sent;
     }
 
     private ConsumerRecord<String, String> deadLettered() {
@@ -120,13 +124,16 @@ class PoisonPillIT {
     @Tag("US-302.3")
     void should_carryTheOriginalTopicPartitionOffsetAndException_when_aMessageIsDeadLettered() throws Exception {
         // Act
-        publishPoisonThenValid();
+        RecordMetadata sent = publishPoisonThenValid();
         ConsumerRecord<String, String> record = deadLettered();
 
-        // Assert
+        // Assert: the values point back at the exact message, and name the real cause
         assertThat(header(record, "kafka_dlt-original-topic")).isEqualTo(TOPIC);
-        assertThat(record.headers().lastHeader("kafka_dlt-original-partition")).isNotNull();
-        assertThat(record.headers().lastHeader("kafka_dlt-original-offset")).isNotNull();
-        assertThat(header(record, "kafka_dlt-exception-fqcn")).isNotBlank();
+        assertThat(ByteBuffer.wrap(record.headers().lastHeader("kafka_dlt-original-partition").value()).getInt())
+                .isEqualTo(sent.partition());
+        assertThat(ByteBuffer.wrap(record.headers().lastHeader("kafka_dlt-original-offset").value()).getLong())
+                .isEqualTo(sent.offset());
+        assertThat(header(record, "kafka_dlt-exception-cause-fqcn")).isEqualTo(MalformedTradeException.class.getName());
+        assertThat(record.key()).isEqualTo(key);
     }
 }
