@@ -55,12 +55,20 @@ alt Accept: application/json (default)
   AuditReportService -> AuditEventStore : find(query, page, size)  (sorted by eventTimestamp, _id from an index)
   AuditReportController --> Client : 200 AuditReportResponse {summary, entries, page metadata}
 else Accept: text/csv (US-503)
-  AuditReportController -> AuditReportService : stream(...)  (US-503, planned)
+  AuditReportController -> AuditReportService : stream(from, to, tradeId, outcome)  (cursor opened before responding)
   AuditReportService -> AuditEventStore : stream(query)  (MongoDB cursor, not loaded into memory: US-502.4)
   loop each event
     AuditReportController -> AuditCsvWriter : writeRow(event, out)
   end
-  AuditReportController --> Client : 200 text/csv (header row + one row per entry)
+  alt cursor fails while streaming
+    AuditReportController -> AuditReportController : log ERROR "CSV export failed after n rows", rethrow
+    AuditReportController --> Client : transfer aborted (incomplete download)
+  else
+    AuditReportController --> Client : 200 text/csv (header row + one row per entry)
+  end
+else MongoDB unavailable when the cursor opens
+  AuditReportController --> GlobalExceptionHandler : DataAccessResourceFailureException
+  GlobalExceptionHandler --> Client : 503 JSON (no CSV download headers)
 else invalid parameter (page < 0, size < 1, from > to, year outside 1-9999, bad date or outcome)
   AuditReportController --> GlobalExceptionHandler : InvalidRequestParameterException / type mismatch
   GlobalExceptionHandler --> Client : 400

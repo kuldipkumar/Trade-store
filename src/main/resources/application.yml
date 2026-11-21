@@ -1,4 +1,8 @@
 spring:
+  mvc:
+    async:
+      # CSV exports stream for as long as the client reads (US-503); Tomcat's 30 s default would cut them off.
+      request-timeout: ${TRADE_STORE_EXPORT_TIMEOUT:30m}
   application:
     name: trade-store
   # Connection settings come from environment variables (A-47, A-50).

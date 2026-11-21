@@ -38,7 +38,10 @@ class AuditReportIT {
 
     private final String tradeId = "A-" + UUID.randomUUID();
 
-    AuditReportIT(RestTestClient rest, AuditEventStore audit, Clock clock) {
+    private final Environment environment;
+
+    AuditReportIT(RestTestClient rest, AuditEventStore audit, Clock clock, Environment environment) {
+        this.environment = environment;
         this.rest = rest;
         this.audit = audit;
         this.clock = clock;
@@ -190,7 +193,7 @@ class AuditReportIT {
 
     @Test
     @Tag("US-503.1")
-    void should_allowLongExports_when_theDefaultAsyncTimeoutWouldCutThemOff(Environment environment) {
+    void should_allowLongExports_when_theDefaultAsyncTimeoutWouldCutThemOff() {
         // Act + Assert: Tomcat's 30 s async default would truncate a large CSV (code review of PR #64)
         assertThat(environment.getProperty("spring.mvc.async.request-timeout", Duration.class))
                 .isEqualTo(Duration.ofMinutes(30));

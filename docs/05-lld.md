@@ -188,7 +188,7 @@ CREATE TABLE outbox_events (
   "reasons": [ { "reason": "LOWER_VERSION", "field": "version", "message": "Trade T2 version 1 is lower than stored version 2" } ],
   "path": "/trades" }
 ```
-**CSV** (`Accept: text/csv`, same filters, not paged: the whole filtered set streamed from a MongoDB cursor, `Content-Disposition: attachment; filename="audit-report.csv"`). Columns: `eventId,eventTimestamp,tradeId,version,outcome,channel,reasons`; reasons as `REASON: message` joined with `;`. The payload is excluded to keep it readable. RFC 4180 quoting, CRLF line ends; a cell starting with `= + - @`, tab or CR is prefixed with `'` so spreadsheets show it as text (CSV injection).
+**CSV** (`Accept: text/csv`, same filters, not paged: the whole filtered set streamed from a MongoDB cursor, `Content-Disposition: attachment; filename="audit-report.csv"`). Columns: `eventId,eventTimestamp,tradeId,version,outcome,channel,reasons`; reasons as `REASON: message` joined with `;`. The payload is excluded to keep it readable. RFC 4180 quoting, CRLF line ends; a cell starting with `= + - @`, tab or CR is prefixed with `'` so spreadsheets show it as text (CSV injection). POISON/FAILED rows carry their `error` in the reasons column. The cursor is opened before the response is returned, so an outage is a plain 503 (D7). A failure mid-export is logged at ERROR with the rows written and aborts the transfer (the status is already 200: clients see an incomplete download). Exports may run up to `spring.mvc.async.request-timeout` (`TRADE_STORE_EXPORT_TIMEOUT`, default 30m). Known limitation: a client that stops reading for over 10 minutes hits MongoDB's idle-cursor timeout.
 
 ### 6.2 Kafka
 | Item | Contract |
