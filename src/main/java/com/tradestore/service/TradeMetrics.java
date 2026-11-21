@@ -17,7 +17,10 @@ public class TradeMetrics {
     }
 
     public void recordOutcome(Outcome outcome, List<ReasonCode> reasons, Channel channel) {
-        registry.counter("trade.outcomes", "outcome", outcome.name(), "reason", "NONE", "channel", channel.name())
-                .increment();
+        List<String> tags = reasons.isEmpty() ? List.of("NONE") : reasons.stream().map(Enum::name).toList();
+        for (String reason : tags) {
+            registry.counter("trade.outcomes", "outcome", outcome.name(), "reason", reason, "channel", channel.name())
+                    .increment();
+        }
     }
 }
