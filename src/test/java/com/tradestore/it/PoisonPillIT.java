@@ -7,7 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 
 import com.tradestore.domain.StoredTrade;
@@ -52,20 +52,15 @@ class PoisonPillIT {
 
     @BeforeEach
     void readTheDeadLetterTopic() {
-        dltReader = consumerFactory.createConsumer("dlt-reader-" + UUID.randomUUID(), null, null,
-                java.util.Properties.class.cast(propertiesOf(Map.of(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest"))));
+        Properties fromTheStart = new Properties();
+        fromTheStart.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        dltReader = consumerFactory.createConsumer("dlt-reader-" + UUID.randomUUID(), null, null, fromTheStart);
         dltReader.subscribe(List.of(DLT));
     }
 
     @AfterEach
     void close() {
         dltReader.close();
-    }
-
-    private static java.util.Properties propertiesOf(Map<String, String> values) {
-        java.util.Properties properties = new java.util.Properties();
-        properties.putAll(values);
-        return properties;
     }
 
     /** Publishes the poison pill and then a valid trade with the same key (same partition, A-22). */
