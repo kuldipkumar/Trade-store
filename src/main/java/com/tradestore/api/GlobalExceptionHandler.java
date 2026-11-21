@@ -71,6 +71,11 @@ public class GlobalExceptionHandler {
                 "The trade store is temporarily unavailable; nothing was stored. Please retry.")), request);
     }
 
+    /** Stub: implemented test-first. */
+    public ResponseEntity<ApiErrorResponse> unexpected(Exception e, HttpServletRequest request) {
+        return ResponseEntity.ok(null);
+    }
+
     static HttpStatus statusOf(TradeRejectedException e) {
         if (e.reasons().contains(ReasonCode.INVALID_FIELD)) {
             return HttpStatus.BAD_REQUEST;

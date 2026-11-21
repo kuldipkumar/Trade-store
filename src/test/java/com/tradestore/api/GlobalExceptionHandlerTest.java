@@ -14,6 +14,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -78,5 +79,31 @@ class GlobalExceptionHandlerTest {
         // Assert
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(output).contains("Connection refused");
+    }
+
+    @Test
+    @Tag("US-401.1")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_return500NotRetryAndLog_when_theDatabaseRejectsTheWritePermanently(CapturedOutput output) {
+        // Act: a permanent failure must not be presented as "temporarily unavailable, retry"
+        ResponseEntity<ApiErrorResponse> response = handler.unexpected(
+                new DataIntegrityViolationException("value too long for type character varying(64)"), request);
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(response.getBody().reasons()).extracting(ApiErrorResponse.Reason::reason).containsExactly("INTERNAL_ERROR");
+        assertThat(output).contains("ERROR").contains("value too long");
+    }
+
+    @Test
+    @Tag("US-401.1")
+    void should_return500InTheStandardShape_when_anUnexpectedExceptionEscapes() {
+        // Act
+        ResponseEntity<ApiErrorResponse> response = handler.unexpected(new IllegalStateException("bug"), request);
+
+        // Assert: the same error shape as every other error, without internal details
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(response.getBody().path()).isEqualTo("/trades");
+        assertThat(response.getBody().reasons().getFirst().message()).doesNotContain("bug");
     }
 }
