@@ -174,4 +174,15 @@ class AuditReportIT {
                 + ",2,REJECTED,STREAM,\"LOWER_VERSION: version 2 is lower than stored version 3;"
                 + "INVALID_FIELD: bookId is required, got \"\"\"\"\"");
     }
+
+    @Test
+    @Tag("US-503.1")
+    void should_returnBadRequest_when_aCsvExportHasAnInvalidRange() {
+        // Act
+        EntityExchangeResult<byte[]> response = rest.get().uri("/reports/audit?from=2026-11-20&to=2026-11-19")
+                .accept(MediaType.parseMediaType("text/csv")).exchange().expectBody().returnResult();
+
+        // Assert: the client error is reported, not hidden behind a 406 or 500
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
 }
