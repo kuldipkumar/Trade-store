@@ -24,7 +24,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.kafka.support.serializer.DeserializationException;
 import org.springframework.messaging.converter.MessageConversionException;
+import java.sql.SQLException;
+
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.jdbc.CannotGetJdbcConnectionException;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.transaction.CannotCreateTransactionException;
+import static org.mockito.Mockito.verifyNoInteractions;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.listener.ListenerExecutionFailedException;
@@ -80,9 +87,9 @@ class KafkaErrorHandlingTest {
     @Test
     @Tag("US-303.2")
     @Tag("US-303.3")
-    void should_recoverOnTheConfiguredAttempt_when_aTransientFailurePersists() {
-        // Arrange
-        DataAccessResourceFailureException down = new DataAccessResourceFailureException("PostgreSQL down");
+    void should_recoverOnTheConfiguredAttempt_when_aFailureOtherThanConnectivityPersists() {
+        // Arrange: not a connection problem, so waiting longer would not help (D9)
+        InvalidDataAccessResourceUsageException down = new InvalidDataAccessResourceUsageException("relation missing");
 
         // Act: max-attempts 3 = the first delivery and two retries
         boolean first = fail(down);
@@ -154,5 +161,49 @@ class KafkaErrorHandlingTest {
 
         // Assert
         assertThat(registry.find("trade.retries").counter()).isNull();
+    }
+
+    static Stream<Exception> connectionFailures() {
+        DataAccessResourceFailureException lost = new DataAccessResourceFailureException("I/O error",
+                new SQLException("connection lost", "08006"));
+        return Stream.of(lost, new CannotCreateTransactionException("no connection"),
+                new CannotGetJdbcConnectionException("pool exhausted"),
+                new DataAccessResourceFailureException("restarting", new SQLException("admin shutdown", "57P01")),
+                new RuntimeException("wrapped", lost),
+                // Precedence: an outage wins over a not-retryable type deeper in the chain (code review of PR #65)
+                new CannotCreateTransactionException("no connection", new IllegalArgumentException("bad url")));
+    }
+
+    static Stream<Exception> boundedFailures() {
+        return Stream.of(new QueryTimeoutException("statement timeout", new SQLException("canceled", "57014")),
+                new DataAccessResourceFailureException("program limit", new SQLException("too complex", "54000")),
+                new InvalidDataAccessResourceUsageException("relation missing"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("boundedFailures")
+    @Tag("US-303.2")
+    void should_deadLetterOnTheThirdAttempt_when_theDatabaseIsUpButTheSameErrorRepeats(Exception failure) {
+        // Act + Assert: these fail the same way every time with a healthy database, so they must not block the
+        // partition forever (code review of PR #65)
+        assertThat(fail(failure)).isFalse();
+        assertThat(fail(failure)).isFalse();
+        assertThat(fail(failure)).isTrue();
+        verify(recoverer).accept(any(), any());
+    }
+
+    @ParameterizedTest
+    @MethodSource("connectionFailures")
+    @Tag("US-303.1")
+    @Tag("US-303.2")
+    void should_keepRetryingAndNeverDeadLetter_when_theDatabaseIsUnreachable(Exception failure) {
+        // Act: well past max-attempts (3)
+        for (int attempt = 1; attempt <= 10; attempt++) {
+            assertThat(fail(failure)).isFalse();
+        }
+
+        // Assert: D9 option C, no trade is dead-lettered because of an outage; every retry is visible
+        verifyNoInteractions(recoverer);
+        assertThat(registry.counter("trade.retries").count()).isEqualTo(10.0);
     }
 }

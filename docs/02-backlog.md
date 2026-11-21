@@ -167,7 +167,7 @@ Dates are relative to the fixed "today" of 2026-11-19, keeping the shape of the 
 | AC | Given | When | Then |
 |----|-------|------|------|
 | US-303.1 | The SQL store fails twice, then recovers | A valid trade is consumed | It is stored after retries, and no dead-letter record is created (A-28) |
-| US-303.2 | The SQL store keeps failing | A valid trade is consumed | After the configured attempts (default 3, exponential backoff) the message is dead-lettered and audited as `FAILED` |
+| US-303.2 | Processing keeps failing for a reason other than the database being unreachable | A valid trade is consumed | After the configured attempts (default 3, exponential backoff) the message is dead-lettered and audited as `FAILED`. If the database is unreachable, the message is retried with backoff until it recovers and is never dead-lettered (decision D9) |
 | US-303.3 | Retry attempts and backoff are configured by properties | The application starts | The configured values are used (A-50) |
 
 ### US-304: Business rejections are final on the stream (M)

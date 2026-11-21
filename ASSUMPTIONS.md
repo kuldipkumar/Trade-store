@@ -50,7 +50,7 @@ The list of assumptions the Trade Store is built on. The reasoning and the impac
 |----|------------|--------|
 | A-26 | Business rejections are not retried and are audited as `REJECTED`. REST returns 409 for a lower version, 422 for a past maturity date and 400 for malformed input. | Agreed |
 | A-27 | Poison pills are never retried. They go to a dead-letter topic and are audited as `POISON`, and the consumer continues. | Agreed |
-| A-28 | Transient failures are retried with backoff (default 3 attempts), then sent to the dead-letter topic and audited as `FAILED`. | Agreed |
+| A-28 | Failures are retried with backoff. A connection failure (database unreachable) is retried until it recovers and is never dead-lettered; any other failure gets the configured attempts (default 3), then goes to the dead-letter topic and is audited as `FAILED`. | Agreed; amended by D9 (option C) on 2026-11-21 |
 | A-29 | Every inbound trade and lifecycle event is audited in the NoSQL database. | Agreed |
 | A-30 | The audit report is generated on demand through REST, filtered by date, trade and outcome, in JSON or CSV with summary counts. | Agreed |
 | A-31 | Audit and history are retained indefinitely. | Agreed |

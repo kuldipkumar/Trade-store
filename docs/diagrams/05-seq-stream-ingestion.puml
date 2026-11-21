@@ -51,8 +51,17 @@ else valid JSON
     end note
     Container -> Topic : commit offset
 
-  else transient failure, e.g. DataAccessException (US-303)
-    TradeIngestionService --> TradeConsumer : throw DataAccessException
+  else database unreachable (connection failure, D9 option C)
+    TradeIngestionService --> TradeConsumer : throw DataAccessResourceFailureException
+    TradeConsumer --> Container : rethrow
+    loop until the database is back, exponential backoff (partition waits)
+      Container -> Container : count trade.retries, WARN position + attempt
+      Container -> TradeConsumer : redeliver same record (seek)
+    end
+    Container -> Topic : commit offset once stored (never dead-lettered)
+
+  else other failure that persists (US-303)
+    TradeIngestionService --> TradeConsumer : throw e.g. InvalidDataAccessResourceUsageException
     TradeConsumer --> Container : rethrow
     loop up to retry.max-attempts deliveries (default 3), exponential backoff
       Container -> Container : count trade.retries, WARN position + attempt

@@ -75,7 +75,8 @@ The detailed sequence diagrams, including failure paths, are drawn in Phase 5.
 
 **5.4 Poison pills and transient failures (Kafka)**
 - **Deserialisation or schema failure, or a message over 1 MB:** not retried. The message is published to `trades.inbound.DLT` with diagnostic headers, and a `POISON` event is written directly to MongoDB.
-- **Transient failure (for example, a database outage):** up to 3 attempts with exponential backoff, then the dead-letter topic plus a `FAILED` event.
+- **Database unreachable (connection failure):** retried with exponential backoff until the database is back; never dead-lettered, so no trade is lost and per-key order holds (decision D9, option C).
+- **Any other failure that persists:** up to 3 attempts with exponential backoff, then the dead-letter topic plus a `FAILED` event.
 - The offset is committed only after the dead-letter publish succeeds (ADR-005 §3).
 
 **5.5 Audit report.** `GET /reports/audit` with filters `from`/`to` (local dates converted to UTC), `tradeId` and `outcome`. Results are paged. Summary counts come from an aggregation. `Accept: text/csv` streams CSV.
