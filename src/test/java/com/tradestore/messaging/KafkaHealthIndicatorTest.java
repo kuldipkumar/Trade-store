@@ -3,10 +3,12 @@ package com.tradestore.messaging;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.DescribeClusterOptions;
@@ -25,7 +27,11 @@ class KafkaHealthIndicatorTest {
 
     private final Admin admin = mock(Admin.class);
     private final DescribeClusterResult cluster = mock(DescribeClusterResult.class);
-    private final KafkaHealthIndicator indicator = new KafkaHealthIndicator(() -> admin, Duration.ofMillis(200));
+    private final AtomicInteger created = new AtomicInteger();
+    private final KafkaHealthIndicator indicator = new KafkaHealthIndicator(() -> {
+        created.incrementAndGet();
+        return admin;
+    }, Duration.ofMillis(200));
 
     @Test
     @Tag("US-604.1")
@@ -40,22 +46,61 @@ class KafkaHealthIndicatorTest {
 
         // Assert
         assertThat(health.getStatus()).isEqualTo(Status.UP);
-        assertThat(health.getDetails()).containsEntry("clusterId", "c-1").containsEntry("nodes", 1);
+        assertThat(health.getDetails()).containsEntry("nodes", 1).doesNotContainKey("clusterId");
     }
 
     @Test
     @Tag("US-604.1")
-    void should_reportDown_when_theBrokerDoesNotAnswerInTime() {
-        // Arrange
-        KafkaFutureImpl<String> unanswered = new KafkaFutureImpl<>();
-        unanswered.completeExceptionally(new TimeoutException("no broker"));
+    void should_reportDownWithinTheTimeout_when_theBrokerNeverAnswers() {
+        // Arrange: futures that never complete
         when(admin.describeCluster(any(DescribeClusterOptions.class))).thenReturn(cluster);
-        when(cluster.clusterId()).thenReturn(unanswered);
+        when(cluster.clusterId()).thenReturn(new KafkaFutureImpl<>());
+        when(cluster.nodes()).thenReturn(new KafkaFutureImpl<>());
+
+        // Act
+        long start = System.nanoTime();
+        Health health = indicator.health();
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+
+        // Assert: DOWN after one 200 ms deadline, not one per future (code review of PR #66)
+        assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+        assertThat(elapsedMs).isLessThan(380);
+    }
+
+    @Test
+    @Tag("US-604.1")
+    void should_reportOnlyTheErrorClass_when_theBrokerFails() {
+        // Arrange
+        KafkaFutureImpl<String> failed = new KafkaFutureImpl<>();
+        failed.completeExceptionally(new TimeoutException("broker kafka-internal.corp:9092 unreachable"));
+        when(admin.describeCluster(any(DescribeClusterOptions.class))).thenReturn(cluster);
+        when(cluster.clusterId()).thenReturn(failed);
+        when(cluster.nodes()).thenReturn(new KafkaFutureImpl<>());
 
         // Act
         Health health = indicator.health();
 
-        // Assert: readiness goes DOWN, so traffic is not routed to an instance that can't consume
+        // Assert: readiness is public, so no host names or messages (code review of PR #66)
         assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+        assertThat(health.getDetails().toString()).doesNotContain("kafka-internal.corp");
+        assertThat(health.getDetails()).containsEntry("error", TimeoutException.class.getName());
+    }
+
+    @Test
+    @Tag("US-604.1")
+    void should_closeTheAdminClient_when_theContextShutsDown() throws Exception {
+        // Arrange: created on first use
+        when(admin.describeCluster(any(DescribeClusterOptions.class))).thenReturn(cluster);
+        when(cluster.clusterId()).thenReturn(KafkaFuture.completedFuture("c-1"));
+        when(cluster.nodes()).thenReturn(KafkaFuture.completedFuture(List.of()));
+        indicator.health();
+        indicator.health();
+
+        // Act
+        indicator.destroy();
+
+        // Assert: one client, closed (code review of PR #66)
+        assertThat(created).hasValue(1);
+        verify(admin).close(any(Duration.class));
     }
 }

@@ -7,11 +7,12 @@ import java.util.function.Supplier;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.DescribeClusterOptions;
 import org.apache.kafka.clients.admin.DescribeClusterResult;
+import org.springframework.beans.factory.DisposableBean;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 
 /** Broker reachability for the readiness probe (US-604.1, A-46): a describeCluster call with a timeout. */
-public class KafkaHealthIndicator implements HealthIndicator {
+public class KafkaHealthIndicator implements HealthIndicator, DisposableBean {
 
     private final Supplier<Admin> admin;
     private final Duration timeout;
@@ -35,5 +36,9 @@ public class KafkaHealthIndicator implements HealthIndicator {
         } catch (Exception unreachable) {
             return Health.down(unreachable).build();
         }
+    }
+
+    @Override
+    public void destroy() {
     }
 }
