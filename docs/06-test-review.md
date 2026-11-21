@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -47,6 +47,7 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-202.2 | Full | `ExpiryIT` (a second run leaves no outbox rows and exactly one EXPIRED audit entry), `JdbcTradeRepositoryIT` | |
 | US-202.3 | Full | `ExpiryIT` (EXPIRED entry in MongoDB through the relay), `ExpiryServiceTest`, `AuditEventFactoryTest` | |
 | US-202.4 | Full | `ExpiryScheduleConfigTest`: default `0 5 0 * * *`, an overridden cron, and the configured zone (00:05 in Kolkata = 18:35 UTC) | |
+| US-203.1 | Full | `ExpiryIT` (real context: ApplicationReadyEvent expires a trade that matured "during downtime"; mutation-verified), `ExpiryScheduleConfigTest` (event wiring), `ExpirySchedulerTest` (on/off via `trade-store.expiry.run-at-startup`) | |
 | US-204.1 | Partial | `JdbcTradeRepositoryIT`: the upsert clears `expired` | Service-level flow (expired v1 → v2 with maturity 2027-01-01 is stored with expired = N). Closed in **US-204**. |
 | US-205.1 | Full | `ClockConfigTest` | |
 | US-205.2 | Full | `TradeIngestionServiceTest`: at 01:30 on 19 Nov in Asia/Kolkata (still 18 Nov in UTC) a trade maturing on 18 Nov is rejected; mutation-verified against a UTC "today" | |
