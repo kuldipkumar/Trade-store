@@ -80,4 +80,17 @@ class ListTradesIT {
         assertThat(content.findValues("expired")).allMatch(JsonNode::asBoolean);
         assertThat(content.findValuesAsString("tradeId")).contains(prefix + 1).doesNotContain(prefix + 0, prefix + 2);
     }
+
+    @Test
+    @Tag("US-403.1")
+    void should_return400InTheStandardShape_when_pageOrSizeIsOutOfRange() {
+        // Act
+        EntityExchangeResult<JsonNode> negativePage = list("?page=-1&size=10");
+        EntityExchangeResult<JsonNode> zeroSize = list("?page=0&size=0");
+
+        // Assert
+        assertThat(negativePage.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(zeroSize.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(negativePage.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("INVALID_PARAMETER");
+    }
 }
