@@ -71,9 +71,12 @@ public class GlobalExceptionHandler {
                 "The trade store is temporarily unavailable; nothing was stored. Please retry.")), request);
     }
 
-    /** Stub: implemented test-first. */
+    /** Anything else, including permanent database errors: 500 in the standard shape, never "retry". */
+    @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> unexpected(Exception e, HttpServletRequest request) {
-        return ResponseEntity.ok(null);
+        log.error("Unexpected error for {} {}", request.getMethod(), request.getRequestURI(), e);
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, List.of(new ApiErrorResponse.Reason("INTERNAL_ERROR", null,
+                "An unexpected error occurred; it has been logged.")), request);
     }
 
     static HttpStatus statusOf(TradeRejectedException e) {
