@@ -1,10 +1,10 @@
 package com.tradestore.messaging;
 
+import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.service.parsing.MalformedTradeException;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
@@ -22,10 +22,9 @@ public class KafkaConfig {
     private static final Logger log = LoggerFactory.getLogger(KafkaConfig.class);
 
     @Bean
-    NewTopic tradesInbound(@Value("${trade-store.kafka.topic:trades.inbound}") String topic,
-                           @Value("${trade-store.kafka.partitions:6}") int partitions,
-                           @Value("${trade-store.kafka.replication-factor:1}") short replicas) {
-        return TopicBuilder.name(topic).partitions(partitions).replicas(replicas).build();
+    NewTopic tradesInbound(TradeStoreProperties properties) {
+        TradeStoreProperties.Kafka kafka = properties.kafka();
+        return TopicBuilder.name(kafka.topic()).partitions(kafka.partitions()).replicas(kafka.replicationFactor()).build();
     }
 
     /**
