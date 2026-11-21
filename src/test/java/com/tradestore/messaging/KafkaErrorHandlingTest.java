@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.time.Duration;
+import java.util.stream.Stream;
 
 import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.service.parsing.MalformedTradeException;
@@ -15,6 +16,10 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.kafka.support.serializer.DeserializationException;
+import org.springframework.messaging.converter.MessageConversionException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
@@ -98,5 +103,27 @@ class KafkaErrorHandlingTest {
 
         // Assert: a negative partition makes the producer choose one by key, so it always exists
         assertThat(destination).isEqualTo(new TopicPartition("trades.inbound.DLT", -1));
+    }
+
+    static Stream<Exception> notRetryable() {
+        return Stream.of(new MalformedTradeException("not JSON"), new IllegalArgumentException("bad value"),
+                new DeserializationException("too large", new byte[0], false, new IllegalStateException()),
+                new MessageConversionException("cannot convert"),
+                new RuntimeException("wrapped", new MalformedTradeException("not JSON")));
+    }
+
+    @ParameterizedTest
+    @MethodSource("notRetryable")
+    @Tag("US-302.2")
+    void should_classifyAsUnreadable_when_theFailureIsNeverRetried(Exception failure) {
+        // Act + Assert: the same set the handler recovers at once, so the audit says POISON, not FAILED
+        assertThat(KafkaConfig.isUnreadable(failure)).isTrue();
+    }
+
+    @Test
+    @Tag("US-303.2")
+    void should_notClassifyAsUnreadable_when_theFailureIsTransient() {
+        // Act + Assert
+        assertThat(KafkaConfig.isUnreadable(new DataAccessResourceFailureException("PostgreSQL down"))).isFalse();
     }
 }
