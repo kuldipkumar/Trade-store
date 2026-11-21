@@ -36,11 +36,13 @@ public class AuditReportService {
      * @param to   last local date included; null for no upper bound
      */
     public AuditReport report(LocalDate from, LocalDate to, String tradeId, Outcome outcome, int page, int size) {
+        int pageSize = Math.min(size, maxPageSize);
         ZoneId zone = clock.getZone();
         AuditQuery query = new AuditQuery(from == null ? null : from.atStartOfDay(zone).toInstant(),
                 to == null ? null : to.plusDays(1).atStartOfDay(zone).toInstant(), tradeId, outcome);
         Map<Outcome, Long> summary = audit.countByOutcome(query);
         long total = summary.values().stream().mapToLong(Long::longValue).sum();
-        return new AuditReport(summary, audit.find(query, page, size), page, size, total, (total + size - 1) / size);
+        return new AuditReport(summary, audit.find(query, page, pageSize), page, pageSize, total,
+                (total + pageSize - 1) / pageSize);
     }
 }
