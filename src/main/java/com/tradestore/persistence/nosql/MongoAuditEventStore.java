@@ -28,6 +28,9 @@ public class MongoAuditEventStore implements AuditEventStore {
 
     static final String COLLECTION = "audit_events";
 
+    /** Served by the audit indexes, which all end with (eventTimestamp, _id). */
+    private static final Sort REPORT_ORDER = Sort.by("eventTimestamp", "_id");
+
     private final MongoTemplate mongo;
 
     public MongoAuditEventStore(MongoTemplate mongo) {
@@ -58,7 +61,7 @@ public class MongoAuditEventStore implements AuditEventStore {
 
     @Override
     public List<AuditEvent> find(AuditQuery query, int page, int size) {
-        Query mongoQuery = Query.query(matching(query)).with(Sort.by("eventTimestamp", "_id"))
+        Query mongoQuery = Query.query(matching(query)).with(REPORT_ORDER)
                 .skip((long) page * size).limit(size);
         return mongo.find(mongoQuery, Document.class, COLLECTION).stream().map(MongoAuditEventStore::toEvent).toList();
     }
@@ -75,7 +78,8 @@ public class MongoAuditEventStore implements AuditEventStore {
 
     @Override
     public Stream<AuditEvent> stream(AuditQuery query) {
-        return Stream.empty();
+        return mongo.stream(Query.query(matching(query)).with(REPORT_ORDER), Document.class, COLLECTION)
+                .map(MongoAuditEventStore::toEvent);
     }
 
     private static Criteria matching(AuditQuery query) {
