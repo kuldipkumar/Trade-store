@@ -48,4 +48,22 @@ class AuditReportServiceTest {
         verify(audit).find(expected, 0, 50);
         verify(audit).countByOutcome(expected);
     }
+
+    @Test
+    @Tag("US-502.3")
+    @Tag("US-502.4")
+    void should_reportTheSummaryAndTotalsOfTheFilteredSet_when_onlyOnePageIsReturned() {
+        // Arrange: 5 matching entries in all
+        when(audit.countByOutcome(any())).thenReturn(Map.of(Outcome.ACCEPTED, 2L, Outcome.REJECTED, 3L));
+
+        // Act
+        AuditReport report = service.report(null, null, null, null, 1, 2);
+
+        // Assert
+        assertThat(report.summary()).isEqualTo(Map.of(Outcome.ACCEPTED, 2L, Outcome.REJECTED, 3L));
+        assertThat(report.totalElements()).isEqualTo(5);
+        assertThat(report.totalPages()).isEqualTo(3);
+        assertThat(report.page()).isEqualTo(1);
+        assertThat(report.size()).isEqualTo(2);
+    }
 }
