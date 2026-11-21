@@ -16,6 +16,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -36,13 +39,16 @@ class ExpiryIT {
     private final MongoTemplate mongo;
     private final JdbcClient jdbc;
     private final MutableClock clock;
+    private final ConfigurableApplicationContext context;
 
     private final String prefix = "T-" + UUID.randomUUID().toString().substring(0, 8);
     private final String maturedYesterday = prefix + "-18";
     private final String maturesToday = prefix + "-19";
     private final String maturesTomorrow = prefix + "-20";
 
-    ExpiryIT(ExpiryService expiry, TradeRepository trades, MongoTemplate mongo, JdbcClient jdbc, MutableClock clock) {
+    ExpiryIT(ExpiryService expiry, TradeRepository trades, MongoTemplate mongo, JdbcClient jdbc, MutableClock clock,
+             ConfigurableApplicationContext context) {
+        this.context = context;
         this.expiry = expiry;
         this.trades = trades;
         this.mongo = mongo;
@@ -120,5 +126,16 @@ class ExpiryIT {
         assertThat(outboxRows(maturedYesterday)).isZero();
         assertThat(expiredAuditEntries(maturedYesterday)).isEqualTo(1);
         assertThat(expired(maturedYesterday)).isTrue();
+    }
+
+    @Test
+    @Tag("US-203.1")
+    void should_expireTradesMaturedDuringDowntime_when_theServiceStarts() {
+        // Act: the application becomes ready (as after a restart over midnight)
+        context.publishEvent(new ApplicationReadyEvent(new SpringApplication(), new String[0], context, Duration.ZERO));
+
+        // Assert: no waiting for the next scheduled run (A-18, A-51)
+        assertThat(expired(maturedYesterday)).isTrue();
+        assertThat(expired(maturesToday)).isFalse();
     }
 }
