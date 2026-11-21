@@ -151,4 +151,17 @@ class TradeStorePropertiesTest {
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause().hasMessageContaining("must be at least 1");
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"trade-store.retry.max-attempts=0", "trade-store.retry.multiplier=0.5"})
+    @Tag("US-303.3")
+    void should_failAtStartup_when_aRetrySettingIsBelowOne(String setting) {
+        // Arrange
+        String[] pair = setting.split("=");
+
+        // Act + Assert: zero attempts would drop messages unseen; a multiplier below 1 shrinks the backoff
+        assertThatThrownBy(() -> bind(Map.of(pair[0], pair[1])))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause().hasMessageContaining("must be at least 1");
+    }
 }
