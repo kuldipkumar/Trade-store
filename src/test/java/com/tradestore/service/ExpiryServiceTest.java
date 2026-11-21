@@ -56,4 +56,19 @@ class ExpiryServiceTest {
                 .containsExactly(tuple("T1", Outcome.EXPIRED),
                         tuple("T2", Outcome.EXPIRED));
     }
+
+    @Test
+    @Tag("US-604.2")
+    void should_countEachExpiredTrade_when_tradesAreMarkedExpired() {
+        // Arrange
+        when(trades.markExpired(TODAY)).thenReturn(List.of(expired("T1"), expired("T2")));
+
+        // Act
+        service.expireMaturedTrades();
+
+        // Assert (observability built in: AGENTS.md section 4)
+        var counter = registry.find("trade.outcomes")
+                .tags("outcome", "EXPIRED", "reason", "NONE", "channel", "SCHEDULER").counter();
+        assertThat(counter == null ? 0 : counter.count()).isEqualTo(2.0);
+    }
 }
