@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -23,7 +23,7 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | AC | Verdict | Evidence | What is missing, and where it will be closed |
 |----|---------|----------|----------------------------------------------|
 | US-101.1 | Full | `TradeTest`, `TradeIngestionServiceTest`, `JdbcTradeRepositoryIT`, `StoreTradeIT` (createdDate = today from the injected Clock, expired = N, ACCEPTED) | |
-| US-101.2 | Partial | `TradeTest`: the store sets createdDate and expired | The criterion is about a sender **sending** `createdDate`/`expired`. `TradeSubmission` can't carry them, so the remaining proof is that the REST and Kafka DTOs ignore those JSON fields. Closed in **US-401 / US-301**. |
+| US-101.2 | Full | `TradeTest`; `TradeApiIT` (a REST caller sending `createdDate` 2015-03-14 and `expired` Y still gets today and N) | The Kafka DTO uses the same record shape (US-301). |
 | US-101.3 | Full | `StoreTradeIT`: the history entry arrives in MongoDB through the real relay | |
 | US-102.1 | Full | `JdbcTradeRepositoryIT` (CP-2 stored), `TradeIngestionServiceTest` (REPLACED), `LowerVersionValidatorTest` | |
 | US-102.2 | Full | `StoreTradeIT`: v1 then v3 stores v3, outcome REPLACED (mutation-verified) | |
@@ -58,6 +58,12 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-205.1 | Full | `ClockConfigTest` | |
 | US-205.2 | Full | `TradeIngestionServiceTest`: at 01:30 on 19 Nov in Asia/Kolkata (still 18 Nov in UTC) a trade maturing on 18 Nov is rejected; mutation-verified against a UTC "today" | |
 | US-302.2 | Partial | `AuditEventFactoryTest`: the payload is capped at the configured size | The POISON entry itself. Closed in **US-302**. |
+| US-401.1 | Full | `TradeApiIT` (201 with the stored trade); `GlobalExceptionHandlerTest` (503 when the database is down, decision D7) | |
+| US-401.2 | Full | `TradeApiIT`: same and higher version → 200 with the stored trade | |
+| US-401.3 | Full | `TradeApiIT`: 409 with `{timestamp, status, error, reasons[], path}` naming both versions | |
+| US-401.4 | Full | `TradeApiIT`: 422 with MATURITY_IN_PAST | |
+| US-401.5 | Full | `TradeApiIT`: invalid fields → 400 listing them; malformed JSON → 400 MALFORMED_REQUEST; invalid fields plus a lower version → 400 with both reasons (D6) | |
+| US-401.6 | Full | `TradeApiIT` (1.1 MB body → 413), `RequestSizeLimitFilterTest` (chunked bodies counted while read), `GlobalExceptionHandlerTest` (413 also when wrapped by the JSON parser) | |
 | US-404.1 | Partial | `MongoStoresIT`: ordered by version, then received time | `GET /trades/{id}/history`. Closed in **US-404**. |
 | US-501.1 | Partial | `MongoStoresIT`, `AuditEventFactoryTest`, `JdbcOutboxRepositoryIT`, `OutboxRelayServiceTest`, `StoreTradeIT` (all the fields) | Proven for the REST channel value only. Closed by **US-301** (the STREAM channel). |
 | US-501.2 | Full | `AuditTrailImmutabilityTest`: the audit and history ports and their MongoDB implementations offer only insert and read operations (mutation-verified) | |
