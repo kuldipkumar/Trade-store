@@ -42,12 +42,7 @@ public class TradeController {
     public PageResponse<TradeResponse> list(@RequestParam(required = false) Boolean expired,
                                             @RequestParam(defaultValue = "0") int page,
                                             @RequestParam(defaultValue = "20") int size) {
-        if (page < 0) {
-            throw new InvalidRequestParameterException("page", "page must be 0 or greater");
-        }
-        if (size < 1) {
-            throw new InvalidRequestParameterException("size", "size must be 1 or greater");
-        }
+        PageParameters.validate(page, size);
         return PageResponse.from(queries.list(expired, page, size), TradeResponse::from);
     }
 
