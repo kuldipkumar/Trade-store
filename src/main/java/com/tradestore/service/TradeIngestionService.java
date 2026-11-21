@@ -59,6 +59,7 @@ public class TradeIngestionService {
         LocalDate today = LocalDate.now(clock);
         Decision decision = transactions.execute(status -> decide(submission, today));
         if (decision.rejection() != null) {
+            metrics.recordOutcome(Outcome.REJECTED, decision.rejection().reasons(), submission.channel());
             throw decision.rejection();
         }
         metrics.recordOutcome(decision.result().outcome(), List.of(), submission.channel());
