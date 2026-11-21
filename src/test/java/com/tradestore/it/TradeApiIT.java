@@ -180,4 +180,28 @@ class TradeApiIT {
         assertThat(response.getResponseBody().path("createdDate").asString()).isEqualTo(LocalDate.now(clock).toString());
         assertThat(response.getResponseBody().path("expired").asBoolean()).isFalse();
     }
+
+    @Test
+    @Tag("US-401.5")
+    void should_return415InTheStandardShape_when_theBodyIsNotJson() {
+        // Act
+        EntityExchangeResult<JsonNode> response = rest.post().uri("/trades").contentType(MediaType.TEXT_PLAIN)
+                .body(json(1, "2099-05-20")).exchange().expectBody(JsonNode.class).returnResult();
+
+        // Assert
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("UNSUPPORTED_MEDIA_TYPE");
+    }
+
+    @Test
+    @Tag("US-401.5")
+    void should_return405InTheStandardShape_when_theMethodIsNotSupported() {
+        // Act
+        EntityExchangeResult<JsonNode> response = rest.put().uri("/trades").contentType(MediaType.APPLICATION_JSON)
+                .body(json(1, "2099-05-20")).exchange().expectBody(JsonNode.class).returnResult();
+
+        // Assert
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("METHOD_NOT_ALLOWED");
+    }
 }
