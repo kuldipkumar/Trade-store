@@ -9,6 +9,10 @@ import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
@@ -58,5 +62,21 @@ class GlobalExceptionHandlerTest {
         // Assert
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(response.getBody().reasons()).extracting(ApiErrorResponse.Reason::reason).containsExactly("SERVICE_UNAVAILABLE");
+    }
+
+    @Test
+    @Tag("US-401.1")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_return503AndLogTheCause_when_noDatabaseConnectionCanBeObtained(CapturedOutput output) {
+        // Arrange: what TransactionTemplate throws when PostgreSQL is down (a TransactionException, not DataAccess)
+        CannotCreateTransactionException e = new CannotCreateTransactionException("Could not open JDBC Connection",
+                new java.sql.SQLTransientConnectionException("Connection refused"));
+
+        // Act
+        ResponseEntity<ApiErrorResponse> response = handler.unavailable(e, request);
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(output).contains("Connection refused");
     }
 }
