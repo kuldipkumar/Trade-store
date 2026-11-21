@@ -96,9 +96,9 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
      * @param dltTopic          where unprocessable messages are moved, on the same partition number (US-302)
      */
     public record Kafka(@DefaultValue("trades.inbound") String topic, @DefaultValue("6") int partitions,
-                        @DefaultValue("1") short replicationFactor, @DefaultValue("") String dltTopic) {
+                        @DefaultValue("1") short replicationFactor, @DefaultValue("trades.inbound.DLT") String dltTopic) {
         static final String DEFAULT_TOPIC = "trades.inbound";
-        static final String DEFAULT_DLT_TOPIC = "";
+        static final String DEFAULT_DLT_TOPIC = "trades.inbound.DLT";
         static final int DEFAULT_PARTITIONS = 6;
         static final short DEFAULT_REPLICATION_FACTOR = 1;
 
