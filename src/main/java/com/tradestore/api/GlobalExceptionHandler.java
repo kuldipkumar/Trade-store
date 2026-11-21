@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -91,6 +92,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> invalidParameter(InvalidRequestParameterException e, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, List.of(new ApiErrorResponse.Reason("INVALID_PARAMETER", e.parameter(),
                 e.getMessage())), request);
+    }
+
+    /** A query parameter of the wrong type, for example page=abc or expired=maybe (US-403). */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> typeMismatch(MethodArgumentTypeMismatchException e, HttpServletRequest request) {
+        return error(HttpStatus.BAD_REQUEST, List.of(new ApiErrorResponse.Reason("INVALID_PARAMETER", e.getName(),
+                e.getName() + " has the wrong type")), request);
     }
 
     /** An unknown trade (US-402.2, US-404.2). */

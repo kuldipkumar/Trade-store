@@ -110,13 +110,14 @@ public class JdbcTradeRepository implements TradeRepository {
 
     @Override
     public PageResult<Trade> findPage(Boolean expired, int page, int size) {
-        // ":expired IS NULL" makes the filter optional; ORDER BY the primary key keeps pages stable (US-403).
+        // ":expired IS NULL" makes the filter optional. ORDER BY trade_id COLLATE "C": stable, locale-independent
+        // (code-point) order on every PostgreSQL installation (US-403).
         String where = " WHERE (CAST(:expired AS boolean) IS NULL OR expired = :expired)";
         long total = jdbc.sql("SELECT count(*) FROM trades" + where).param("expired", expired)
                 .query(Long.class).single();
         List<Trade> content = jdbc.sql("""
                         SELECT trade_id, version, counter_party_id, book_id, maturity_date, created_date, expired
-                          FROM trades""" + where + " ORDER BY trade_id LIMIT :size OFFSET :offset")
+                          FROM trades""" + where + " ORDER BY trade_id COLLATE \"C\" LIMIT :size OFFSET :offset")
                 .param("expired", expired)
                 .param("size", size)
                 .param("offset", (long) page * size)
