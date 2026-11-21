@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 public class TradeQueryService {
 
     private final TradeRepository trades;
+    private final int maxPageSize;
 
     @Autowired
     public TradeQueryService(TradeRepository trades, TradeStoreProperties properties) {
@@ -21,11 +22,12 @@ public class TradeQueryService {
 
     TradeQueryService(TradeRepository trades, int maxPageSize) {
         this.trades = trades;
+        this.maxPageSize = maxPageSize;
     }
 
-    /** Stub: implemented test-first. */
+    /** One page of trades, sorted by tradeId; the size is capped at max-page-size (US-403, A-52). */
     public PageResult<Trade> list(Boolean expired, int page, int size) {
-        return null;
+        return trades.findPage(expired, page, Math.min(size, maxPageSize));
     }
 
     /** @throws TradeNotFoundException if no trade is stored with this ID */
