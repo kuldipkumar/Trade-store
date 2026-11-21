@@ -137,7 +137,8 @@ class AuditReportIT {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"&page=-1", "&size=0", "&from=2026-11-20&to=2026-11-19", "&from=19-11-2026", "&outcome=MAYBE"})
+    @ValueSource(strings = {"&page=-1", "&size=0", "&from=2026-11-20&to=2026-11-19", "&from=19-11-2026", "&outcome=MAYBE",
+            "&to=+999999999-12-31", "&from=-999999999-01-01"})
     @Tag("US-502.1")
     void should_returnBadRequest_when_aParameterIsInvalid(String query) {
         // Act
