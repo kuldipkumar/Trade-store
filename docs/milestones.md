@@ -29,3 +29,6 @@ One entry per story that is completed, tested, peer-reviewed and merged. The sam
 | 23 | US-502 Generate an audit report on demand | 2026-11-21 | #63 | 4 of 4 | /code-review: 2 important + 5 nits fixed |
 | 24 | US-503 Export the audit report as CSV | 2026-11-21 | #64 | 1 of 1 | /code-review: 3 important + 4 nits fixed |
 | 25 | D9 Outages never dead-letter a trade (option C) | 2026-11-21 | #65 | US-303.1, US-303.2 | /code-review: 1 important + 5 nits fixed |
+| 26 | US-607 Input hardening on the stream | 2026-11-22 | #66 | 2 of 2 | /code-review: 2 important + 6 nits fixed |
+| 27 | US-604 Observability | 2026-11-22 | #66 | 3 of 3 | /code-review of #66 |
+| 28 | US-603 Automated regression suite on real infrastructure | 2026-11-22 | #66 | 2 of 2 | /code-review of #66 |
