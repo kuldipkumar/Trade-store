@@ -22,12 +22,14 @@ import java.util.List;
 import java.util.Optional;
 
 import com.tradestore.domain.AuditEvent;
+import com.tradestore.domain.Channel;
 import com.tradestore.domain.LowerVersionException;
 import com.tradestore.domain.Outcome;
 import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
 import com.tradestore.domain.TradeRejectedException;
+import com.tradestore.domain.TradeSubmission;
 import com.tradestore.persistence.OutboxRepository;
 import com.tradestore.persistence.TradeRepository;
 import com.tradestore.persistence.UpsertResult;
@@ -37,8 +39,12 @@ import com.tradestore.service.validation.MandatoryFieldsValidator;
 import com.tradestore.service.validation.MaturityDateFormatValidator;
 import com.tradestore.service.validation.PositiveVersionValidator;
 import org.junit.jupiter.api.Tag;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionOperations;
 
@@ -52,11 +58,12 @@ class TradeIngestionServiceTest {
     private final TradeRepository trades = mock(TradeRepository.class);
     private final OutboxRepository outbox = mock(OutboxRepository.class);
     private final RecordingTransactions tx = new RecordingTransactions();
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
     private final TradeIngestionService service = new TradeIngestionService(
             new CompositeTradeValidator(List.of(new MandatoryFieldsValidator(), new PositiveVersionValidator(),
                     new MaturityDateFormatValidator(), new LowerVersionValidator())),
-            trades, outbox, new AuditEventFactory(CLOCK, 10_000), tx, CLOCK);
+            trades, outbox, new AuditEventFactory(CLOCK, 10_000), tx, CLOCK, new TradeMetrics(registry));
 
     /** Runs the callback directly and records whether it completed (i.e. would have committed). */
     static class RecordingTransactions implements TransactionOperations {
@@ -212,5 +219,103 @@ class TradeIngestionServiceTest {
                 .isInstanceOf(LowerVersionException.class)
                 .hasMessage("Trade T1 version 2 is lower than stored version 4");
         verify(trades, times(2)).upsertIfNotOlder(any());
+    }
+
+    private double outcomes(String outcome, String reason) {
+        var counter = registry.find("trade.outcomes").tags("outcome", outcome, "reason", reason).counter();
+        return counter == null ? 0 : counter.count();
+    }
+
+    @Test
+    @Tag("US-604.2")
+    void should_countTheOutcome_when_tradeIsStored() {
+        // Arrange
+        when(trades.findById("T1")).thenReturn(Optional.empty());
+        when(trades.upsertIfNotOlder(any())).thenReturn(UpsertResult.INSERTED);
+
+        // Act
+        service.ingest(validSubmission());
+
+        // Assert
+        assertThat(outcomes("ACCEPTED", "NONE")).isEqualTo(1.0);
+    }
+
+    @Test
+    @Tag("US-604.2")
+    void should_countEachRejectionReason_when_tradeIsRejected() {
+        // Arrange: blank bookId and a lower version than stored
+        when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 2, false)));
+        TradeSubmission submission = new TradeSubmission("T1", 1, "CP-1", " ", "2027-05-20", Channel.REST, "{}");
+
+        // Act
+        assertThatThrownBy(() -> service.ingest(submission)).isInstanceOf(LowerVersionException.class);
+
+        // Assert
+        assertThat(outcomes("REJECTED", "INVALID_FIELD")).isEqualTo(1.0);
+        assertThat(outcomes("REJECTED", "LOWER_VERSION")).isEqualTo(1.0);
+    }
+
+    private long timedIngestions(String channel) {
+        var timer = registry.find("trade.processing").tag("channel", channel).timer();
+        return timer == null ? 0 : timer.count();
+    }
+
+    @Test
+    @Tag("US-604.2")
+    void should_timeTheIngestion_when_tradeIsStored() {
+        // Arrange
+        when(trades.findById("T1")).thenReturn(Optional.empty());
+        when(trades.upsertIfNotOlder(any())).thenReturn(UpsertResult.INSERTED);
+
+        // Act
+        service.ingest(validSubmission());
+
+        // Assert
+        assertThat(timedIngestions("REST")).isEqualTo(1);
+    }
+
+    @Test
+    @Tag("US-604.2")
+    void should_timeTheIngestion_when_tradeIsRejected() {
+        // Arrange
+        when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 2, false)));
+
+        // Act
+        assertThatThrownBy(() -> service.ingest(withVersion(1))).isInstanceOf(LowerVersionException.class);
+
+        // Assert
+        assertThat(timedIngestions("REST")).isEqualTo(1);
+    }
+
+    @Test
+    @Tag("US-604.3")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_logOutcomeWithIdsButNoPayload_when_tradeIsStored(CapturedOutput output) {
+        // Arrange
+        when(trades.findById("T1")).thenReturn(Optional.empty());
+        when(trades.upsertIfNotOlder(any())).thenReturn(UpsertResult.INSERTED);
+        TradeSubmission submission = new TradeSubmission("T1", 1, "CP-1", "B1", "2027-05-20", Channel.REST,
+                "{\"note\":\"PAYLOAD-MARKER\"}");
+
+        // Act
+        service.ingest(submission);
+
+        // Assert (A-32: IDs and outcomes only)
+        assertThat(output).contains("outcome=ACCEPTED tradeId=T1 version=1 channel=REST");
+        assertThat(output).doesNotContain("PAYLOAD-MARKER");
+    }
+
+    @Test
+    @Tag("US-604.3")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_logTheReasons_when_tradeIsRejected(CapturedOutput output) {
+        // Arrange
+        when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 2, false)));
+
+        // Act
+        assertThatThrownBy(() -> service.ingest(withVersion(1))).isInstanceOf(LowerVersionException.class);
+
+        // Assert (format from docs/05-lld.md section 8)
+        assertThat(output).contains("outcome=REJECTED tradeId=T1 version=1 channel=REST reasons=[LOWER_VERSION]");
     }
 }

@@ -22,6 +22,7 @@ import org.bson.Document;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.test.web.servlet.client.RestTestClient;
 
 /**
  * End to end through the real application: ingestion service, PostgreSQL (trade + outbox), outbox relay,
@@ -43,14 +44,17 @@ class StoreTradeIT {
 
     private final Clock clock;
 
+    private final RestTestClient rest;
+
     private final String tradeId = "T-" + UUID.randomUUID();
 
-    StoreTradeIT(TradeIngestionService ingestion, TradeRepository trades, TradeHistoryStore history, MongoTemplate mongo, Clock clock) {
+    StoreTradeIT(TradeIngestionService ingestion, TradeRepository trades, TradeHistoryStore history, MongoTemplate mongo, Clock clock, RestTestClient rest) {
         this.ingestion = ingestion;
         this.trades = trades;
         this.history = history;
         this.mongo = mongo;
         this.clock = clock;
+        this.rest = rest;
     }
 
     private TradeSubmission submission(int version) {
@@ -107,5 +111,18 @@ class StoreTradeIT {
                     .extracting(r -> r.getString("reason")).containsExactly("LOWER_VERSION");
             assertThat(history.findByTradeId(tradeId)).extracting(e -> e.version()).containsExactly(2);
         });
+    }
+
+    @Test
+    @Tag("US-604.2")
+    void should_exposeOutcomeAndLatencyMetrics_when_tradeIsProcessed() {
+        // Act
+        ingestion.ingest(submission(1));
+
+        // Assert: the business metrics reach the Prometheus endpoint (docs/05-lld.md section 8)
+        String metrics = rest.get().uri("/actuator/prometheus").exchange()
+                .expectStatus().isOk().expectBody(String.class).returnResult().getResponseBody();
+        assertThat(metrics).contains("trade_outcomes_total{channel=\"REST\",outcome=\"ACCEPTED\",reason=\"NONE\"}");
+        assertThat(metrics).contains("trade_processing_seconds_count{channel=\"REST\"}");
     }
 }
