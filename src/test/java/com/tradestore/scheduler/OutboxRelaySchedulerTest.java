@@ -8,7 +8,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 
+import com.tradestore.persistence.OutboxBacklog;
 import com.tradestore.persistence.OutboxRepository;
 import com.tradestore.service.OutboxRelayService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -115,5 +117,41 @@ class OutboxRelaySchedulerTest {
 
         // Assert: reminded at 3 and 6, not on every poll
         assertThat(output.getAll().split("consecutive polls", -1).length - 1).isEqualTo(2);
+    }
+
+    @Test
+    @Tag("US-501.3")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_stillAlertWithoutThrowing_when_theWaitingTradesCannotBeRead(CapturedOutput output) {
+        // Arrange: PostgreSQL itself is down, so the lookup of waiting trades fails too (threshold 3)
+        when(relay.relayBatch()).thenThrow(new DataAccessResourceFailureException("PostgreSQL down"));
+        when(outbox.pendingTradeIds(anyInt())).thenThrow(new DataAccessResourceFailureException("PostgreSQL down"));
+        when(outbox.backlog()).thenThrow(new DataAccessResourceFailureException("PostgreSQL down"));
+
+        // Act + Assert: the scheduler never throws, and the outage is still reported with its cause
+        for (int i = 0; i < 3; i++) {
+            assertThatCode(scheduler::poll).doesNotThrowAnyException();
+        }
+        assertThat(output).contains("3 consecutive polls").contains("PostgreSQL down").contains("waiting trades unavailable");
+    }
+
+    @Test
+    @Tag("US-501.3")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_includeTheCauseAndTheBacklogSize_when_anOutageIsReported(CapturedOutput output) {
+        // Arrange (threshold 3)
+        when(relay.relayBatch()).thenThrow(new DataAccessResourceFailureException("MongoDB down"));
+        when(outbox.pendingTradeIds(anyInt())).thenReturn(List.of());
+        when(outbox.backlog()).thenReturn(new OutboxBacklog(5, Optional.empty()));
+
+        // Act
+        for (int i = 0; i < 3; i++) {
+            scheduler.poll();
+        }
+
+        // Assert: the cause, and the count even when no waiting event has a trade ID; WARN comes before ERROR
+        String log = output.getAll();
+        assertThat(log).contains("waiting events: 5").contains("MongoDB down");
+        assertThat(log.lastIndexOf("WARN")).isLessThan(log.lastIndexOf("ERROR"));
     }
 }
