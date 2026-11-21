@@ -1,13 +1,18 @@
 package com.tradestore.messaging;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 
 import com.tradestore.config.TradeStoreProperties;
+import com.tradestore.domain.AuditEvent;
+import com.tradestore.domain.Channel;
+import com.tradestore.domain.Outcome;
 import com.tradestore.persistence.AuditEventStore;
 import com.tradestore.service.AuditEventFactory;
 import com.tradestore.service.parsing.MalformedTradeException;
@@ -15,6 +20,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.ListenerExecutionFailedException;
 
@@ -42,5 +48,19 @@ class DeadLetterAuditRecovererTest {
 
         // Assert
         verify(publisher).accept(record, failure);
+    }
+
+    @Test
+    @Tag("US-302.2")
+    void should_auditAPoisonEntryKeyedByPositionWithTheCause_when_aMalformedMessageIsRecovered() {
+        // Act
+        recoverer.accept(record, failure);
+
+        // Assert: the cause, not the listener wrapper, is the reason
+        ArgumentCaptor<AuditEvent> event = ArgumentCaptor.forClass(AuditEvent.class);
+        verify(audit).insert(event.capture());
+        assertThat(event.getValue()).isEqualTo(new AuditEvent("trades.inbound-3-42", null, null, Outcome.POISON,
+                List.of(), Channel.STREAM, NOW, "{bad", null,
+                "com.tradestore.service.parsing.MalformedTradeException: The body is not valid JSON"));
     }
 }
