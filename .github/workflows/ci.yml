@@ -78,11 +78,25 @@ jobs:
           format: table
           output: trivy-dependencies.txt
 
+      # 6b. Full report of every severity, never failing the build (US-602.2): uploaded with the other reports
+      - name: Trivy full report
+        if: always()
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+          format: table
+          output: trivy-full-report.txt
+
       # 8. Package the Docker image
       - name: Build Docker image
         run: docker build -t "$IMAGE_NAME:${{ github.sha }}" .
 
-      # 6b. OSS vulnerability scan of the image, including OS packages (fails on CRITICAL)
+      # 6c. OSS vulnerability scan of the image, including OS packages (fails on CRITICAL)
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -123,3 +137,15 @@ jobs:
           name: diagrams
           if-no-files-found: warn
           path: docs/diagrams/out/*.svg
+
+  # US-606.1: the one-command local run works from a clean checkout (A-49)
+  compose-smoke:
+    name: docker compose smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Start the stack and wait for readiness
+        run: scripts/compose-smoke.sh

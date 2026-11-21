@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301; US-304; US-302; US-303; US-502; US-503; D9; US-603.2; US-604; US-607). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301; US-304; US-302; US-303; US-502; US-503; D9; US-603.2; US-604; US-607; US-601; US-602; US-606; US-608; US-609). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -94,6 +94,20 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-604.2 | Full | `TradeMetricsTest`, `TradeIngestionServiceTest`, `StoreTradeIT` (outcome counters and latency timer at `/actuator/prometheus`), `PoisonPillIT` (`trade_deadletter_total{type="POISON"}` at `/actuator/prometheus`), `DeadLetterAuditRecovererTest`, `KafkaErrorHandlingTest` (`trade_retries_total`) | |
 | US-607.1 | Full | `TradeConsumerTest` (a message over the limit is malformed and never ingested), `TradeStorePropertiesTest` (`kafka.max-message-bytes` default 1 MB, configurable, positive), `AuditEventFactoryTest` (POISON payload capped), `PoisonPillIT` (malformed → DLT and POISON) | |
 | US-607.2 | Full | `TradeJsonParserTest`: extra fields (scalars, arrays, objects) are ignored and the raw text is kept (mutation-verified) | |
+| US-601.1 | Full | `CiPipelineConformanceTest`: the AGENTS.md §6 stages appear in order; triggers are PRs and pushes to `main` | Each run of the workflow is the live proof. |
+| US-601.2 | Full | `CiPipelineConformanceTest`: no `continue-on-error` and no ignored test failures in ci.yml or pom.xml | |
+| US-601.3 | Full | `CiPipelineConformanceTest`: JaCoCo `check` on verify, LINE COVEREDRATIO ≥ 0.80 | |
+| US-601.4 | Full | `CiPipelineConformanceTest`: PlantUML rendered with `-failfast2`; SVGs uploaded | |
+| US-601.5 | Full | `CiPipelineConformanceTest`: reports uploaded with `if: always()` (surefire, failsafe, JaCoCo, Trivy) | |
+| US-602.1 | Full | `CiPipelineConformanceTest`: dependency and image scans with `severity: CRITICAL` (CVSS ≥ 9), `exit-code: '1'`, table report naming the package and CVE | |
+| US-602.2 | Full | `CiPipelineConformanceTest`: a full report of every severity, `exit-code: '0'`, uploaded as `trivy-full-report.txt` | |
+| US-606.1 | Full | `CiPipelineConformanceTest` (a `compose-smoke` CI job runs `scripts/compose-smoke.sh`), and the script itself: `docker compose up --build`, waits for readiness UP, stores and reads a trade (run locally and in CI) | |
+| US-606.2 | Full | `ContainerAndSecretsConformanceTest`: the runtime stage sets a non-root `USER` before `ENTRYPOINT` | |
+| US-606.3 | Full | `ContainerAndSecretsConformanceTest`: every connection setting is an `${ENV:default}` placeholder; no private keys or cloud/GitHub/Slack tokens in tracked files | Compose has local-only default passwords, overridable by environment. |
+| US-608.1 | Full | `DocumentationConformanceTest`: every PROMPTS.md row has its decision column filled in (it found rows 34–36 malformed, now fixed) | |
+| US-608.2 | Full | `DocumentationConformanceTest` (every AGENTS.md §12 diagram exists with a title), `CiPipelineConformanceTest` (rendered with `-failfast2` in CI) | |
+| US-609.1 | Full | `DocumentationConformanceTest`: README covers overview, architecture (SVGs), run, tests, pipeline, assumptions, limitations, future improvements | |
+| US-609.2 | Full | `DocumentationConformanceTest`: [runbook](runbook-dead-letter.md) inspect → find audit → fix → replay, linked from the README | |
 | A-09 | Full | `LowerVersionValidatorTest`: an expired trade still rejects a lower version | |
 | A-46 (outbox backlog) | Full | `OutboxMetricsTest` (size, oldest age, NaN when the database is down), `JdbcOutboxRepositoryIT` (`backlog`), `StoreTradeIT` (gauges and job-failure counters at `/actuator/prometheus`, mutation-verified) | |
 | A-50 | Full | `TradeStorePropertiesTest`: defaults and overrides | |

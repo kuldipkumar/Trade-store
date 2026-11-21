@@ -106,4 +106,17 @@ class CiPipelineConformanceTest {
         assertThat(read("scripts/compose-smoke.sh")).contains("docker compose up -d --build")
                 .contains("/actuator/health/readiness").contains("docker compose down");
     }
+
+    @Test
+    @Tag("US-605.3")
+    void should_runThePerformanceBaselineOnDemandAndUploadItsSummary_when_dispatched() {
+        // Arrange
+        assertThat(RepositoryFiles.exists(".github/workflows/performance.yml")).isTrue();
+        String performance = read(".github/workflows/performance.yml");
+
+        // Act + Assert: manual trigger only (too slow and noisy as a gate on every PR), summary kept as an artifact
+        assertThat(performance).contains("workflow_dispatch:").doesNotContain("pull_request:").doesNotContain("push:")
+                .contains("-Pperformance").contains("target/performance/");
+        assertThat(pom).contains("<id>performance</id>").contains("**/*PT.java");
+    }
 }
