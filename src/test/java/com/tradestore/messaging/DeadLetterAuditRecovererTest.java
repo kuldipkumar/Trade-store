@@ -82,4 +82,18 @@ class DeadLetterAuditRecovererTest {
         assertThatCode(() -> recoverer.accept(record, failure)).doesNotThrowAnyException();
         assertThat(output).contains("ERROR").contains("trades.inbound-3-42").doesNotContain("{bad");
     }
+
+    @Test
+    @Tag("US-302.1")
+    @Tag("US-604.2")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_countAndLogTheDeadLetterWithoutThePayload_when_aMessageIsRecovered(CapturedOutput output) {
+        // Act
+        recoverer.accept(record, failure);
+
+        // Assert: trade_deadletter_total{type=POISON}, and one WARN line with the position only (A-32)
+        assertThat(registry.counter("trade.deadletter", "type", "POISON").count()).isEqualTo(1.0);
+        assertThat(output).contains("WARN").contains("outcome=POISON position=trades.inbound-3-42")
+                .contains("MalformedTradeException").doesNotContain("{bad");
+    }
 }
