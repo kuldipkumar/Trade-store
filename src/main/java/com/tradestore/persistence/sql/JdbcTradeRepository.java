@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
+import com.tradestore.persistence.PageResult;
 import com.tradestore.persistence.TradeRepository;
 import com.tradestore.persistence.UpsertResult;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -105,5 +106,10 @@ public class JdbcTradeRepository implements TradeRepository {
     public List<Trade> markExpired(LocalDate today, int limit) {
         return jdbc.sql(MARK_EXPIRED_BATCH).param("today", today).param("limit", limit)
                 .query(JdbcTradeRepository::mapTrade).list();
+    }
+
+    @Override
+    public PageResult<Trade> findPage(Boolean expired, int page, int size) {
+        return new PageResult<>(List.of(), page, size, 0); // stub: implemented test-first
     }
 }

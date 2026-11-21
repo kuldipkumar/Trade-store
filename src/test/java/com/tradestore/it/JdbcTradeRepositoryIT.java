@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
+import com.tradestore.persistence.PageResult;
 import com.tradestore.persistence.TradeRepository;
 import com.tradestore.persistence.UpsertResult;
 import org.junit.jupiter.api.Tag;
@@ -267,5 +268,43 @@ class JdbcTradeRepositoryIT {
         assertThat(first).hasSize(2);
         assertThat(second).hasSize(1);
         assertThat(repository.markExpired(y2k, 2)).isEmpty();
+    }
+
+    @Test
+    @Tag("US-403.1")
+    void should_returnAPageSortedByTradeIdWithTheTotal_when_listing() {
+        // Arrange: the shared database already holds other tests' trades, so compare with a baseline
+        long before = repository.findPage(null, 0, 1).totalElements();
+        for (String suffix : List.of("-c", "-a", "-b")) {
+            repository.upsertIfNotOlder(new Trade(tradeId + suffix, 1, "CP-1", "B1", MATURITY, TODAY, false));
+        }
+
+        // Act
+        PageResult<Trade> all = repository.findPage(null, 0, 1000);
+        PageResult<Trade> firstTwo = repository.findPage(null, 0, 2);
+
+        // Assert
+        assertThat(all.totalElements()).isEqualTo(before + 3);
+        assertThat(all.content()).extracting(Trade::tradeId).isSorted()
+                .contains(tradeId + "-a", tradeId + "-b", tradeId + "-c");
+        assertThat(firstTwo.content()).hasSize(2);
+        assertThat(firstTwo.totalElements()).isEqualTo(before + 3);
+    }
+
+    @Test
+    @Tag("US-403.2")
+    void should_returnOnlyTradesWithTheGivenExpiredFlag_when_filtering() {
+        // Arrange
+        repository.upsertIfNotOlder(new Trade(tradeId + "-live", 1, "CP-1", "B1", MATURITY, TODAY, false));
+        repository.upsertIfNotOlder(new Trade(tradeId + "-gone", 1, "CP-1", "B1", MATURITY, TODAY, false));
+        jdbc.sql("UPDATE trades SET expired = true WHERE trade_id = ?").param(tradeId + "-gone").update();
+
+        // Act
+        PageResult<Trade> expired = repository.findPage(true, 0, 1000);
+        PageResult<Trade> live = repository.findPage(false, 0, 1000);
+
+        // Assert
+        assertThat(expired.content()).allMatch(Trade::expired).extracting(Trade::tradeId).contains(tradeId + "-gone");
+        assertThat(live.content()).noneMatch(Trade::expired).extracting(Trade::tradeId).contains(tradeId + "-live");
     }
 }

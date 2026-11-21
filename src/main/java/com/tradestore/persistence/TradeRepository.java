@@ -29,4 +29,7 @@ public interface TradeRepository {
      * back to false (US-204.2). Callers repeat it while it returns a full batch.
      */
     List<Trade> markExpired(LocalDate today, int limit);
+
+    /** Stub: implemented test-first. */
+    PageResult<Trade> findPage(Boolean expired, int page, int size);
 }
