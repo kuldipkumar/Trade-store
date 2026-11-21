@@ -66,4 +66,15 @@ class AuditReportServiceTest {
         assertThat(report.page()).isEqualTo(1);
         assertThat(report.size()).isEqualTo(2);
     }
+
+    @Test
+    @Tag("US-502.4")
+    void should_capThePageSize_when_moreThanTheMaximumIsRequested() {
+        // Act: max-page-size is 100 (A-52: never everything at once)
+        AuditReport report = service.report(null, null, null, null, 0, 5000);
+
+        // Assert
+        verify(audit).find(new AuditQuery(null, null, null, null), 0, 100);
+        assertThat(report.size()).isEqualTo(100);
+    }
 }
