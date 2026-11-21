@@ -42,8 +42,9 @@ public class KafkaConfig {
     /**
      * The listener's error handler (ADR-002). A malformed message is never retried (A-27): it is published to the
      * dead-letter topic with Spring's diagnostic headers and audited as POISON (US-302). Anything else, for
-     * example the database briefly unavailable, is redelivered with exponential backoff (1 s, doubling to 10 s)
-     * until it succeeds, so no trade is dropped; the partition waits meanwhile. US-303 adds a retry limit.
+     * example the database briefly unavailable, is redelivered with exponential backoff (default 1 s, doubling
+     * to 10 s) up to {@code trade-store.retry.max-attempts} deliveries (default 3); the partition waits meanwhile.
+     * Then it is dead-lettered and audited as FAILED (US-303).
      */
     @Bean
     DefaultErrorHandler kafkaErrorHandler(KafkaOperations<?, ?> kafka, TradeStoreProperties properties,
@@ -62,8 +63,9 @@ public class KafkaConfig {
     }
 
     DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer, TradeStoreProperties.Retry retry) {
-        ExponentialBackOff backOff = new ExponentialBackOff(1_000, 2.0);
-        backOff.setMaxInterval(10_000);
+        ExponentialBackOff backOff = new ExponentialBackOff(retry.initialInterval().toMillis(), retry.multiplier());
+        backOff.setMaxInterval(retry.maxInterval().toMillis());
+        backOff.setMaxAttempts(retry.maxAttempts() - 1); // retries after the first delivery
         DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);
         handler.addNotRetryableExceptions(MalformedTradeException.class);
         return handler;
