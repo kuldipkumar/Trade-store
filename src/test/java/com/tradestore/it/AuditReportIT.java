@@ -3,6 +3,7 @@ package com.tradestore.it;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.client.EntityExchangeResult;
@@ -184,5 +186,13 @@ class AuditReportIT {
 
         // Assert: the client error is reported, not hidden behind a 406 or 500
         assertThat(response.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @Tag("US-503.1")
+    void should_allowLongExports_when_theDefaultAsyncTimeoutWouldCutThemOff(Environment environment) {
+        // Act + Assert: Tomcat's 30 s async default would truncate a large CSV (code review of PR #64)
+        assertThat(environment.getProperty("spring.mvc.async.request-timeout", Duration.class))
+                .isEqualTo(Duration.ofMinutes(30));
     }
 }
