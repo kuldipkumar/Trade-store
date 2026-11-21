@@ -10,6 +10,8 @@ import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.Violation;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** US-201: a maturity date before today (2026-11-19 in TestTrades) is rejected; today itself is valid (A-13). */
 class MaturityNotInPastValidatorTest {
@@ -28,5 +30,16 @@ class MaturityNotInPastValidatorTest {
             assertThat(v.field()).isEqualTo("maturityDate");
             assertThat(v.message()).contains("2026-11-18").contains("2026-11-19");
         });
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"2026-11-19", "2026-11-20", "2027-05-20"})
+    @Tag("US-201.2")
+    void should_reportNoViolation_when_maturityDateIsTodayOrLater(String maturityDate) {
+        // Act (the boundary: a maturity date equal to today is valid, A-13)
+        List<Violation> violations = validator.validate(contextFor(withMaturityDate(maturityDate)));
+
+        // Assert
+        assertThat(violations).isEmpty();
     }
 }
