@@ -13,7 +13,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties("trade-store")
 public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @DefaultValue Outbox outbox,
-                                   @DefaultValue Expiry expiry, @DefaultValue Api api) {
+                                   @DefaultValue Expiry expiry, @DefaultValue Api api, @DefaultValue Kafka kafka) {
 
     public TradeStoreProperties {
         audit = audit == null ? new Audit(Audit.DEFAULT_MAX_PAYLOAD_CHARS) : audit;
@@ -25,6 +25,7 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
                         Expiry.DEFAULT_STARTUP_RETRY_INTERVAL, Expiry.DEFAULT_STARTUP_MAX_ATTEMPTS)
                 : expiry;
         api = api == null ? new Api(Api.DEFAULT_MAX_REQUEST_BYTES, Api.DEFAULT_MAX_PAGE_SIZE) : api;
+        kafka = kafka == null ? new Kafka(Kafka.DEFAULT_TOPIC, Kafka.DEFAULT_PARTITIONS, Kafka.DEFAULT_REPLICATION_FACTOR) : kafka;
     }
 
     /** @param maxPayloadChars longer payloads are truncated in the audit trail (US-302.2, A-52) */
@@ -82,6 +83,28 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
             }
             if (maxPageSize < 1) {
                 throw new IllegalArgumentException("trade-store.api.max-page-size must be at least 1, was " + maxPageSize);
+            }
+        }
+    }
+
+    /**
+     * @param topic             the inbound trade topic (A-50)
+     * @param partitions        consumers scale up to this count (A-42). Never increase it on a live topic: it
+     *                          remaps keys to partitions and can reorder a trade's versions (A-22).
+     * @param replicationFactor broker copies of each partition
+     */
+    public record Kafka(@DefaultValue("trades.inbound") String topic, @DefaultValue("6") int partitions,
+                        @DefaultValue("1") short replicationFactor) {
+        static final String DEFAULT_TOPIC = "trades.inbound";
+        static final int DEFAULT_PARTITIONS = 6;
+        static final short DEFAULT_REPLICATION_FACTOR = 1;
+
+        public Kafka {
+            if (partitions < 1) {
+                throw new IllegalArgumentException("trade-store.kafka.partitions must be at least 1, was " + partitions);
+            }
+            if (replicationFactor < 1) {
+                throw new IllegalArgumentException("trade-store.kafka.replication-factor must be at least 1, was " + replicationFactor);
             }
         }
     }

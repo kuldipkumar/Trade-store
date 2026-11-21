@@ -1,5 +1,5 @@
 @startuml 05-seq-stream-ingestion
-title Kafka ingestion: happy path, business rejection, poison pill, transient failure
+title Kafka ingestion: happy path, business rejection, poison pill, transient failure\n(implemented: happy path, rejection, retry with backoff; dead-letter topic and POISON/FAILED audit: US-302/303)
 
 autonumber
 queue "trades.inbound" as Topic

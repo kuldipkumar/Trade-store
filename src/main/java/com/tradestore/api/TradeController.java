@@ -7,6 +7,7 @@ import com.tradestore.domain.Outcome;
 import com.tradestore.service.IngestionResult;
 import com.tradestore.service.TradeIngestionService;
 import com.tradestore.service.TradeQueryService;
+import com.tradestore.service.parsing.TradeJsonParser;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;

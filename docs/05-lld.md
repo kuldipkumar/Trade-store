@@ -35,17 +35,16 @@ Base package: `com.tradestore`. The structure follows AGENTS.md §7. Services de
 | `service.validation` | `TradeValidator` (interface) and 5 implementations | **One class per rule** (AGENTS.md §4): `MandatoryFieldsValidator`, `PositiveVersionValidator`, `MaturityDateFormatValidator`, `LowerVersionValidator`, `MaturityNotInPastValidator`. |
 | | `CompositeTradeValidator` | Runs every `TradeValidator` bean and collects all violations (A-15). A new rule is a new bean (Open/Closed). |
 | | `MaturityDates` | Strict `yyyy-MM-dd` parsing (`ResolverStyle.STRICT`, so `2026-02-30` is invalid). |
+| `service.parsing` | `TradeJsonParser`, `MalformedTradeException` | Strict trade JSON for both channels: text fields must be JSON strings, `version` a whole number; nothing is coerced. The original text is kept as the audit payload. |
 | `persistence` | `TradeRepository`, `OutboxRepository`, `AuditEventStore`, `TradeHistoryStore` | Ports (interfaces). |
 | `persistence.sql` | `JdbcTradeRepository`, `JdbcOutboxRepository` | `JdbcClient` adapters ([ADR-008](adr/008-plain-jdbc-for-postgresql.md)). |
 | `persistence.nosql` | `MongoAuditEventStore`, `MongoTradeHistoryStore` | `MongoTemplate` adapters. Insert-only. A duplicate key counts as success. |
-| `messaging` | `TradeConsumer` | `@KafkaListener`: maps `TradeMessage` to `TradeSubmission`, calls the service, catches business rejections. |
-| | `TradeMessage` (record) | Kafka value DTO. `@JsonIgnoreProperties(ignoreUnknown = true)` (US-607.2). |
+| `messaging` | `TradeConsumer` | `@KafkaListener` on `trades.inbound`: reads the message as **text**, parses it with the shared strict `TradeJsonParser` (raw text kept for the audit), calls the ingestion service. *Simplification of the original design (US-301): no custom deserializer; unparseable messages surface as `MalformedTradeException` in the listener and become poison pills in US-302.* |
 | | `SizeLimitedJsonDeserializer` | Rejects payloads over `kafka.max-message-bytes` before parsing. Wrapped by `ErrorHandlingDeserializer`. |
 | | `DeadLetterAuditRecoverer` | Publishes to the dead-letter topic (delegating to `DeadLetterPublishingRecoverer`), then writes the `POISON`/`FAILED` audit entry. |
-| | `KafkaConfig` | Topics (`NewTopic`), consumer factory, `DefaultErrorHandler` (backoff, non-retryable exceptions). |
+| | `KafkaConfig` | Topics (`NewTopic`: `trades.inbound`, from `trade-store.kafka.*`, default 6 partitions / 1 replica; **never increase partitions on a live topic**, it reorders keys) and the `DefaultErrorHandler`: `MalformedTradeException` not retried; other failures retried with exponential backoff (1 s → 10 s). Dead-letter topic and retry limit: US-302/303. |
 | | `KafkaHealthIndicator` | `describeCluster` with a timeout; part of the readiness group (US-604.1). |
 | `api` | `TradeController`, `AuditReportController` | HTTP endpoints (§6.1). |
-| | `TradeJsonParser`, `MalformedTradeException` | Strict trade JSON: text fields must be JSON strings, `version` a whole number; nothing is coerced. The original text is kept as the audit payload. Shared by REST (and the stream, US-301). |
 | | DTO records | `TradeResponse`, `TradeVersionResponse`, `PageResponse<T>`, `AuditReportResponse`, `ApiErrorResponse` (with `Reason`). |
 | | `GlobalExceptionHandler` | `@RestControllerAdvice`: one error shape, status mapping (§7). |
 | | `RequestSizeLimitFilter` | Returns 413 for bodies over `api.max-request-bytes`, by `Content-Length` and by counting streamed bytes (chunked requests). |

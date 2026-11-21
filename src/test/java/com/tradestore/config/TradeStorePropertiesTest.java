@@ -36,6 +36,9 @@ class TradeStorePropertiesTest {
         assertThat(properties.expiry().runAtStartup()).isTrue();
         assertThat(properties.api().maxRequestBytes()).isEqualTo(1_048_576L);
         assertThat(properties.api().maxPageSize()).isEqualTo(100);
+        assertThat(properties.kafka().topic()).isEqualTo("trades.inbound");
+        assertThat(properties.kafka().partitions()).isEqualTo(6);
+        assertThat(properties.kafka().replicationFactor()).isEqualTo((short) 1);
         assertThat(properties.expiry().startupRetryInterval()).isEqualTo(Duration.ofMinutes(1));
         assertThat(properties.expiry().startupMaxAttempts()).isEqualTo(10);
     }
@@ -99,5 +102,15 @@ class TradeStorePropertiesTest {
         assertThatThrownBy(() -> bind(Map.of("trade-store.api.max-page-size", value)))
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause().hasMessageContaining("max-page-size must be at least 1");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"trade-store.kafka.partitions", "trade-store.kafka.replication-factor"})
+    @Tag("A-42")
+    void should_failAtStartup_when_aKafkaCountIsBelowOne(String property) {
+        // Act + Assert: a clear configuration error instead of an obscure broker error at topic creation
+        assertThatThrownBy(() -> bind(Map.of(property, "0")))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause().hasMessageContaining("must be at least 1");
     }
 }

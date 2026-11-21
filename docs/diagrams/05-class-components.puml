@@ -29,11 +29,6 @@ package "api" {
     + noRoute(NoResourceFoundException) : 404
     + unexpected(Exception) : Spring client errors keep their 4xx; else 500
   }
-  class TradeJsonParser {
-    + parse(body : String, channel) : TradeSubmission
-  }
-  class MalformedTradeException
-  TradeJsonParser ..> MalformedTradeException : throws
   TradeController --> TradeJsonParser
   class RequestSizeLimitFilter <<OncePerRequestFilter>>
   class AuditCsvWriter
@@ -43,7 +38,7 @@ package "api" {
 
 package "messaging" {
   class TradeConsumer {
-    + onMessage(record : ConsumerRecord<String, TradeMessage>)
+    + onMessage(message : String)
   }
   class KafkaConfig {
     + errorHandler(...) : DefaultErrorHandler
@@ -160,6 +155,7 @@ TradeController --> TradeQueryService
 AuditReportController --> AuditReportService
 AuditReportController --> AuditCsvWriter
 TradeConsumer --> TradeIngestionService
+TradeConsumer --> TradeJsonParser
 KafkaConfig ..> DeadLetterAuditRecoverer
 DeadLetterAuditRecoverer --> AuditEventStore
 DeadLetterAuditRecoverer --> AuditEventFactory
@@ -193,6 +189,13 @@ TradeRepository ..> UpsertResult
 
 package "service.validation" {
   class CompositeTradeValidator
+}
+package "service.parsing" {
+  class TradeJsonParser {
+    + parse(body : String, channel) : TradeSubmission
+  }
+  class MalformedTradeException
+  TradeJsonParser ..> MalformedTradeException : throws
 }
 class Clock <<java.time>>
 
