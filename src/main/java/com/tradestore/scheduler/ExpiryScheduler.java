@@ -16,8 +16,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Runs the expiry job (US-202). A failed run is counted ({@code trade_job_failures_total{job="expiry"}}) and
- * logged at ERROR, never thrown: the next run, or the run at startup (US-203), catches up.
+ * Runs the expiry job: daily on the cron (US-202) and once at startup, off the startup thread (US-203). A failed
+ * run is counted ({@code trade_job_failures_total{job="expiry"}}) and logged at ERROR, never thrown. A failed
+ * startup run is retried every {@code startup-retry-interval}, up to {@code startup-max-attempts}; after that,
+ * and for a failed cron run, the next cron run catches up.
  */
 @Component
 public class ExpiryScheduler {
@@ -60,11 +62,11 @@ public class ExpiryScheduler {
     /** Default: daily at 00:05 in the configured zone, or the server's zone if none is set (A-18, US-205). */
     @Scheduled(cron = "${trade-store.expiry.cron:0 5 0 * * *}", zone = "${trade-store.time-zone:}")
     public void runScheduled() {
-        runOnce();
+        runOnce("cron");
     }
 
     private void startupAttempt(int attempt) {
-        if (runOnce()) {
+        if (runOnce("startup")) {
             return;
         }
         if (attempt >= startupMaxAttempts) {
@@ -76,14 +78,14 @@ public class ExpiryScheduler {
     }
 
     /** @return true if the run succeeded */
-    private boolean runOnce() {
+    private boolean runOnce(String source) {
         try {
             int expired = expiry.expireMaturedTrades();
-            log.info("Expiry run expired {} trades", expired);
+            log.info("Expiry run ({}) expired {} trades", source, expired);
             return true;
         } catch (RuntimeException e) {
             failures.increment();
-            log.error("Expiry run failed; the next run catches up", e);
+            log.error("Expiry run ({}) failed", source, e);
             return false;
         }
     }
