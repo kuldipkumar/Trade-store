@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -39,6 +39,11 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-105.3 | Full | `MaturityDateFormatValidatorTest`, `MaturityDatesTest` (strict format, impossible dates) | |
 | US-106.1 | Full | `JdbcTradeRepositoryIT`: deterministic races on real PostgreSQL in both orderings, the waiter identified with `pg_blocking_pids`: v2 waiting on v3 writes nothing (STALE → LOWER_VERSION in the service, US-106.2); v3 waiting on v2 replaces it. Each ordering is mutation-verified. | |
 | US-106.2 | Full | `TradeIngestionServiceTest`: re-validates after a lost race and retries once | |
+| US-107.1 | Full | `AssignmentScenarioIT` step 1: T1 v1 ACCEPTED, stored with createdDate 2026-11-19, expired N | |
+| US-107.2 | Full | `AssignmentScenarioIT` step 2: T2 v2 ACCEPTED | |
+| US-107.3 | Full | `AssignmentScenarioIT` step 3: T2 v1 → LowerVersionException; T2 stays v2 | |
+| US-107.4 | Full | `AssignmentScenarioIT` step 4: T3 v3 (maturity 2026-05-20) → MATURITY_IN_PAST; not stored | |
+| US-107.5 | Full | `AssignmentScenarioIT` step 5: clock to 2027-05-21, expiry → T1 and T2 expired; audit 2 ACCEPTED, 2 REJECTED, 2 EXPIRED (mutation-verified) | |
 | US-201.1 | Full | `MaturityNotInPastValidatorTest`, `TradeIngestionServiceTest` (rejected, not written, counted as `MATURITY_IN_PAST`) | |
 | US-201.2 | Full | `MaturityNotInPastValidatorTest`: today and later dates are valid (the boundary) | |
 | US-201.3 | Full | `TradeIngestionServiceTest`: v2 with past maturity is rejected and no write is attempted, so v1 stays | |
@@ -80,7 +85,7 @@ These criteria belong to stories already started, but no test covers them yet. T
 | Q2 | Integration tests used field `@Autowired` (AGENTS.md §8: constructor injection only) | Fixed: `junit-platform.properties` plus constructors |
 | Q3 | `ClockConfigTest` checked two inputs in one test (AGENTS.md §5: one behaviour per test) | Fixed: parameterized test |
 | Q4 | Inline fully-qualified class names in three tests | Fixed: imports |
-| Q5 | The end-to-end tests used the real system clock; US-107 and US-202 need to move "today". | Fixed in US-202: `MutableClock`, a `@Primary` test bean that tests pin and reset. |
+| Q5 | The end-to-end tests used the real system clock; US-107 and US-202 need to move "today". | Fixed in US-202: `MutableClock`, a `@Primary` test bean that tests pin and reset (used by `ExpiryIT` and `AssignmentScenarioIT`). |
 | Q6 | The traceability parser missed tests with multi-line annotations | Fixed test-first (`MultiLineAnnotationTest`) |
 
 ## Decision D8 (accepted: option A, 2026-11-20)
