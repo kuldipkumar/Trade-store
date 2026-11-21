@@ -56,4 +56,21 @@ class TradeApiIT {
         assertThat(trade.path("createdDate").asString()).isEqualTo(LocalDate.now(clock).toString());
         assertThat(trade.path("expired").asBoolean()).isFalse();
     }
+
+    @Test
+    @Tag("US-401.2")
+    void should_return200WithTheStoredTrade_when_aStoredTradeIsReplaced() {
+        // Arrange
+        post(json(1, "2099-05-20"));
+
+        // Act: the same version, then a higher one
+        EntityExchangeResult<JsonNode> same = post(json(1, "2099-05-20"));
+        EntityExchangeResult<JsonNode> higher = post(json(2, "2099-06-20"));
+
+        // Assert
+        assertThat(same.getStatus()).isEqualTo(HttpStatus.OK);
+        assertThat(higher.getStatus()).isEqualTo(HttpStatus.OK);
+        assertThat(higher.getResponseBody().path("version").asInt()).isEqualTo(2);
+        assertThat(higher.getResponseBody().path("maturityDate").asString()).isEqualTo("2099-06-20");
+    }
 }
