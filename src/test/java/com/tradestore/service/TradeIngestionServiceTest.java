@@ -346,4 +346,18 @@ class TradeIngestionServiceTest {
         assertThatThrownBy(() -> service.ingest(v2Past)).isExactlyInstanceOf(TradeRejectedException.class);
         verify(trades, never()).upsertIfNotOlder(any());
     }
+
+    @Test
+    @Tag("US-201.4")
+    void should_raiseOneLowerVersionExceptionWithBothReasons_when_lowerVersionAlsoHasAPastMaturity() {
+        // Arrange (A-15, US-104.4)
+        when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 2, false)));
+        TradeSubmission v1Past = new TradeSubmission("T1", 1, "CP-1", "B1", "2026-11-18", Channel.REST, "{}");
+
+        // Act + Assert
+        assertThatThrownBy(() -> service.ingest(v1Past))
+                .isInstanceOf(LowerVersionException.class)
+                .satisfies(e -> assertThat(((TradeRejectedException) e).reasons())
+                        .containsExactly(ReasonCode.LOWER_VERSION, ReasonCode.MATURITY_IN_PAST));
+    }
 }
