@@ -3,6 +3,7 @@ package com.tradestore.scheduler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.time.Clock;
@@ -98,6 +99,19 @@ class ExpiryScheduleConfigTest {
             // Assert: the run happens on the task scheduler, shortly after
             await().atMost(Duration.ofSeconds(5))
                     .untilAsserted(() -> verify(context.getBean(ExpiryService.class)).expireMaturedTrades());
+        });
+    }
+
+    @Test
+    @Tag("US-203.1")
+    void should_notRunAtStartup_when_runAtStartupIsSetToFalse() {
+        runner.withPropertyValues("trade-store.expiry.cron=-", "trade-store.expiry.run-at-startup=false").run(context -> {
+            // Act
+            publishApplicationReady(context);
+
+            // Assert: bound from the real property, nothing is scheduled or run
+            await().during(Duration.ofMillis(500)).atMost(Duration.ofSeconds(2))
+                    .untilAsserted(() -> verify(context.getBean(ExpiryService.class), never()).expireMaturedTrades());
         });
     }
 }

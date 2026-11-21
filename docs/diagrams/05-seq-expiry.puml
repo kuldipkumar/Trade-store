@@ -13,6 +13,12 @@ database PostgreSQL
 
 alt application started (US-203: catch up after downtime; trade-store.expiry.run-at-startup, default true)
   Spring -> ExpiryScheduler : onApplicationReady()
+  ExpiryScheduler -> ExpiryScheduler : TaskScheduler.schedule(startup attempt, now)\n(returns at once: readiness is not held up)
+  note right of ExpiryScheduler
+    A failed startup attempt is retried every startup-retry-interval
+    (default 1m), up to startup-max-attempts (default 10); then it logs
+    "gave up" at ERROR and the cron run is the fallback.
+  end note
 else cron fires (default "0 5 0 * * *" in the configured zone: US-202.4)
   Spring -> ExpiryScheduler : runScheduled()
 end
@@ -38,7 +44,7 @@ loop while the last batch was full (batch-size, default 1000)
   ExpiryService -> ExpiryService : count trade_outcomes_total{EXPIRED, SCHEDULER};\nlog INFO outcome=EXPIRED tradeId=… per trade
 end
 ExpiryService --> ExpiryScheduler : count
-ExpiryScheduler -> ExpiryScheduler : log INFO "Expiry run expired {count} trades"
+ExpiryScheduler -> ExpiryScheduler : log INFO "Expiry run (startup|cron) expired {count} trades"
 
 alt PostgreSQL unavailable
   PostgreSQL --> ExpiryService : DataAccessException

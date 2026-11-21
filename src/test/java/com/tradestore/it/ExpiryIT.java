@@ -10,15 +10,13 @@ import java.util.UUID;
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
 import com.tradestore.persistence.TradeRepository;
+import com.tradestore.scheduler.ExpiryScheduler;
 import com.tradestore.service.ExpiryService;
 import org.bson.Document;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -39,7 +37,7 @@ class ExpiryIT {
     private final MongoTemplate mongo;
     private final JdbcClient jdbc;
     private final MutableClock clock;
-    private final ConfigurableApplicationContext context;
+    private final ExpiryScheduler scheduler;
 
     private final String prefix = "T-" + UUID.randomUUID().toString().substring(0, 8);
     private final String maturedYesterday = prefix + "-18";
@@ -47,8 +45,8 @@ class ExpiryIT {
     private final String maturesTomorrow = prefix + "-20";
 
     ExpiryIT(ExpiryService expiry, TradeRepository trades, MongoTemplate mongo, JdbcClient jdbc, MutableClock clock,
-             ConfigurableApplicationContext context) {
-        this.context = context;
+             ExpiryScheduler scheduler) {
+        this.scheduler = scheduler;
         this.expiry = expiry;
         this.trades = trades;
         this.mongo = mongo;
@@ -131,11 +129,14 @@ class ExpiryIT {
     @Test
     @Tag("US-203.1")
     void should_expireTradesMaturedDuringDowntime_when_theServiceStarts() {
-        // Act: the application becomes ready (as after a restart over midnight)
-        context.publishEvent(new ApplicationReadyEvent(new SpringApplication(), new String[0], context, Duration.ZERO));
+        // Act: the startup hook, as after a restart over midnight (called directly: firing a second
+        // ApplicationReadyEvent into the shared context would re-run every other ready listener)
+        scheduler.onApplicationReady();
 
-        // Assert: no waiting for the next scheduled run (A-18, A-51)
-        assertThat(expired(maturedYesterday)).isTrue();
+        // Assert: expired shortly after startup, on the task scheduler, without waiting for the cron (A-18, A-51)
+        await().atMost(RELAY_TIMEOUT).untilAsserted(() -> assertThat(expired(maturedYesterday)).isTrue());
         assertThat(expired(maturesToday)).isFalse();
+        assertThat(expired(maturesTomorrow)).isFalse();
+        await().atMost(RELAY_TIMEOUT).untilAsserted(() -> assertThat(expiredAuditEntries(maturedYesterday)).isEqualTo(1));
     }
 }
