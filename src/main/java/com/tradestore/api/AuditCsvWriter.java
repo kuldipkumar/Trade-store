@@ -3,6 +3,7 @@ package com.tradestore.api;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.tradestore.domain.AuditEvent;
 
@@ -23,9 +24,18 @@ final class AuditCsvWriter {
     static void writeRow(AuditEvent event, Writer out) throws IOException {
         String reasons = event.reasons().stream().map(v -> v.reason() + ": " + v.message())
                 .collect(Collectors.joining(";"));
-        out.write(String.join(",", event.eventId(), String.valueOf(event.eventTimestamp()),
-                nullToEmpty(event.tradeId()), event.version() == null ? "" : event.version().toString(),
-                event.outcome().name(), event.channel().name(), reasons) + LINE_END);
+        out.write(Stream.of(event.eventId(), String.valueOf(event.eventTimestamp()), nullToEmpty(event.tradeId()),
+                        event.version() == null ? "" : event.version().toString(), event.outcome().name(),
+                        event.channel().name(), reasons)
+                .map(AuditCsvWriter::cell).collect(Collectors.joining(",")) + LINE_END);
+    }
+
+    /** RFC 4180: a field with a comma, quote or line break is quoted, and its quotes doubled. */
+    private static String cell(String value) {
+        if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 
     private static String nullToEmpty(String value) {
