@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -48,7 +48,8 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-202.3 | Full | `ExpiryIT` (EXPIRED entry in MongoDB through the relay), `ExpiryServiceTest`, `AuditEventFactoryTest` | |
 | US-202.4 | Full | `ExpiryScheduleConfigTest`: default `0 5 0 * * *`, an overridden cron, and the configured zone (00:05 in Kolkata = 18:35 UTC) | |
 | US-203.1 | Full | `ExpiryIT` (real context: the startup hook expires a trade that matured "during downtime", off the startup thread, and writes the EXPIRED entry), `ExpirySchedulerTest` (async hand-off, retry after the interval, give-up after max attempts, on/off), `ExpiryScheduleConfigTest` (ApplicationReadyEvent wiring; off switch via real property binding, mutation-verified) | |
-| US-204.1 | Partial | `JdbcTradeRepositoryIT`: the upsert clears `expired` | Service-level flow (expired v1 → v2 with maturity 2027-01-01 is stored with expired = N). Closed in **US-204**. |
+| US-204.1 | Full | `ExpiryIT`: expired v1 then v2 (maturity 2027-01-01) through the ingestion service → REPLACED and expired = N (mutation-verified); `JdbcTradeRepositoryIT` | |
+| US-204.2 | Full | `ExpiryIT`: an expired trade stays expired after the job runs, even if its maturity is not yet past (mutation-verified) | |
 | US-205.1 | Full | `ClockConfigTest` | |
 | US-205.2 | Full | `TradeIngestionServiceTest`: at 01:30 on 19 Nov in Asia/Kolkata (still 18 Nov in UTC) a trade maturing on 18 Nov is rejected; mutation-verified against a UTC "today" | |
 | US-302.2 | Partial | `AuditEventFactoryTest`: the payload is capped at the configured size | The POISON entry itself. Closed in **US-302**. |
