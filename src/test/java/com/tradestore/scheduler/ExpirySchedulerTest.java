@@ -50,7 +50,7 @@ class ExpirySchedulerTest {
         assertThatCode(scheduler::runScheduled).doesNotThrowAnyException();
         var failures = registry.find("trade.job.failures").tag("job", "expiry").counter();
         assertThat(failures == null ? 0 : failures.count()).isEqualTo(1.0);
-        assertThat(output).contains("ERROR").contains("Expiry run failed");
+        assertThat(output).contains("ERROR").contains("Expiry run (cron) failed");
     }
 
     @Test
@@ -79,7 +79,7 @@ class ExpirySchedulerTest {
         scheduler.runScheduled();
 
         // Assert (05-seq-expiry: log INFO "expired {count} trades")
-        assertThat(output).contains("Expiry run expired 3 trades");
+        assertThat(output).contains("Expiry run (cron) expired 3 trades");
     }
 
     @Test
@@ -144,5 +144,20 @@ class ExpirySchedulerTest {
         // Assert: no fourth attempt; the cron run remains the fallback
         assertThat(taskScheduler.scheduled).isEmpty();
         assertThat(output).contains("Startup expiry catch-up gave up after 3 attempts");
+    }
+
+    @Test
+    @Tag("US-604.3")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_tagTheLogLineAsStartup_when_theStartupRunSucceeds(CapturedOutput output) {
+        // Arrange
+        when(expiry.expireMaturedTrades()).thenReturn(4);
+        scheduler.onApplicationReady();
+
+        // Act
+        taskScheduler.runNext();
+
+        // Assert: startup and cron runs can be told apart in the log
+        assertThat(output).contains("Expiry run (startup) expired 4 trades");
     }
 }
