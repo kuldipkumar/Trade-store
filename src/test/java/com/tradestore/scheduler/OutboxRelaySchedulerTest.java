@@ -75,6 +75,7 @@ class OutboxRelaySchedulerTest {
         // Arrange: threshold 3
         when(relay.relayBatch()).thenThrow(new DataAccessResourceFailureException("MongoDB down"));
         when(outbox.pendingTradeIds(anyInt())).thenReturn(List.of("T1", "T2"));
+        when(outbox.backlog()).thenReturn(new OutboxBacklog(2, Optional.empty()));
 
         // Act + Assert: no ERROR yet after two failed polls
         scheduler.poll();

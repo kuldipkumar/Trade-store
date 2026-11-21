@@ -50,11 +50,20 @@ public class OutboxRelayScheduler {
         } catch (RuntimeException e) {
             failedPolls.increment();
             consecutiveFailures++;
-            if (consecutiveFailures % alertAfterFailedPolls == 0) {
-                log.error("Audit relay has failed for {} consecutive polls; outcomes are kept in the outbox and retried. "
-                        + "Trades waiting for their audit entries: {}", consecutiveFailures, outbox.pendingTradeIds(20));
-            }
             log.warn("Outbox relay failed; events stay in the outbox and are retried on the next poll: {}", e.toString());
+            if (consecutiveFailures % alertAfterFailedPolls == 0) {
+                log.error("Audit relay has failed for {} consecutive polls ({}); outcomes are kept in the outbox and "
+                        + "retried. {}", consecutiveFailures, e.toString(), waitingSummary());
+            }
+        }
+    }
+
+    /** What is waiting, for the outage alert; never throws (the database may be the thing that is down). */
+    private String waitingSummary() {
+        try {
+            return "waiting events: " + outbox.backlog().size() + "; trades: " + outbox.pendingTradeIds(20);
+        } catch (RuntimeException e) {
+            return "waiting trades unavailable: " + e.toString();
         }
     }
 }
