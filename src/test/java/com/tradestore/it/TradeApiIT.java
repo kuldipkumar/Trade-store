@@ -246,4 +246,29 @@ class TradeApiIT {
         assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("MALFORMED_REQUEST");
         assertThat(trades.findById(tradeId)).isEmpty();
     }
+
+    private EntityExchangeResult<JsonNode> get(String path) {
+        return rest.get().uri(path).exchange().expectBody(JsonNode.class).returnResult();
+    }
+
+    @Test
+    @Tag("US-402.1")
+    void should_return200WithTheLatestVersionAndAllFields_when_theTradeIsStored() {
+        // Arrange: v1 then v2
+        post(json(1, "2099-05-20"));
+        post(json(2, "2099-06-20"));
+
+        // Act
+        EntityExchangeResult<JsonNode> response = get("/trades/" + tradeId);
+
+        // Assert: v2, including createdDate and expired
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.OK);
+        JsonNode trade = response.getResponseBody();
+        assertThat(trade.path("tradeId").asString()).isEqualTo(tradeId);
+        assertThat(trade.path("version").asInt()).isEqualTo(2);
+        assertThat(trade.path("maturityDate").asString()).isEqualTo("2099-06-20");
+        assertThat(trade.path("createdDate").asString()).isEqualTo(LocalDate.now(clock).toString());
+        assertThat(trade.has("expired")).isTrue();
+        assertThat(trade.path("expired").asBoolean()).isFalse();
+    }
 }
