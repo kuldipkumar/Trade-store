@@ -45,7 +45,8 @@ Base package: `com.tradestore`. The structure follows AGENTS.md §7. Services de
 | | `KafkaConfig` | Topics (`NewTopic`), consumer factory, `DefaultErrorHandler` (backoff, non-retryable exceptions). |
 | | `KafkaHealthIndicator` | `describeCluster` with a timeout; part of the readiness group (US-604.1). |
 | `api` | `TradeController`, `AuditReportController` | HTTP endpoints (§6.1). |
-| | DTO records | `TradeRequest`, `TradeResponse`, `TradeVersionResponse`, `PageResponse<T>`, `AuditReportResponse`, `ApiErrorResponse`, `ReasonResponse`. |
+| | `TradeJsonParser`, `MalformedTradeException` | Strict trade JSON: text fields must be JSON strings, `version` a whole number; nothing is coerced. The original text is kept as the audit payload. Shared by REST (and the stream, US-301). |
+| | DTO records | `TradeResponse`, `TradeVersionResponse`, `PageResponse<T>`, `AuditReportResponse`, `ApiErrorResponse` (with `Reason`). |
 | | `GlobalExceptionHandler` | `@RestControllerAdvice`: one error shape, status mapping (§7). |
 | | `RequestSizeLimitFilter` | Returns 413 for bodies over `api.max-request-bytes`, by `Content-Length` and by counting streamed bytes (chunked requests). |
 | | `AuditCsvWriter` | Writes the CSV header and rows (RFC 4180 quoting). |
@@ -226,9 +227,10 @@ CREATE TABLE outbox_events (
 | `LOWER_VERSION` (and no invalid field) | `LowerVersionException` | **409** | Offset committed, no retry | `REJECTED` |
 | `MATURITY_IN_PAST` only | `TradeRejectedException` | **422** | Offset committed, no retry | `REJECTED` |
 | Unknown trade on the read side | `TradeNotFoundException` | 404 | n/a | n/a |
-| Database unavailable | `DataAccessException` | 503 | Retry with backoff, then DLT | `FAILED` (Kafka only) |
+| Database unavailable (no connection, transient or resource failure) | `CannotCreateTransactionException`, `TransientDataAccessException`, `DataAccessResourceFailureException` | 503, logged | Retry with backoff, then DLT | `FAILED` (Kafka only) |
+| Unsupported content type / method | `HttpMediaTypeNotSupportedException` / `HttpRequestMethodNotSupportedException` | 415 / 405 | n/a | n/a |
 | MongoDB unavailable during relay | `MongoException` | n/a | n/a | Delayed, never lost: rows stay in the outbox |
-| Anything else | `Exception` | 500 (generic message, logged with a correlation ID) | Retry, then DLT | `FAILED` |
+| Anything else, including permanent database errors | `Exception` | 500 `INTERNAL_ERROR` (generic message, logged with stack trace) | Retry, then DLT | `FAILED` |
 
 **Status precedence when a trade breaks several rules:** 400 (the request itself must be fixed) > 409 > 422. The response always lists **all** reasons.
 

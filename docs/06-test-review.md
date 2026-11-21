@@ -62,10 +62,10 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-401.2 | Full | `TradeApiIT`: same and higher version → 200 with the stored trade | |
 | US-401.3 | Full | `TradeApiIT`: 409 with `{timestamp, status, error, reasons[], path}` naming both versions | |
 | US-401.4 | Full | `TradeApiIT`: 422 with MATURITY_IN_PAST | |
-| US-401.5 | Full | `TradeApiIT`: invalid fields → 400 listing them; malformed JSON → 400 MALFORMED_REQUEST; invalid fields plus a lower version → 400 with both reasons (D6) | |
-| US-401.6 | Full | `TradeApiIT` (1.1 MB body → 413), `RequestSizeLimitFilterTest` (chunked bodies counted while read), `GlobalExceptionHandlerTest` (413 also when wrapped by the JSON parser) | |
+| US-401.5 | Full | `TradeApiIT`: invalid fields → 400 listing them; malformed JSON or a wrong JSON type (version 1.9) → 400 MALFORMED_REQUEST, nothing stored; invalid fields plus a lower version → 400 with both reasons (D6); 415 and 405 in the standard shape. `TradeJsonParserTest` (strict types) | |
+| US-401.6 | Full | `TradeApiIT` (1.1 MB body → 413), `RequestSizeLimitFilterTest` (chunked bodies counted while read, through `getReader()` and repeated `getInputStream()` too), `GlobalExceptionHandlerTest` (413 also when wrapped), `TradeStorePropertiesTest` (limit must be positive) | |
 | US-404.1 | Partial | `MongoStoresIT`: ordered by version, then received time | `GET /trades/{id}/history`. Closed in **US-404**. |
-| US-501.1 | Partial | `MongoStoresIT`, `AuditEventFactoryTest`, `JdbcOutboxRepositoryIT`, `OutboxRelayServiceTest`, `StoreTradeIT` (all the fields) | Proven for the REST channel value only. Closed by **US-301** (the STREAM channel). |
+| US-501.1 | Partial | `MongoStoresIT`, `AuditEventFactoryTest`, `JdbcOutboxRepositoryIT`, `OutboxRelayServiceTest`, `StoreTradeIT` (all the fields); `TradeApiIT` (the payload is exactly the body the REST client sent) | Proven for the REST channel. Closed by **US-301** (the STREAM channel). |
 | US-501.2 | Full | `AuditTrailImmutabilityTest`: the audit and history ports and their MongoDB implementations offer only insert and read operations (mutation-verified) | |
 | US-501.3 | Full | `OutboxRelayServiceTest` (failed batch kept), `OutboxRelaySchedulerTest` (each failure counted; ERROR with waiting trade IDs every N consecutive failures; reset on success), `JdbcOutboxRepositoryIT` (`pendingTradeIds`) | |
 | US-603.1 | Full | `@IntegrationTest` + `TestcontainersConfiguration`; every `*IT` runs on real Kafka, PostgreSQL and MongoDB | |
