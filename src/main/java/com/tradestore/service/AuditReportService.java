@@ -39,10 +39,7 @@ public class AuditReportService {
      */
     public AuditReport report(LocalDate from, LocalDate to, String tradeId, Outcome outcome, int page, int size) {
         int pageSize = Math.min(size, maxPageSize);
-        ZoneId zone = clock.getZone();
-        AuditQuery query = new AuditQuery(from == null ? null : from.atStartOfDay(zone).toInstant(),
-                to == null ? null : to.plusDays(1).atStartOfDay(zone).toInstant(),
-                tradeId == null || tradeId.isBlank() ? null : tradeId, outcome);
+        AuditQuery query = query(from, to, tradeId, outcome);
         Map<Outcome, Long> summary = audit.countByOutcome(query);
         long total = summary.values().stream().mapToLong(Long::longValue).sum();
         return new AuditReport(summary, audit.find(query, page, pageSize), page, pageSize, total,
@@ -51,6 +48,14 @@ public class AuditReportService {
 
     /** Every matching entry, oldest first, read lazily (US-503); the caller must close the stream. */
     public Stream<AuditEvent> stream(LocalDate from, LocalDate to, String tradeId, Outcome outcome) {
-        return Stream.empty();
+        return audit.stream(query(from, to, tradeId, outcome));
+    }
+
+    /** Inclusive local dates in the configured zone (A-53) as [from 00:00, to+1 00:00); blank tradeId = no filter. */
+    private AuditQuery query(LocalDate from, LocalDate to, String tradeId, Outcome outcome) {
+        ZoneId zone = clock.getZone();
+        return new AuditQuery(from == null ? null : from.atStartOfDay(zone).toInstant(),
+                to == null ? null : to.plusDays(1).atStartOfDay(zone).toInstant(),
+                tradeId == null || tradeId.isBlank() ? null : tradeId, outcome);
     }
 }
