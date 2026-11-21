@@ -158,7 +158,7 @@ CREATE TABLE outbox_events (
 | `GET /trades/{tradeId}` | | `200 TradeResponse` | 404 |
 | `GET /trades?expired={bool}&page=0&size=20` | `size` capped at `api.max-page-size` (100); `page ≥ 0`, `size ≥ 1` | `200 PageResponse<TradeResponse>` sorted by `tradeId` (`COLLATE "C"`, code-point order); page and total from one query (`count(*) OVER ()`) | 400 `INVALID_PARAMETER` |
 | `GET /trades/{tradeId}/history` | | `200 [TradeVersionResponse]` sorted by version, then received time | 404 |
-| `GET /reports/audit?from&to&tradeId&outcome&page&size` | `from`/`to`: local dates, inclusive, in the configured zone | `200 AuditReportResponse` (JSON) or `text/csv` (by `Accept`) | 400 |
+| `GET /reports/audit?from&to&tradeId&outcome&page&size` | All optional. `from`/`to`: local dates, inclusive, in the configured zone (queried as `[from 00:00, to+1 00:00)`); `size` default 50, capped at `api.max-page-size`; entries oldest first; `summary` and `totalElements` come from one `$group` aggregation | `200 AuditReportResponse` (JSON) or `text/csv` (by `Accept`) | 400 |
 
 ```jsonc
 // TradeRequest (and the Kafka TradeMessage): unknown fields are ignored
@@ -179,7 +179,8 @@ CREATE TABLE outbox_events (
 { "summary": { "ACCEPTED": 2, "REJECTED": 2, "EXPIRED": 2 },
   "entries": [ { "eventId": "…", "tradeId": "T2", "version": 1, "outcome": "REJECTED",
                  "reasons": [ { "reason": "LOWER_VERSION", "field": "version", "message": "…" } ],
-                 "channel": "REST", "eventTimestamp": "2026-11-19T10:15:30Z", "payload": "{…}" } ],
+                 "channel": "REST", "eventTimestamp": "2026-11-19T10:15:30Z", "payload": "{…}",
+                 "error": null } ],                // error: set for POISON / FAILED only
   "page": 0, "size": 50, "totalElements": 6, "totalPages": 1 }
 
 // ApiErrorResponse (every error)
