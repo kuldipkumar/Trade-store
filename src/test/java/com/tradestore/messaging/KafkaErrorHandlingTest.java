@@ -25,6 +25,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.kafka.support.serializer.DeserializationException;
 import org.springframework.messaging.converter.MessageConversionException;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.transaction.CannotCreateTransactionException;
+import static org.mockito.Mockito.verifyNoInteractions;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.listener.ListenerExecutionFailedException;
@@ -80,9 +84,9 @@ class KafkaErrorHandlingTest {
     @Test
     @Tag("US-303.2")
     @Tag("US-303.3")
-    void should_recoverOnTheConfiguredAttempt_when_aTransientFailurePersists() {
-        // Arrange
-        DataAccessResourceFailureException down = new DataAccessResourceFailureException("PostgreSQL down");
+    void should_recoverOnTheConfiguredAttempt_when_aFailureOtherThanConnectivityPersists() {
+        // Arrange: not a connection problem, so waiting longer would not help (D9)
+        InvalidDataAccessResourceUsageException down = new InvalidDataAccessResourceUsageException("relation missing");
 
         // Act: max-attempts 3 = the first delivery and two retries
         boolean first = fail(down);
@@ -154,5 +158,26 @@ class KafkaErrorHandlingTest {
 
         // Assert
         assertThat(registry.find("trade.retries").counter()).isNull();
+    }
+
+    static Stream<Exception> connectionFailures() {
+        return Stream.of(new DataAccessResourceFailureException("PostgreSQL down"),
+                new CannotCreateTransactionException("no connection"), new QueryTimeoutException("timed out"),
+                new RuntimeException("wrapped", new DataAccessResourceFailureException("PostgreSQL down")));
+    }
+
+    @ParameterizedTest
+    @MethodSource("connectionFailures")
+    @Tag("US-303.1")
+    @Tag("US-303.2")
+    void should_keepRetryingAndNeverDeadLetter_when_theDatabaseIsUnreachable(Exception failure) {
+        // Act: well past max-attempts (3)
+        for (int attempt = 1; attempt <= 10; attempt++) {
+            assertThat(fail(failure)).isFalse();
+        }
+
+        // Assert: D9 option C, no trade is dead-lettered because of an outage; every retry is visible
+        verifyNoInteractions(recoverer);
+        assertThat(registry.counter("trade.retries").count()).isEqualTo(10.0);
     }
 }
