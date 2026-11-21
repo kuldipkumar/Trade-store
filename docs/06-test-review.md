@@ -118,3 +118,15 @@ These criteria belong to stories already started, but no test covers them yet. T
 |--------|---------|
 | **A (chosen)** | Reword US-501.3: *"the audit write is retried until it succeeds; an outage longer than N polls is logged at ERROR with the affected trade IDs, and the outbox backlog gauges (US-604) show it"*. Implement it test-first in US-501. |
 | B | Keep the wording and add an ERROR log with trade IDs on every failed poll (noisy during an outage). |
+
+## Decision D9 (open: needs a product decision, raised 2026-11-21)
+
+**D9 (US-303 retry window).** C-28/A-28 agreed on "3 attempts with exponential backoff", which is what's implemented: 1 s, then 2 s. A database outage longer than about 3 s therefore dead-letters every trade consumed during it as `FAILED`. Replaying the DLT later can turn those into `LOWER_VERSION` rejections if newer versions of the same trade were stored in the meantime. The `/code-review` of PR #62 flagged this against the story's goal that brief outages don't lose trades.
+
+| Option | What it means | Trade-off |
+|---|---|---|
+| **A. Keep the default, configurable (current)** | 3 deliveries, 1 s ×2 up to 10 s. Operators can raise `trade-store.retry.max-attempts` | Matches the agreed assumption. Short window by default |
+| B. Longer default window | For example 10 deliveries up to 30 s (about 3–4 minutes in total) | Covers a database restart. A partition waits longer behind a message that will never succeed |
+| C. Never dead-letter connection failures | Retry `DataAccessResourceFailureException` and `CannotCreateTransactionException` indefinitely (as before US-303); other errors keep the limit | No trade is lost to an outage, and ordering is kept. A long outage stalls the stream, but that is visible in lag and `trade_retries_total` |
+
+**Recommendation: C.** It is the only option that keeps every trade and the per-key ordering through an outage. The limit still applies to failures that aren't about connectivity. Option A stays in place until you decide.

@@ -40,7 +40,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * as FAILED. The SQL store is a spy that fails on demand. Short backoff so the test runs quickly (US-303.3).
  */
 @IntegrationTest
-@TestPropertySource(properties = {"trade-store.retry.initial-interval=100ms", "trade-store.retry.max-interval=200ms"})
+// Startup expiry is off: it would call the spied repository on another thread while @BeforeEach stubs it, and
+// Mockito stubbing is not thread-safe (the stub could land on markExpired instead).
+@TestPropertySource(properties = {"trade-store.retry.initial-interval=100ms", "trade-store.retry.max-interval=200ms",
+        "trade-store.expiry.run-at-startup=false"})
 class RetryThenDeadLetterIT {
 
     private static final String TOPIC = "trades.inbound";
