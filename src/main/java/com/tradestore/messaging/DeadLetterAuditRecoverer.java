@@ -27,5 +27,6 @@ public class DeadLetterAuditRecoverer implements ConsumerRecordRecoverer {
 
     @Override
     public void accept(ConsumerRecord<?, ?> record, Exception exception) {
+        publisher.accept(record, exception);
     }
 }
