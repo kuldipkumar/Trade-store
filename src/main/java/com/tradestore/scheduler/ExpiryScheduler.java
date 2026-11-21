@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -24,6 +25,8 @@ public class ExpiryScheduler {
         this.failures = registry.counter("trade.job.failures", "job", "expiry");
     }
 
+    /** Default: daily at 00:05 in the configured zone, or the server's zone if none is set (A-18, US-205). */
+    @Scheduled(cron = "${trade-store.expiry.cron:0 5 0 * * *}", zone = "${trade-store.time-zone:}")
     public void runScheduled() {
         try {
             expiry.expireMaturedTrades();
