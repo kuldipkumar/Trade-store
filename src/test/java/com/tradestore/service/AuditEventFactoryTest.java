@@ -119,4 +119,14 @@ class AuditEventFactoryTest {
         // Assert
         assertThat(event.payload()).isEqualTo("x".repeat(20));
     }
+
+    @Test
+    @Tag("US-302.2")
+    void should_capTheErrorAtTheConfiguredSize_when_itCarriesALongMessage() {
+        // Act: some exception messages embed the whole message (code review of PR #61)
+        AuditEvent event = factory.deadLettered("t-0-1", Outcome.POISON, "p", "e".repeat(25));
+
+        // Assert
+        assertThat(event.error()).isEqualTo("e".repeat(20));
+    }
 }
