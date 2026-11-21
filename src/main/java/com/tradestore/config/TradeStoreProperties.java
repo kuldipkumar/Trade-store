@@ -101,14 +101,17 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
      */
     public record Kafka(@DefaultValue("trades.inbound") String topic, @DefaultValue("6") int partitions,
                         @DefaultValue("1") short replicationFactor, String dltTopic,
-                        @DefaultValue("1") int maxMessageBytes) {
-        static final int DEFAULT_MAX_MESSAGE_BYTES = 1;
+                        @DefaultValue("1048576") int maxMessageBytes) {
+        static final int DEFAULT_MAX_MESSAGE_BYTES = 1_048_576;
         static final String DEFAULT_TOPIC = "trades.inbound";
         static final int DEFAULT_PARTITIONS = 6;
         static final short DEFAULT_REPLICATION_FACTOR = 1;
 
         public Kafka {
             dltTopic = dltTopic == null || dltTopic.isBlank() ? topic + ".DLT" : dltTopic;
+            if (maxMessageBytes < 1) {
+                throw new IllegalArgumentException("trade-store.kafka.max-message-bytes must be positive, was " + maxMessageBytes);
+            }
             if (partitions < 1) {
                 throw new IllegalArgumentException("trade-store.kafka.partitions must be at least 1, was " + partitions);
             }

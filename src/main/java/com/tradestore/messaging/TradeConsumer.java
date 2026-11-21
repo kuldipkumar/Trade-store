@@ -7,6 +7,8 @@ import com.tradestore.service.parsing.MalformedTradeException;
 import com.tradestore.service.parsing.TradeJsonParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.nio.charset.StandardCharsets;
+
 import com.tradestore.config.TradeStoreProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -45,6 +47,10 @@ public class TradeConsumer {
     public void onMessage(@Payload(required = false) String message) {
         if (message == null || message.isBlank()) {
             throw new MalformedTradeException("The message is empty");
+        }
+        // Checked before parsing so an oversized message costs nothing more (US-607.1, A-47).
+        if (message.length() > maxMessageBytes || message.getBytes(StandardCharsets.UTF_8).length > maxMessageBytes) {
+            throw new MalformedTradeException("The message is larger than " + maxMessageBytes + " bytes");
         }
         try {
             ingestion.ingest(parser.parse(message, Channel.STREAM));
