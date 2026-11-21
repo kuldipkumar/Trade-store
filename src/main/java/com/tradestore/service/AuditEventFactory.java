@@ -53,7 +53,7 @@ public class AuditEventFactory {
      * keyed by its position, {@code topic-partition-offset}, which makes a repeated recovery idempotent (D5).
      */
     public AuditEvent deadLettered(String position, Outcome outcome, String payload, String error) {
-        return new AuditEvent(position, null, null, outcome, List.of(), Channel.STREAM, clock.instant(), payload, null,
+        return new AuditEvent(position, null, null, outcome, List.of(), Channel.STREAM, clock.instant(), cap(payload), null,
                 error);
     }
 
