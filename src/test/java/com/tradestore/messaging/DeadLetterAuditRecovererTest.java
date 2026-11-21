@@ -2,9 +2,11 @@ package com.tradestore.messaging;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 
 import java.time.Clock;
@@ -28,6 +30,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.mockito.ArgumentCaptor;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.ListenerExecutionFailedException;
 
@@ -95,5 +98,17 @@ class DeadLetterAuditRecovererTest {
         assertThat(registry.counter("trade.deadletter", "type", "POISON").count()).isEqualTo(1.0);
         assertThat(output).contains("WARN").contains("outcome=POISON position=trades.inbound-3-42")
                 .contains("MalformedTradeException").doesNotContain("{bad");
+    }
+
+    @Test
+    @Tag("US-302.1")
+    void should_propagateAndNotAudit_when_theDeadLetterPublishFails() {
+        // Arrange: Kafka refuses the dead-letter record
+        doThrow(new KafkaException("DLT unavailable")).when(publisher).accept(any(), any());
+
+        // Act + Assert: the container keeps the offset uncommitted and redelivers later; nothing is recorded yet
+        assertThatThrownBy(() -> recoverer.accept(record, failure)).isInstanceOf(KafkaException.class);
+        verifyNoInteractions(audit);
+        assertThat(registry.find("trade.deadletter").counter()).isNull();
     }
 }
