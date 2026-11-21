@@ -15,3 +15,4 @@ One entry per story that is completed, tested, peer-reviewed and merged. The sam
 | 9 | US-106 Concurrent updates to the same trade are safe | 2026-11-21 | #50 | 2 of 2 | /code-review: 2 important + 3 nits fixed |
 | 10 | US-202 Mark matured trades as expired automatically | 2026-11-21 | #51 | 4 of 4 | /code-review: 2 important + 4 nits fixed |
 | 11 | US-203 Catch up on expiry at startup | 2026-11-21 | #52 | 1 of 1 | /code-review: 2 important + 4 nits fixed |
+| 12 | US-204 Replace an expired trade with a valid version | 2026-11-21 | #53 | 2 of 2 | /code-review: 3 nits fixed |
