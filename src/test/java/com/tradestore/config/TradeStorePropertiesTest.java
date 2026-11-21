@@ -90,4 +90,14 @@ class TradeStorePropertiesTest {
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause().hasMessageContaining("max-request-bytes must be positive");
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-5"})
+    @Tag("US-403.1")
+    void should_failAtStartup_when_maxPageSizeIsBelowOne(String value) {
+        // Act + Assert: otherwise every list is empty (0) or fails in SQL (negative LIMIT)
+        assertThatThrownBy(() -> bind(Map.of("trade-store.api.max-page-size", value)))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause().hasMessageContaining("max-page-size must be at least 1");
+    }
 }
