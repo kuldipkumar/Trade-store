@@ -17,7 +17,7 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
 
     public TradeStoreProperties {
         audit = audit == null ? new Audit(Audit.DEFAULT_MAX_PAYLOAD_CHARS) : audit;
-        outbox = outbox == null ? new Outbox(Outbox.DEFAULT_POLL_INTERVAL, Outbox.DEFAULT_BATCH_SIZE) : outbox;
+        outbox = outbox == null ? new Outbox(Outbox.DEFAULT_POLL_INTERVAL, Outbox.DEFAULT_BATCH_SIZE, 0) : outbox; // stub
         expiry = expiry == null
                 ? new Expiry(Expiry.DEFAULT_BATCH_SIZE, Expiry.DEFAULT_RUN_AT_STARTUP,
                         Expiry.DEFAULT_STARTUP_RETRY_INTERVAL, Expiry.DEFAULT_STARTUP_MAX_ATTEMPTS)
@@ -33,7 +33,8 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
      * @param pollInterval delay between relay runs; also read by OutboxRelayScheduler's @Scheduled
      * @param batchSize    maximum events relayed per run
      */
-    public record Outbox(@DefaultValue("1s") Duration pollInterval, @DefaultValue("500") int batchSize) {
+    public record Outbox(@DefaultValue("1s") Duration pollInterval, @DefaultValue("500") int batchSize,
+                         int alertAfterFailedPolls) {
         static final Duration DEFAULT_POLL_INTERVAL = Duration.ofSeconds(1);
         static final int DEFAULT_BATCH_SIZE = 500;
     }
