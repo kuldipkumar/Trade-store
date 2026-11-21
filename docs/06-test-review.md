@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -42,6 +42,7 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-201.4 | Full | `TradeIngestionServiceTest` (one `LowerVersionException` carrying both reasons), `ValidatorWiringTest` (order in the real context), `TradeRejectedExceptionTest` | |
 | US-204.1 | Partial | `JdbcTradeRepositoryIT`: the upsert clears `expired` | Service-level flow (expired v1 → v2 with maturity 2027-01-01 is stored with expired = N). Closed in **US-204**. |
 | US-205.1 | Full | `ClockConfigTest` | |
+| US-205.2 | Full | `TradeIngestionServiceTest`: at 01:30 on 19 Nov in Asia/Kolkata (still 18 Nov in UTC) a trade maturing on 18 Nov is rejected; mutation-verified against a UTC "today" | |
 | US-302.2 | Partial | `AuditEventFactoryTest`: the payload is capped at the configured size | The POISON entry itself. Closed in **US-302**. |
 | US-404.1 | Partial | `MongoStoresIT`: ordered by version, then received time | `GET /trades/{id}/history`. Closed in **US-404**. |
 | US-501.1 | Partial | `MongoStoresIT`, `AuditEventFactoryTest`, `JdbcOutboxRepositoryIT`, `OutboxRelayServiceTest`, `StoreTradeIT` (all the fields) | Proven for the REST channel value only. Closed by **US-301** (the STREAM channel). |
