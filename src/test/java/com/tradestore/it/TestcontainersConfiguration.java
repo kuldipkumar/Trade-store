@@ -4,7 +4,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import java.time.ZoneId;
+
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.testcontainers.mongodb.MongoDBContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -44,5 +47,12 @@ public class TestcontainersConfiguration {
     @ServiceConnection
     KafkaContainer kafkaContainer() {
         return new KafkaContainer(DockerImageName.parse(KAFKA_IMAGE)).withLogConsumer(logsOf("kafka"));
+    }
+
+    /** Replaces the application's Clock in ITs so a test can pin "today" (see MutableClock). */
+    @Bean
+    @Primary
+    MutableClock testClock() {
+        return new MutableClock(ZoneId.systemDefault());
     }
 }
