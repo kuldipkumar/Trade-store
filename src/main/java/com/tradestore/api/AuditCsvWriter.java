@@ -22,8 +22,9 @@ final class AuditCsvWriter {
     }
 
     static void writeRow(AuditEvent event, Writer out) throws IOException {
-        String reasons = event.reasons().stream().map(v -> v.reason() + ": " + v.message())
-                .collect(Collectors.joining(";"));
+        // POISON and FAILED entries have no violations; their cause is the reason.
+        String reasons = event.reasons().isEmpty() && event.error() != null ? event.error()
+                : event.reasons().stream().map(v -> v.reason() + ": " + v.message()).collect(Collectors.joining(";"));
         out.write(Stream.of(event.eventId(), String.valueOf(event.eventTimestamp()), nullToEmpty(event.tradeId()),
                         event.version() == null ? "" : event.version().toString(), event.outcome().name(),
                         event.channel().name(), reasons)

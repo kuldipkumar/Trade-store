@@ -10,6 +10,8 @@ import java.util.stream.Stream;
 import com.tradestore.domain.AuditEvent;
 import com.tradestore.domain.Outcome;
 import com.tradestore.service.AuditReportService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -22,6 +24,8 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 /** The audit report on demand: JSON, paged (US-502), or CSV, streamed (US-503); same filters. */
 @RestController
 public class AuditReportController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuditReportController.class);
 
     private final AuditReportService reports;
 
@@ -57,11 +61,17 @@ public class AuditReportController {
         Stream<AuditEvent> opened = reports.stream(from, to, tradeId, outcome);
         StreamingResponseBody body = output -> {
             Writer out = new BufferedWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8));
+            long rows = 0;
             try (Stream<AuditEvent> events = opened) {
                 AuditCsvWriter.writeHeader(out);
                 for (AuditEvent event : (Iterable<AuditEvent>) events::iterator) {
                     AuditCsvWriter.writeRow(event, out);
+                    rows++;
                 }
+            } catch (RuntimeException failed) {
+                // Already 200: rethrowing aborts the chunked transfer, so the client sees an incomplete download.
+                log.error("CSV export failed after {} rows: {}", rows, failed.toString());
+                throw failed;
             }
             out.flush();
         };
