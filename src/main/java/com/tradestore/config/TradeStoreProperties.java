@@ -13,7 +13,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties("trade-store")
 public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @DefaultValue Outbox outbox,
-                                   @DefaultValue Expiry expiry, @DefaultValue Api api) {
+                                   @DefaultValue Expiry expiry, @DefaultValue Api api, @DefaultValue Kafka kafka) {
 
     public TradeStoreProperties {
         audit = audit == null ? new Audit(Audit.DEFAULT_MAX_PAYLOAD_CHARS) : audit;
@@ -25,6 +25,7 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
                         Expiry.DEFAULT_STARTUP_RETRY_INTERVAL, Expiry.DEFAULT_STARTUP_MAX_ATTEMPTS)
                 : expiry;
         api = api == null ? new Api(Api.DEFAULT_MAX_REQUEST_BYTES, Api.DEFAULT_MAX_PAGE_SIZE) : api;
+        kafka = kafka == null ? new Kafka(null, 0, (short) 0) : kafka; // stub: implemented test-first
     }
 
     /** @param maxPayloadChars longer payloads are truncated in the audit trail (US-302.2, A-52) */
@@ -84,5 +85,9 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
                 throw new IllegalArgumentException("trade-store.api.max-page-size must be at least 1, was " + maxPageSize);
             }
         }
+    }
+
+    /** Stub: implemented test-first. */
+    public record Kafka(String topic, int partitions, short replicationFactor) {
     }
 }
