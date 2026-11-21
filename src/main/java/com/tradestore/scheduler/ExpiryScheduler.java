@@ -8,9 +8,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class ExpiryScheduler {
 
+    private final ExpiryService expiry;
+
     public ExpiryScheduler(ExpiryService expiry, MeterRegistry registry) {
+        this.expiry = expiry;
     }
 
     public void runScheduled() {
+        expiry.expireMaturedTrades();
     }
 }
