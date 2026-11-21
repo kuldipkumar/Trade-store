@@ -54,7 +54,7 @@ public class AuditEventFactory {
      */
     public AuditEvent deadLettered(String position, Outcome outcome, String payload, String error) {
         return new AuditEvent(position, null, null, outcome, List.of(), Channel.STREAM, clock.instant(), cap(payload), null,
-                error);
+                cap(error));
     }
 
     private String cap(String payload) {
