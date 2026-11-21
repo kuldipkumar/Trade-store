@@ -95,4 +95,15 @@ class TradeApiIT {
         assertThat(error.path("reasons").get(0).path("field").asString()).isEqualTo("version");
         assertThat(error.path("reasons").get(0).path("message").asString()).contains("version 1").contains("stored version 2");
     }
+
+    @Test
+    @Tag("US-401.4")
+    void should_return422_when_theMaturityDateIsInThePast() {
+        // Act: yesterday, relative to the application's own clock
+        EntityExchangeResult<JsonNode> response = post(json(1, LocalDate.now(clock).minusDays(1).toString()));
+
+        // Assert
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("MATURITY_IN_PAST");
+    }
 }
