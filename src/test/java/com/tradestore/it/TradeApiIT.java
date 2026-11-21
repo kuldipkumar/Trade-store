@@ -296,4 +296,29 @@ class TradeApiIT {
         assertThat(response.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("NOT_FOUND");
     }
+
+    @Test
+    @Tag("US-402.1")
+    void should_return406NotServerError_when_theClientAcceptsOnlyXml() {
+        // Arrange
+        post(json(1, "2099-05-20"));
+
+        // Act
+        var response = rest.get().uri("/trades/" + tradeId).accept(MediaType.APPLICATION_XML).exchange()
+                .returnResult(String.class);
+
+        // Assert: a client error, not a 500
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.NOT_ACCEPTABLE);
+    }
+
+    @Test
+    @Tag("US-402.2")
+    void should_return404_when_anUnknownPathIsPosted() {
+        // Act
+        EntityExchangeResult<JsonNode> response = rest.post().uri("/no-such-path").contentType(MediaType.APPLICATION_JSON)
+                .body("{}").exchange().expectBody(JsonNode.class).returnResult();
+
+        // Assert: not 405 from the static-resource handler
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
 }
