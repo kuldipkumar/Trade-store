@@ -2,10 +2,13 @@ package com.tradestore.service;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Map;
 
 import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.domain.Outcome;
 import com.tradestore.persistence.AuditEventStore;
+import com.tradestore.persistence.AuditQuery;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +36,10 @@ public class AuditReportService {
      * @param to   last local date included; null for no upper bound
      */
     public AuditReport report(LocalDate from, LocalDate to, String tradeId, Outcome outcome, int page, int size) {
-        return null;
+        ZoneId zone = clock.getZone();
+        AuditQuery query = new AuditQuery(from == null ? null : from.atStartOfDay(zone).toInstant(),
+                to == null ? null : to.plusDays(1).atStartOfDay(zone).toInstant(), tradeId, outcome);
+        Map<Outcome, Long> summary = audit.countByOutcome(query);
+        return new AuditReport(summary, audit.find(query, page, size), page, size, 0, 0);
     }
 }
