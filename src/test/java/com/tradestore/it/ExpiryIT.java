@@ -7,11 +7,16 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import com.tradestore.domain.Channel;
+import com.tradestore.domain.Outcome;
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
+import com.tradestore.domain.TradeSubmission;
 import com.tradestore.persistence.TradeRepository;
 import com.tradestore.scheduler.ExpiryScheduler;
 import com.tradestore.service.ExpiryService;
+import com.tradestore.service.IngestionResult;
+import com.tradestore.service.TradeIngestionService;
 import org.bson.Document;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +43,7 @@ class ExpiryIT {
     private final JdbcClient jdbc;
     private final MutableClock clock;
     private final ExpiryScheduler scheduler;
+    private final TradeIngestionService ingestion;
 
     private final String prefix = "T-" + UUID.randomUUID().toString().substring(0, 8);
     private final String maturedYesterday = prefix + "-18";
@@ -45,8 +51,9 @@ class ExpiryIT {
     private final String maturesTomorrow = prefix + "-20";
 
     ExpiryIT(ExpiryService expiry, TradeRepository trades, MongoTemplate mongo, JdbcClient jdbc, MutableClock clock,
-             ExpiryScheduler scheduler) {
+             ExpiryScheduler scheduler, TradeIngestionService ingestion) {
         this.scheduler = scheduler;
+        this.ingestion = ingestion;
         this.expiry = expiry;
         this.trades = trades;
         this.mongo = mongo;
@@ -138,5 +145,38 @@ class ExpiryIT {
         assertThat(expired(maturesToday)).isFalse();
         assertThat(expired(maturesTomorrow)).isFalse();
         await().atMost(RELAY_TIMEOUT).untilAsserted(() -> assertThat(expiredAuditEntries(maturedYesterday)).isEqualTo(1));
+    }
+
+    private void markExpiredDirectly(String tradeId) {
+        jdbc.sql("UPDATE trades SET expired = true WHERE trade_id = ?").param(tradeId).update();
+    }
+
+    @Test
+    @Tag("US-204.1")
+    void should_storeTheNewVersionAsLive_when_anExpiredTradeIsReplacedByAValidVersion() {
+        // Arrange: v1 is stored and expired
+        expiry.expireMaturedTrades();
+        assertThat(expired(maturedYesterday)).isTrue();
+
+        // Act: v2 with maturity 2027-01-01 (A-09)
+        IngestionResult result = ingestion.ingest(
+                new TradeSubmission(maturedYesterday, 2, "CP-1", "B1", "2027-01-01", Channel.REST, "{}"));
+
+        // Assert: replaced, and live again (A-19: only a new valid version resets expired)
+        assertThat(result.outcome()).isEqualTo(Outcome.REPLACED);
+        assertThat(trades.findById(maturedYesterday)).contains(new StoredTrade(maturedYesterday, 2, false));
+    }
+
+    @Test
+    @Tag("US-204.2")
+    void should_neverSetExpiredBackToN_when_theJobRunsOnAnExpiredTrade() {
+        // Arrange: a trade already marked expired, even one whose maturity is not yet past
+        markExpiredDirectly(maturesTomorrow);
+
+        // Act
+        expiry.expireMaturedTrades();
+
+        // Assert
+        assertThat(expired(maturesTomorrow)).isTrue();
     }
 }
