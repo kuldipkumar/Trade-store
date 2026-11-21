@@ -53,9 +53,11 @@ public class GlobalExceptionHandler {
                 request);
     }
 
-    /** Stub: implemented test-first. */
+    /** Database unavailable (decision D7): nothing was stored or audited, so the client may retry. */
+    @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ApiErrorResponse> unavailable(DataAccessException e, HttpServletRequest request) {
-        return null;
+        return error(HttpStatus.SERVICE_UNAVAILABLE, List.of(new ApiErrorResponse.Reason("SERVICE_UNAVAILABLE", null,
+                "The trade store is temporarily unavailable; nothing was stored. Please retry.")), request);
     }
 
     static HttpStatus statusOf(TradeRejectedException e) {
