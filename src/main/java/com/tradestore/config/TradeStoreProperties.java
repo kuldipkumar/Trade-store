@@ -18,7 +18,7 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
     public TradeStoreProperties {
         audit = audit == null ? new Audit(Audit.DEFAULT_MAX_PAYLOAD_CHARS) : audit;
         outbox = outbox == null ? new Outbox(Outbox.DEFAULT_POLL_INTERVAL, Outbox.DEFAULT_BATCH_SIZE) : outbox;
-        expiry = expiry == null ? new Expiry(0) : expiry; // stub default: implemented test-first
+        expiry = expiry == null ? new Expiry(Expiry.DEFAULT_BATCH_SIZE) : expiry;
     }
 
     /** @param maxPayloadChars longer payloads are truncated in the audit trail (US-302.2, A-52) */
@@ -35,7 +35,11 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
         static final int DEFAULT_BATCH_SIZE = 500;
     }
 
-    /** Stub: implemented test-first. */
-    public record Expiry(int batchSize) {
+    /**
+     * @param batchSize maximum trades expired per transaction, so a large backlog (e.g. after downtime) never
+     *                  locks every matured trade at once (US-202, US-203)
+     */
+    public record Expiry(@DefaultValue("1000") int batchSize) {
+        static final int DEFAULT_BATCH_SIZE = 1000;
     }
 }
