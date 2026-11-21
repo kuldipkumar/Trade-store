@@ -7,6 +7,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +37,7 @@ public class ExpiryScheduler {
     }
 
     /** Catches up once at startup, so trades that matured while the service was down are not left stale (US-203). */
+    @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         if (runAtStartup) {
             runScheduled();
