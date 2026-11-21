@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.persistence.TradeRepository;
+import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.bson.Document;
 import org.junit.jupiter.api.Tag;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerProperties;
 
@@ -33,11 +35,13 @@ class StreamIngestionIT {
     private final MongoTemplate mongo;
     private final KafkaListenerEndpointRegistry registry;
     private final ConsumerFactory<?, ?> consumerFactory;
+    private final KafkaAdmin kafkaAdmin;
 
     private final String tradeId = "K-" + UUID.randomUUID();
 
     StreamIngestionIT(KafkaTemplate<String, String> kafka, TradeRepository trades, MongoTemplate mongo,
-                      KafkaListenerEndpointRegistry registry, ConsumerFactory<?, ?> consumerFactory) {
+                      KafkaListenerEndpointRegistry registry, ConsumerFactory<?, ?> consumerFactory, KafkaAdmin kafkaAdmin) {
+        this.kafkaAdmin = kafkaAdmin;
         this.registry = registry;
         this.consumerFactory = consumerFactory;
         this.kafka = kafka;
@@ -101,5 +105,17 @@ class StreamIngestionIT {
         assertThat(consumerConfig.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG)).isIn(false, "false");
         assertThat(container.getContainerProperties().getAckMode())
                 .isIn(ContainerProperties.AckMode.BATCH, ContainerProperties.AckMode.RECORD);
+    }
+
+    @Test
+    @Tag("A-42")
+    void should_declareTheInboundTopicWithSixPartitions_when_theApplicationStarts() throws Exception {
+        // Act
+        try (AdminClient admin = AdminClient.create(kafkaAdmin.getConfigurationProperties())) {
+            var description = admin.describeTopics(java.util.List.of(TOPIC)).allTopicNames().get().get(TOPIC);
+
+            // Assert: consumers scale up to the partition count (A-42)
+            assertThat(description.partitions()).hasSize(6);
+        }
     }
 }
