@@ -16,7 +16,8 @@ import org.springframework.context.annotation.Import;
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+// The daily expiry cron is off in ITs: tests run expiry explicitly, and a cron run at 00:05 could race them.
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "trade-store.expiry.cron=-")
 @AutoConfigureMetrics // tests disable metrics exporters by default; we verify the real setup
 @AutoConfigureRestTestClient
 @Import(TestcontainersConfiguration.class)
