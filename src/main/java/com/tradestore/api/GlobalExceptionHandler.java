@@ -41,6 +41,13 @@ public class GlobalExceptionHandler {
         return error(statusOf(e), e.violations().stream().map(ApiErrorResponse.Reason::from).toList(), request);
     }
 
+    /** Not a trade JSON object, or a field of the wrong JSON type: not a trade, so not audited (decision D3). */
+    @ExceptionHandler(MalformedTradeException.class)
+    public ResponseEntity<ApiErrorResponse> malformed(MalformedTradeException e, HttpServletRequest request) {
+        return error(HttpStatus.BAD_REQUEST, List.of(new ApiErrorResponse.Reason("MALFORMED_REQUEST", null, e.getMessage())),
+                request);
+    }
+
     /** Malformed JSON or wrong JSON types: not a trade, so not audited (decision D3). */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> unreadable(HttpMessageNotReadableException e, HttpServletRequest request) {
