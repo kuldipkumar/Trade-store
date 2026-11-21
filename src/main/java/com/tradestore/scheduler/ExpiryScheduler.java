@@ -27,6 +27,7 @@ public class ExpiryScheduler {
     private final ExpiryService expiry;
     private final Counter failures;
     private final boolean runAtStartup;
+    private final TaskScheduler taskScheduler;
 
     @Autowired
     public ExpiryScheduler(ExpiryService expiry, MeterRegistry registry, TaskScheduler taskScheduler,
@@ -40,13 +41,15 @@ public class ExpiryScheduler {
         this.expiry = expiry;
         this.failures = registry.counter("trade.job.failures", "job", "expiry");
         this.runAtStartup = runAtStartup;
+        this.taskScheduler = taskScheduler;
     }
 
     /** Catches up once at startup, so trades that matured while the service was down are not left stale (US-203). */
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         if (runAtStartup) {
-            runScheduled();
+            // Off the startup thread: Spring reports readiness only after ready-event listeners return.
+            taskScheduler.schedule(this::runScheduled, taskScheduler.getClock().instant());
         }
     }
 
