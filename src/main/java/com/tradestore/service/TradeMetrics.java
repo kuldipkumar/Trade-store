@@ -25,12 +25,13 @@ public class TradeMetrics {
         }
     }
 
-    /** Stub: implemented test-first. */
+    /** Starts measuring one ingestion; uses the registry's monotonic clock, not wall time. */
     public Timer.Sample startProcessing() {
         return Timer.start(registry);
     }
 
-    /** Stub: implemented test-first. */
+    /** Ends a {@link #startProcessing()} measurement: the trade.processing timer, tagged by channel. */
     public void stopProcessing(Timer.Sample sample, Channel channel) {
+        sample.stop(registry.timer("trade.processing", "channel", channel.name()));
     }
 }
