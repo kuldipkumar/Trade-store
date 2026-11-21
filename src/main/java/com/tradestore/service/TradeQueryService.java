@@ -40,11 +40,13 @@ public class TradeQueryService {
      * Every accepted version, ordered by version and then received time (US-404). Eventually consistent: a
      * version appears once the outbox relay has copied it to MongoDB (ADR-005).
      *
-     * @throws TradeNotFoundException if no history exists for this ID
+     * A trade that is stored but not yet relayed has an empty history, not a 404.
+     *
+     * @throws TradeNotFoundException if neither history nor a stored trade exists for this ID
      */
     public List<TradeHistoryEntry> history(String tradeId) {
         List<TradeHistoryEntry> entries = history.findByTradeId(tradeId);
-        if (entries.isEmpty()) {
+        if (entries.isEmpty() && trades.findTrade(tradeId).isEmpty()) {
             throw new TradeNotFoundException(tradeId);
         }
         return entries;
