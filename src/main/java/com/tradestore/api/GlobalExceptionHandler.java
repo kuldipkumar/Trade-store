@@ -40,6 +40,11 @@ public class GlobalExceptionHandler {
                 request);
     }
 
+    /** Stub: implemented test-first. */
+    public ResponseEntity<ApiErrorResponse> tooLarge(PayloadTooLargeException e, HttpServletRequest request) {
+        return null;
+    }
+
     static HttpStatus statusOf(TradeRejectedException e) {
         if (e.reasons().contains(ReasonCode.INVALID_FIELD)) {
             return HttpStatus.BAD_REQUEST;
