@@ -43,7 +43,7 @@ class DeadLetterAuditRecovererTest {
     private final AuditEventStore audit = mock(AuditEventStore.class);
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final DeadLetterAuditRecoverer recoverer = new DeadLetterAuditRecoverer(publisher,
-            new AuditEventFactory(Clock.fixed(NOW, ZoneOffset.UTC), new TradeStoreProperties(null, null, null, null, null, null)),
+            new AuditEventFactory(Clock.fixed(NOW, ZoneOffset.UTC), new TradeStoreProperties(null, null, null, null, null, null, null)),
             audit, registry);
 
     private final ConsumerRecord<String, String> record = new ConsumerRecord<>("trades.inbound", 3, 42L, "T1", "{bad");

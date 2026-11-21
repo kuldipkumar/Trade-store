@@ -68,6 +68,20 @@ class TradeStorePropertiesTest {
     }
 
     @Test
+    @Tag("US-303.3")
+    void should_useTheDocumentedRetryDefaultsAndConfiguredValues_when_bound() {
+        // Act
+        TradeStoreProperties.Retry defaults = bind(Map.of()).retry();
+        TradeStoreProperties.Retry configured = bind(Map.of("trade-store.retry.max-attempts", "5",
+                "trade-store.retry.initial-interval", "200ms", "trade-store.retry.multiplier", "3",
+                "trade-store.retry.max-interval", "30s")).retry();
+
+        // Assert
+        assertThat(defaults).isEqualTo(new TradeStoreProperties.Retry(3, Duration.ofSeconds(1), 2.0, Duration.ofSeconds(10)));
+        assertThat(configured).isEqualTo(new TradeStoreProperties.Retry(5, Duration.ofMillis(200), 3.0, Duration.ofSeconds(30)));
+    }
+
+    @Test
     @Tag("A-50")
     void should_useConfiguredValues_when_propertiesAreSet() {
         // Act

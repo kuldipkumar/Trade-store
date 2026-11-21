@@ -21,7 +21,7 @@ class ClockConfigTest {
     @Tag("US-205.1")
     void should_useServerDefaultZone_when_noZoneIsConfigured(String zone) {
         // Act
-        ZoneId actual = config.clock(new TradeStoreProperties(zone, null, null, null, null, null)).getZone();
+        ZoneId actual = config.clock(new TradeStoreProperties(zone, null, null, null, null, null, null)).getZone();
 
         // Assert
         assertThat(actual).isEqualTo(ZoneId.systemDefault());
@@ -31,6 +31,6 @@ class ClockConfigTest {
     @Tag("US-205.1")
     void should_useConfiguredZone_when_zoneIsSet() {
         // Act + Assert
-        assertThat(config.clock(new TradeStoreProperties("Asia/Kolkata", null, null, null, null, null)).getZone()).isEqualTo(ZoneId.of("Asia/Kolkata"));
+        assertThat(config.clock(new TradeStoreProperties("Asia/Kolkata", null, null, null, null, null, null)).getZone()).isEqualTo(ZoneId.of("Asia/Kolkata"));
     }
 }
