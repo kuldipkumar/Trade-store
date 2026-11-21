@@ -17,3 +17,4 @@ One entry per story that is completed, tested, peer-reviewed and merged. The sam
 | 11 | US-203 Catch up on expiry at startup | 2026-11-21 | #52 | 1 of 1 | /code-review: 2 important + 4 nits fixed |
 | 12 | US-204 Replace an expired trade with a valid version | 2026-11-21 | #53 | 2 of 2 | /code-review: 3 nits fixed |
 | 13 | US-107 Assignment example scenario | 2026-11-21 | #54 | 5 of 5 | /code-review: 1 important + 5 nits fixed |
+| 14 | US-401 Submit a trade over REST | 2026-11-21 | #56 | 6 of 6 | /code-review: 7 important + 3 nits fixed |
