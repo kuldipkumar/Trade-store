@@ -4,6 +4,9 @@ import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.persistence.AuditEventStore;
 import com.tradestore.service.AuditEventFactory;
 import com.tradestore.service.parsing.MalformedTradeException;
+import java.sql.SQLException;
+import java.sql.SQLNonTransientConnectionException;
+import java.sql.SQLTransientConnectionException;
 import java.util.List;
 import java.util.function.BiFunction;
 
@@ -15,8 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.dao.TransientDataAccessException;
+import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
@@ -99,11 +101,21 @@ public class KafkaConfig {
         return backOff;
     }
 
-    /** The database is unreachable or briefly unable to answer, anywhere in the cause chain (same set as REST 503). */
+    /** SQLStates meaning the connection is gone: class 08, and 57P01-57P03 (server shutting down or restarting). */
+    private static final List<String> CONNECTION_SQL_STATES = List.of("57P01", "57P02", "57P03");
+
+    /**
+     * The database is unreachable (D9 option C), anywhere in the cause chain: no connection could be obtained, or
+     * the connection was lost. Errors that repeat with a healthy database (timeouts, deadlocks, limits) are not.
+     */
     static boolean isConnectionFailure(Throwable failure) {
         for (Throwable t = failure; t != null; t = t.getCause() == t ? null : t.getCause()) {
-            if (t instanceof DataAccessResourceFailureException || t instanceof TransientDataAccessException
-                    || t instanceof CannotCreateTransactionException) {
+            if (t instanceof CannotCreateTransactionException || t instanceof CannotGetJdbcConnectionException
+                    || t instanceof SQLTransientConnectionException || t instanceof SQLNonTransientConnectionException) {
+                return true;
+            }
+            if (t instanceof SQLException sql && sql.getSQLState() != null
+                    && (sql.getSQLState().startsWith("08") || CONNECTION_SQL_STATES.contains(sql.getSQLState()))) {
                 return true;
             }
         }
@@ -127,12 +139,14 @@ public class KafkaConfig {
         limited.setMaxAttempts(retry.maxAttempts() - 1); // retries after the first delivery
         DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, limited);
         NOT_RETRYABLE.forEach(handler::addNotRetryableExceptions);
+        // An outage wins over a not-retryable type deeper in its cause chain (classification looks at the top first).
+        handler.addRetryableExceptions(CannotCreateTransactionException.class, CannotGetJdbcConnectionException.class);
         // D9 option C: the database being unreachable is waited out, never dead-lettered; the partition pauses.
         ExponentialBackOff unlimited = backOff(retry);
         handler.setBackOffFunction((record, failure) -> isConnectionFailure(failure) ? unlimited : null);
         handler.setRetryListeners((record, failure, attempt) -> {
             // Called for every failed delivery; count only those that will be redelivered (AGENTS.md section 4).
-            if (!isUnreadable(failure) && (isConnectionFailure(failure) || attempt < retry.maxAttempts())) {
+            if (isConnectionFailure(failure) || (!isUnreadable(failure) && attempt < retry.maxAttempts())) {
                 registry.counter("trade.retries").increment();
                 log.warn("Retrying position={}-{}-{} attempt={}{}: {}", record.topic(), record.partition(),
                         record.offset(), attempt, isConnectionFailure(failure) ? " (until the database is back)"
