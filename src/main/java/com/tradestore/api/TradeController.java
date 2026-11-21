@@ -1,6 +1,7 @@
 package com.tradestore.api;
 
 import com.tradestore.domain.Channel;
+import com.tradestore.domain.Outcome;
 import com.tradestore.domain.TradeSubmission;
 import com.tradestore.service.IngestionResult;
 import com.tradestore.service.TradeIngestionService;
@@ -30,6 +31,7 @@ public class TradeController {
         TradeSubmission submission = new TradeSubmission(request.tradeId(), request.version(), request.counterPartyId(),
                 request.bookId(), request.maturityDate(), Channel.REST, json.writeValueAsString(request));
         IngestionResult result = ingestion.ingest(submission);
-        return ResponseEntity.status(HttpStatus.CREATED).body(TradeResponse.from(result.trade()));
+        HttpStatus status = result.outcome() == Outcome.ACCEPTED ? HttpStatus.CREATED : HttpStatus.OK;
+        return ResponseEntity.status(status).body(TradeResponse.from(result.trade()));
     }
 }
