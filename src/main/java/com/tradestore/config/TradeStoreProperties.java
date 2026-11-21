@@ -136,6 +136,13 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
             if (multiplier < 1) {
                 throw new IllegalArgumentException("trade-store.retry.multiplier must be at least 1, was " + multiplier);
             }
+            if (!initialInterval.isPositive()) {
+                throw new IllegalArgumentException("trade-store.retry.initial-interval must be positive, was " + initialInterval);
+            }
+            if (maxInterval.compareTo(initialInterval) < 0) {
+                throw new IllegalArgumentException("trade-store.retry.max-interval must be at least initial-interval ("
+                        + initialInterval + "), was " + maxInterval);
+            }
         }
     }
 }
