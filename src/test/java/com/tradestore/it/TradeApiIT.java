@@ -353,4 +353,21 @@ class TradeApiIT {
         assertThat(response.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("NOT_FOUND");
     }
+
+    @Test
+    @Tag("US-404.1")
+    void should_orderSameVersionsByReceivedTime_when_aVersionWasResent() {
+        // Arrange: v1, v1 again (a correction), then v2
+        post(json(1, "2099-05-20"));
+        post(json(1, "2099-05-21"));
+        post(json(2, "2099-06-20"));
+
+        // Act + Assert: by version, then by received time
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            JsonNode versions = get("/trades/" + tradeId + "/history").getResponseBody();
+            assertThat(versions.findValues("version")).extracting(JsonNode::asInt).containsExactly(1, 1, 2);
+            assertThat(versions.findValuesAsString("maturityDate")).containsExactly("2099-05-20", "2099-05-21", "2099-06-20");
+            assertThat(versions.findValuesAsString("receivedTimestamp")).isSorted();
+        });
+    }
 }

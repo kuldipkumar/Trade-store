@@ -97,4 +97,16 @@ class TradeQueryServiceTest {
         // Act + Assert
         assertThatThrownBy(() -> service.history("T9")).isInstanceOf(TradeNotFoundException.class);
     }
+
+    @Test
+    @Tag("US-404.2")
+    void should_returnAnEmptyHistoryNotNotFound_when_theTradeExistsButIsNotYetRelayed() {
+        // Arrange: stored in PostgreSQL, history not yet copied to MongoDB (ADR-005)
+        when(history.findByTradeId("T1")).thenReturn(List.of());
+        when(trades.findTrade("T1")).thenReturn(Optional.of(
+                new Trade("T1", 1, "CP-1", "B1", LocalDate.of(2027, 5, 20), LocalDate.of(2026, 11, 19), false)));
+
+        // Act + Assert: 404 is only for an unknown trade
+        assertThat(service.history("T1")).isEmpty();
+    }
 }
