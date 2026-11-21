@@ -22,7 +22,7 @@ Base package: `com.tradestore`. The structure follows AGENTS.md §7. Services de
 | | `StoredTrade` (record) | The minimal stored view used by validation: `tradeId`, `version`, `expired`. |
 | | `Violation` (record), `ReasonCode` (enum) | One broken rule: `reason`, `field`, `message`. |
 | | `Outcome`, `Channel` (enums) | `ACCEPTED, REPLACED, REJECTED, EXPIRED, POISON, FAILED`; `STREAM, REST, SCHEDULER`. |
-| | `AuditEvent` (record), `DeadLetterSource` (record) | One audit-trail entry (the outbox payload and the MongoDB document). |
+| | `AuditEvent` (record) | One audit-trail entry (the outbox payload and the MongoDB document). `error` is set only for `POISON`/`FAILED`; their `eventId` is the message's `topic-partition-offset` (§6.3). *The planned `DeadLetterSource` record was not needed: the position is the ID and the DLT headers carry the rest.* |
 | | `TradeRejectedException`, `LowerVersionException` | One exception per rejected trade, carrying all violations (§3). |
 | | `TradeNotFoundException` | Unknown `tradeId` on the read side (404). |
 | `service` | `TradeIngestionService` | The single use case for both channels (§4.1). Owns the transaction. |
@@ -39,10 +39,10 @@ Base package: `com.tradestore`. The structure follows AGENTS.md §7. Services de
 | `persistence` | `TradeRepository`, `OutboxRepository`, `AuditEventStore`, `TradeHistoryStore` | Ports (interfaces). |
 | `persistence.sql` | `JdbcTradeRepository`, `JdbcOutboxRepository` | `JdbcClient` adapters ([ADR-008](adr/008-plain-jdbc-for-postgresql.md)). |
 | `persistence.nosql` | `MongoAuditEventStore`, `MongoTradeHistoryStore` | `MongoTemplate` adapters. Insert-only. A duplicate key counts as success. |
-| `messaging` | `TradeConsumer` | `@KafkaListener` on `trades.inbound`: reads the message as **text**, parses it with the shared strict `TradeJsonParser` (raw text kept for the audit), calls the ingestion service. *Simplification of the original design (US-301): no custom deserializer; unparseable messages surface as `MalformedTradeException` in the listener and become poison pills in US-302.* |
-| | `SizeLimitedJsonDeserializer` | Rejects payloads over `kafka.max-message-bytes` before parsing. Wrapped by `ErrorHandlingDeserializer`. |
-| | `DeadLetterAuditRecoverer` | Publishes to the dead-letter topic (delegating to `DeadLetterPublishingRecoverer`), then writes the `POISON`/`FAILED` audit entry. |
-| | `KafkaConfig` | Topics (`NewTopic`: `trades.inbound`, from `trade-store.kafka.*`, default 6 partitions / 1 replica; **never increase partitions on a live topic**, it reorders keys) and the `DefaultErrorHandler`: `MalformedTradeException` not retried; other failures retried with exponential backoff (1 s → 10 s). Dead-letter topic and retry limit: US-302/303. |
+| `messaging` | `TradeConsumer` | `@KafkaListener` on `trades.inbound`: reads the message as **text**, parses it with the shared strict `TradeJsonParser` (raw text kept for the audit), calls the ingestion service. *Simplification of the original design (US-301): no custom deserializer; unparseable messages surface as `MalformedTradeException` in the listener and are dead-lettered as poison pills (US-302).* |
+| | `SizeLimitedJsonDeserializer` (US-607) | Rejects payloads over `kafka.max-message-bytes` before parsing. Wrapped by `ErrorHandlingDeserializer`. |
+| | `DeadLetterAuditRecoverer` | Publishes to the dead-letter topic (delegating to `DeadLetterPublishingRecoverer`, same partition number), then counts `trade.deadletter{type}`, logs one WARN line (`outcome=POISON position=… error=<class>`, no payload) and writes the audit entry directly to MongoDB (not through the outbox: there is no trade transaction). A failed publish propagates (offset not committed, redelivered); a failed audit write is logged at ERROR, not thrown. `POISON` now; `FAILED` with US-303. |
+| | `KafkaConfig` | Topics (`NewTopic`: `trades.inbound` and `trades.inbound.DLT` with the same partition count, from `trade-store.kafka.*`, default 6 partitions / 1 replica; **never increase partitions on a live topic**, it reorders keys) and the `DefaultErrorHandler`: `MalformedTradeException` not retried; other failures retried with exponential backoff (1 s → 10 s). Retry limit: US-303. |
 | | `KafkaHealthIndicator` | `describeCluster` with a timeout; part of the readiness group (US-604.1). |
 | `api` | `TradeController`, `AuditReportController` | HTTP endpoints (§6.1). |
 | | DTO records | `TradeResponse`, `TradeVersionResponse`, `PageResponse<T>`, `AuditReportResponse`, `ApiErrorResponse` (with `Reason`). |
@@ -291,7 +291,7 @@ Test names follow `should_<behaviour>_when_<condition>` and reference the AC ID 
 | US-204 Replace an expired trade | Upsert sets `expired = false`; expiry never resets it | state, seq-expiry |
 | US-205 Time zone | `ClockConfig`, `TradeStoreProperties.timeZone`, cron `zone` | seq-trade-ingestion |
 | US-301 Consume from stream | `TradeConsumer`, `TradeMessage`, `KafkaConfig` | seq-stream-ingestion |
-| US-302 Poison pills | `SizeLimitedJsonDeserializer`, `ErrorHandlingDeserializer`, `DeadLetterAuditRecoverer` | seq-stream-ingestion |
+| US-302 Poison pills | `TradeConsumer` (`MalformedTradeException`), `KafkaConfig` (DLT topic, error handler), `DeadLetterAuditRecoverer`, `AuditEventFactory.deadLettered` | seq-stream-ingestion |
 | US-303 Retry then dead-letter | `DefaultErrorHandler` + `ExponentialBackOff`, `DeadLetterAuditRecoverer` | seq-stream-ingestion |
 | US-304 Rejections final on stream | `TradeConsumer` catches `TradeRejectedException` | seq-stream-ingestion |
 | US-401 Submit over REST | `TradeController`, `GlobalExceptionHandler`, `RequestSizeLimitFilter` | seq-rest-submit |

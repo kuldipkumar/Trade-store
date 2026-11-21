@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301; US-304). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301; US-304; US-302). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -60,10 +60,11 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-301.1 | Full | `StreamIngestionIT` (published → stored and audited as STREAM, real Kafka), `TradeConsumerTest` | |
 | US-301.2 | Full | `StreamIngestionIT`: v1, v2, v3 keyed by tradeId → v3 stored, no REJECTED | |
 | US-301.3 | Full | `StreamIngestionIT`: no auto-commit; the container commits after the listener returns (mutation-verified) | |
-| US-302.1 | Partial | `KafkaErrorHandlingTest` (malformed → recovered at once, no retries), `TradeConsumerTest` (empty message is malformed) | The dead-letter topic and the valid-trade-still-stored check come with **US-302**. |
+| US-302.1 | Full | `PoisonPillIT` (non-JSON then a valid trade on the same key, real Kafka: the trade is stored and the pill is on `trades.inbound.DLT`), `KafkaErrorHandlingTest` (malformed → recovered at once, no retries), `DeadLetterAuditRecovererTest` (published first; a failed publish propagates and nothing is audited, mutation-verified; counted and logged at WARN without the payload), `TradeConsumerTest` (empty message is malformed) | |
 | US-303.1 | Partial | `KafkaErrorHandlingTest` (a transient database failure is retried, not recovered) | End to end with a failing store: **US-303**. |
 | US-304.1 | Full | `StreamIngestionIT` (a lower version consumed → exactly one REJECTED, stays one; v2 still stored), `TradeConsumerTest` | |
-| US-302.2 | Partial | `AuditEventFactoryTest`: the payload is capped at the configured size | The POISON entry itself. Closed in **US-302**. |
+| US-302.2 | Full | `PoisonPillIT` (POISON entry in MongoDB with the payload, the exception and channel STREAM), `DeadLetterAuditRecovererTest` (keyed `topic-partition-offset`, the unwrapped cause; a MongoDB failure is logged at ERROR, not thrown), `AuditEventFactoryTest` (payload capped), `MongoStoresIT` (the `error` field is stored) | |
+| US-302.3 | Full | `PoisonPillIT`: the DLT record carries `kafka_dlt-original-topic`, `-partition`, `-offset` and `-exception-fqcn`; `TradeStorePropertiesTest` (`kafka.dlt-topic` default and override) | |
 | US-401.1 | Full | `TradeApiIT` (201 with the stored trade); `GlobalExceptionHandlerTest` (503 when the database is down, decision D7) | |
 | US-401.2 | Full | `TradeApiIT`: same and higher version → 200 with the stored trade | |
 | US-401.3 | Full | `TradeApiIT`: 409 with `{timestamp, status, error, reasons[], path}` naming both versions | |
@@ -82,7 +83,7 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-603.1 | Full | `@IntegrationTest` + `TestcontainersConfiguration`; every `*IT` runs on real Kafka, PostgreSQL and MongoDB | |
 | US-604.3 | Full | `TradeIngestionServiceTest`: one INFO line per trade with outcome, tradeId, version, channel and reasons; a payload marker never appears in the log | MDC context (`tradeId`, `channel`) is added by the channel adapters (US-401/US-301). |
 | US-604.1 | Partial | `WalkingSkeletonIT`: health is UP with db and mongo | `/actuator/health/readiness` including Kafka. Closed in **US-604**. |
-| US-604.2 | Partial | `TradeMetricsTest` (counter per outcome and per rejection reason; latency timer), `TradeIngestionServiceTest` (recorded for stored and rejected trades), `StoreTradeIT` (visible at `/actuator/prometheus`) | The dead-letter counter (US-302/303) and the outbox backlog gauges (US-501). |
+| US-604.2 | Partial | `TradeMetricsTest` (counter per outcome and per rejection reason; latency timer), `TradeIngestionServiceTest` (recorded for stored and rejected trades), `StoreTradeIT` (visible at `/actuator/prometheus`) | The FAILED dead-letter count (US-303). POISON is counted (`DeadLetterAuditRecovererTest`). |
 | A-09 | Full | `LowerVersionValidatorTest`: an expired trade still rejects a lower version | |
 | A-46 (outbox backlog) | Full | `OutboxMetricsTest` (size, oldest age, NaN when the database is down), `JdbcOutboxRepositoryIT` (`backlog`), `StoreTradeIT` (gauges and job-failure counters at `/actuator/prometheus`, mutation-verified) | |
 | A-50 | Full | `TradeStorePropertiesTest`: defaults and overrides | |

@@ -44,7 +44,7 @@ package "messaging" {
     + errorHandler(...) : DefaultErrorHandler
     + topics() : NewTopics
   }
-  class SizeLimitedJsonDeserializer
+  class SizeLimitedJsonDeserializer <<US-607>>
   class DeadLetterAuditRecoverer <<ConsumerRecordRecoverer>> {
     + accept(record, exception)
   }
@@ -74,7 +74,7 @@ package "service" {
     + stored(trade, outcome, s) : AuditEvent
     + rejected(s, violations) : AuditEvent
     + expired(trade) : AuditEvent  <<US-202>>
-    + deadLettered(outcome, source, payload, error) : AuditEvent  <<US-302>>
+    + deadLettered(position, outcome, payload, error) : AuditEvent  <<US-302>>
   }
   class TradeMetrics
   class OutboxMetrics <<MeterBinder>> {
