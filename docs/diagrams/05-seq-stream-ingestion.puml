@@ -1,5 +1,5 @@
 @startuml 05-seq-stream-ingestion
-title Kafka ingestion: happy path, business rejection, poison pill, transient failure\n(implemented, except the size limit: US-607)
+title Kafka ingestion: happy path, business rejection, poison pill, transient failure\n(all implemented)
 
 autonumber
 queue "trades.inbound" as Topic
@@ -8,7 +8,7 @@ participant TradeConsumer
 participant TradeJsonParser
 participant TradeIngestionService
 participant DeadLetterAuditRecoverer
-participant DeadLetterPublishingRecoverer
+participant "TruncatingDeadLetterPublisher\n(DeadLetterPublishingRecoverer)" as DeadLetterPublishingRecoverer
 queue "trades.inbound.DLT" as DLT
 participant AuditEventStore
 database MongoDB
@@ -17,12 +17,12 @@ Topic -> Container : poll() record (key = tradeId, value read as String)
 Container -> TradeConsumer : onMessage(value)
 TradeConsumer -> TradeJsonParser : parse(value, STREAM)
 
-alt empty, not JSON, or wrong JSON types (POISON: US-302; oversized: US-607.1)
+alt empty, over kafka.max-message-bytes (US-607.1), not JSON, or wrong JSON types (POISON: US-302)
   TradeJsonParser --> TradeConsumer : MalformedTradeException
   TradeConsumer --> Container : rethrow (not retryable)
   Container -> DeadLetterAuditRecoverer : accept(record, exception)
   DeadLetterAuditRecoverer -> DeadLetterPublishingRecoverer : accept(record, exception)
-  DeadLetterPublishingRecoverer -> DLT : publish key + value, partition by key, + headers\n(topic, partition, offset, exception class/message)
+  DeadLetterPublishingRecoverer -> DLT : publish key + value (oversized: truncated, header trade-store-dlt-truncated),\npartition by key, + headers (topic, partition, offset, exception class/message)
   DeadLetterAuditRecoverer -> DeadLetterAuditRecoverer : count trade.deadletter{type=POISON},\nWARN position (no payload)
   DeadLetterAuditRecoverer -> AuditEventStore : insert(POISON, _id = "topic-partition-offset", payload capped, error)
   AuditEventStore -> MongoDB : insertOne (duplicate key = already recorded)

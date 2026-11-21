@@ -75,7 +75,7 @@ class KafkaHealthIndicatorTest {
         failed.completeExceptionally(new TimeoutException("broker kafka-internal.corp:9092 unreachable"));
         when(admin.describeCluster(any(DescribeClusterOptions.class))).thenReturn(cluster);
         when(cluster.clusterId()).thenReturn(failed);
-        when(cluster.nodes()).thenReturn(new KafkaFutureImpl<>());
+        when(cluster.nodes()).thenReturn(failedNodes());
 
         // Act
         Health health = indicator.health();
@@ -84,6 +84,12 @@ class KafkaHealthIndicatorTest {
         assertThat(health.getStatus()).isEqualTo(Status.DOWN);
         assertThat(health.getDetails().toString()).doesNotContain("kafka-internal.corp");
         assertThat(health.getDetails()).containsEntry("error", TimeoutException.class.getName());
+    }
+
+    private static KafkaFuture<java.util.Collection<Node>> failedNodes() {
+        KafkaFutureImpl<java.util.Collection<Node>> failed = new KafkaFutureImpl<>();
+        failed.completeExceptionally(new TimeoutException("broker kafka-internal.corp:9092 unreachable"));
+        return failed;
     }
 
     @Test

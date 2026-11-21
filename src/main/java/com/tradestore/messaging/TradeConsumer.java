@@ -48,8 +48,9 @@ public class TradeConsumer {
         if (message == null || message.isBlank()) {
             throw new MalformedTradeException("The message is empty");
         }
-        // Checked before parsing so an oversized message costs nothing more (US-607.1, A-47).
-        if (message.length() > maxMessageBytes || message.getBytes(StandardCharsets.UTF_8).length > maxMessageBytes) {
+        // Checked before parsing (US-607.1, A-47). UTF-8 needs at most 3 bytes per char, so most messages skip encoding.
+        if (message.length() > maxMessageBytes
+                || (message.length() * 3L > maxMessageBytes && message.getBytes(StandardCharsets.UTF_8).length > maxMessageBytes)) {
             throw new MalformedTradeException("The message is larger than " + maxMessageBytes + " bytes");
         }
         try {

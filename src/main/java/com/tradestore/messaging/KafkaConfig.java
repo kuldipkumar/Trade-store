@@ -9,7 +9,6 @@ import java.sql.SQLNonTransientConnectionException;
 import java.sql.SQLTransientConnectionException;
 import java.time.Duration;
 import java.util.List;
-import java.util.function.Supplier;
 import java.util.function.BiFunction;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -34,7 +33,6 @@ import org.springframework.messaging.converter.MessageConversionException;
 import org.springframework.messaging.handler.invocation.MethodArgumentResolutionException;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.util.backoff.ExponentialBackOff;
-import org.springframework.util.function.SingletonSupplier;
 
 /**
  * Kafka topics owned by the trade store (ADR-002). Declared here so they exist with the intended partition
@@ -51,11 +49,10 @@ public class KafkaConfig {
         return TopicBuilder.name(kafka.topic()).partitions(kafka.partitions()).replicas(kafka.replicationFactor()).build();
     }
 
-    /** Broker reachability, in the readiness group (US-604.1). One admin client, created on first use. */
+    /** Broker reachability, in the readiness group (US-604.1). One admin client, created on first use, closed with the context. */
     @Bean
     KafkaHealthIndicator kafkaHealthIndicator(KafkaAdmin kafkaAdmin) {
-        Supplier<Admin> admin = SingletonSupplier.of(() -> Admin.create(kafkaAdmin.getConfigurationProperties()));
-        return new KafkaHealthIndicator(admin, Duration.ofSeconds(3));
+        return new KafkaHealthIndicator(() -> Admin.create(kafkaAdmin.getConfigurationProperties()), Duration.ofSeconds(3));
     }
 
     /** The dead-letter topic (US-302), sized like the inbound topic; records are partitioned by key. */
@@ -76,7 +73,9 @@ public class KafkaConfig {
     DefaultErrorHandler kafkaErrorHandler(KafkaOperations<?, ?> kafka, TradeStoreProperties properties,
                                           AuditEventFactory events, AuditEventStore audit, MeterRegistry registry) {
         String deadLetterTopic = properties.kafka().dltTopic();
-        DeadLetterPublishingRecoverer publisher = new DeadLetterPublishingRecoverer(kafka, deadLetterDestination(deadLetterTopic));
+        DeadLetterPublishingRecoverer publisher = new TruncatingDeadLetterPublisher(kafka,
+                deadLetterDestination(deadLetterTopic), properties.kafka().maxMessageBytes(),
+                properties.audit().maxPayloadChars());
         return errorHandler(new DeadLetterAuditRecoverer(publisher, events, audit, registry, KafkaConfig::isUnreadable),
                 properties.retry(), registry);
     }
