@@ -7,10 +7,13 @@ import com.tradestore.service.parsing.MalformedTradeException;
 import java.sql.SQLException;
 import java.sql.SQLNonTransientConnectionException;
 import java.sql.SQLTransientConnectionException;
+import java.time.Duration;
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.function.BiFunction;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
@@ -20,6 +23,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
@@ -30,6 +34,7 @@ import org.springframework.messaging.converter.MessageConversionException;
 import org.springframework.messaging.handler.invocation.MethodArgumentResolutionException;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.util.backoff.ExponentialBackOff;
+import org.springframework.util.function.SingletonSupplier;
 
 /**
  * Kafka topics owned by the trade store (ADR-002). Declared here so they exist with the intended partition
@@ -44,6 +49,13 @@ public class KafkaConfig {
     NewTopic tradesInbound(TradeStoreProperties properties) {
         TradeStoreProperties.Kafka kafka = properties.kafka();
         return TopicBuilder.name(kafka.topic()).partitions(kafka.partitions()).replicas(kafka.replicationFactor()).build();
+    }
+
+    /** Broker reachability, in the readiness group (US-604.1). One admin client, created on first use. */
+    @Bean
+    KafkaHealthIndicator kafkaHealthIndicator(KafkaAdmin kafkaAdmin) {
+        Supplier<Admin> admin = SingletonSupplier.of(() -> Admin.create(kafkaAdmin.getConfigurationProperties()));
+        return new KafkaHealthIndicator(admin, Duration.ofSeconds(3));
     }
 
     /** The dead-letter topic (US-302), sized like the inbound topic; records are partitioned by key. */

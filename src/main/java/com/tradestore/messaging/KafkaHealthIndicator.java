@@ -1,9 +1,12 @@
 package com.tradestore.messaging;
 
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.DescribeClusterOptions;
+import org.apache.kafka.clients.admin.DescribeClusterResult;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 
@@ -20,6 +23,17 @@ public class KafkaHealthIndicator implements HealthIndicator {
 
     @Override
     public Health health() {
-        return Health.unknown().build();
+        try {
+            DescribeClusterResult cluster = admin.get()
+                    .describeCluster(new DescribeClusterOptions().timeoutMs((int) timeout.toMillis()));
+            String clusterId = cluster.clusterId().get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            int nodes = cluster.nodes().get(timeout.toMillis(), TimeUnit.MILLISECONDS).size();
+            return Health.up().withDetail("clusterId", clusterId).withDetail("nodes", nodes).build();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return Health.down(interrupted).build();
+        } catch (Exception unreachable) {
+            return Health.down(unreachable).build();
+        }
     }
 }
