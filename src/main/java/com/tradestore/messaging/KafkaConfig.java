@@ -4,6 +4,7 @@ import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.persistence.AuditEventStore;
 import com.tradestore.service.AuditEventFactory;
 import com.tradestore.service.parsing.MalformedTradeException;
+import java.util.List;
 import java.util.function.BiFunction;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -17,6 +18,10 @@ import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.converter.ConversionException;
+import org.springframework.kafka.support.serializer.DeserializationException;
+import org.springframework.messaging.converter.MessageConversionException;
+import org.springframework.messaging.handler.invocation.MethodArgumentResolutionException;
 import org.springframework.util.backoff.ExponentialBackOff;
 
 /**
@@ -63,9 +68,25 @@ public class KafkaConfig {
         return (record, e) -> new TopicPartition(topic, -1);
     }
 
-    /** A failure that retrying can't fix: the message itself is unusable (POISON). */
+    /** Ours, added to the handler's not-retryable list (LLD section 6.2). */
+    private static final List<Class<? extends Exception>> NOT_RETRYABLE =
+            List.of(MalformedTradeException.class, IllegalArgumentException.class);
+
+    /** Ours plus DefaultErrorHandler's built-in not-retryable exceptions: all are recovered at once. */
+    private static final List<Class<? extends Throwable>> UNREADABLE = List.of(MalformedTradeException.class,
+            IllegalArgumentException.class, DeserializationException.class, MessageConversionException.class,
+            ConversionException.class, MethodArgumentResolutionException.class, NoSuchMethodException.class,
+            ClassCastException.class);
+
+    /** A failure that retrying can't fix, anywhere in the cause chain: the message itself is unusable (POISON). */
     static boolean isUnreadable(Throwable failure) {
-        return failure instanceof MalformedTradeException;
+        for (Throwable t = failure; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            Throwable current = t;
+            if (UNREADABLE.stream().anyMatch(type -> type.isInstance(current))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer, TradeStoreProperties.Retry retry) {
@@ -73,7 +94,7 @@ public class KafkaConfig {
         backOff.setMaxInterval(retry.maxInterval().toMillis());
         backOff.setMaxAttempts(retry.maxAttempts() - 1); // retries after the first delivery
         DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);
-        handler.addNotRetryableExceptions(MalformedTradeException.class, IllegalArgumentException.class);
+        NOT_RETRYABLE.forEach(handler::addNotRetryableExceptions);
         return handler;
     }
 }
