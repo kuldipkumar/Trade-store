@@ -11,3 +11,4 @@ One entry per story that is completed, tested, peer-reviewed and merged. The sam
 | 5 | US-201 Reject trades with a past maturity date | 2026-11-21 | #44 | 4 of 4 | before peer review existed |
 | 6 | US-205 "Today" follows the configured time zone | 2026-11-21 | #46 | 2 of 2 | Approve with notes |
 | 7 | US-102 Higher version replaces the stored trade | 2026-11-21 | #47 | 3 of 3 | Approve with notes |
+| 8 | US-103 Same version replaces the stored trade | 2026-11-21 | #48 | 2 of 2 | Approve |

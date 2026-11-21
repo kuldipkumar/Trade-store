@@ -1,6 +1,6 @@
-# Senior Engineer review checklist
+# Author checklist
 
-Used on every pull request before it is merged (AGENTS.md section 3, Phase 6). The review is posted on the pull request and ends with one verdict.
+The author's own check before opening a pull request (AGENTS.md section 3, Phase 6). The merge gate itself is `/code-review` plus green CI; the human reviews merged pull requests when they have time.
 
 | # | Area | What is checked |
 |---|------|-----------------|
@@ -13,7 +13,6 @@ Used on every pull request before it is merged (AGENTS.md section 3, Phase 6). T
 | 7 | **Documentation** | Diagrams and LLD updated in the same PR when the design changed. `docs/traceability.md` regenerated. `docs/06-test-review.md` verdicts updated. Prompts logged. |
 | 8 | **CI** | All stages green, including the traceability check and both vulnerability scans. Coverage gate met. |
 
-## Verdicts
-- **Approve**: merge.
-- **Approve with notes**: merge; the notes become follow-ups, linked in the review.
-- **Changes requested**: fix on the branch and review again. If the problem needs a product or design decision, it is flagged to the human before any change.
+## Outcome
+- Every item satisfied: open the pull request, run `/code-review`, fix real findings, merge when CI is green.
+- An item that needs a product or design decision: flag it to the human and carry on with other stories meanwhile.
