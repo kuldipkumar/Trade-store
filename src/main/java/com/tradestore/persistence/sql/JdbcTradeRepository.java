@@ -45,6 +45,21 @@ public class JdbcTradeRepository implements TradeRepository {
             RETURNING trade_id, version, counter_party_id, book_id, maturity_date, created_date, expired
             """;
 
+    // One bounded batch: rows locked by another transaction (e.g. a concurrent replacement) are skipped and
+    // picked up by a later batch or run, so expiry never waits on, or blocks, ingestion for long.
+    private static final String MARK_EXPIRED_BATCH = """
+            WITH due AS (
+                SELECT trade_id FROM trades
+                 WHERE maturity_date < :today AND expired = false
+                 ORDER BY maturity_date, trade_id
+                 LIMIT :limit
+                   FOR UPDATE SKIP LOCKED)
+            UPDATE trades t SET expired = true, updated_at = now()
+              FROM due
+             WHERE t.trade_id = due.trade_id
+            RETURNING t.trade_id, t.version, t.counter_party_id, t.book_id, t.maturity_date, t.created_date, t.expired
+            """;
+
     private final JdbcClient jdbc;
 
     public JdbcTradeRepository(JdbcClient jdbc) {
@@ -97,6 +112,7 @@ public class JdbcTradeRepository implements TradeRepository {
 
     @Override
     public List<Trade> markExpired(LocalDate today, int limit) {
-        return List.of(); // stub: implemented test-first
+        return jdbc.sql(MARK_EXPIRED_BATCH).param("today", today).param("limit", limit)
+                .query(JdbcTradeRepository::mapTrade).list();
     }
 }
