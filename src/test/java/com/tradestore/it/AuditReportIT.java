@@ -15,6 +15,8 @@ import com.tradestore.domain.Violation;
 import com.tradestore.persistence.AuditEventStore;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.client.EntityExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
@@ -132,5 +134,17 @@ class AuditReportIT {
         assertThat(first.path("page").asInt()).isZero();
         assertThat(first.path("size").asInt()).isEqualTo(2);
         assertThat(timestamps(second)).containsExactly(local("2026-11-19T12:00:00").toString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"&page=-1", "&size=0", "&from=2026-11-20&to=2026-11-19", "&from=19-11-2026", "&outcome=MAYBE"})
+    @Tag("US-502.1")
+    void should_returnBadRequest_when_aParameterIsInvalid(String query) {
+        // Act
+        EntityExchangeResult<JsonNode> response = report(query);
+
+        // Assert: the standard error shape
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("INVALID_PARAMETER");
     }
 }
