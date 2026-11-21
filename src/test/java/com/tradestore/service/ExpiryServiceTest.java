@@ -21,7 +21,10 @@ import com.tradestore.persistence.TradeRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.transaction.support.TransactionOperations;
 
 /** US-202: the expiry use case (docs/05-lld.md section 4.2). */
@@ -70,5 +73,19 @@ class ExpiryServiceTest {
         var counter = registry.find("trade.outcomes")
                 .tags("outcome", "EXPIRED", "reason", "NONE", "channel", "SCHEDULER").counter();
         assertThat(counter == null ? 0 : counter.count()).isEqualTo(2.0);
+    }
+
+    @Test
+    @Tag("US-604.3")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_logOneOutcomeLinePerExpiredTrade_when_tradesAreMarkedExpired(CapturedOutput output) {
+        // Arrange
+        when(trades.markExpired(TODAY)).thenReturn(List.of(expired("T1")));
+
+        // Act
+        service.expireMaturedTrades();
+
+        // Assert: same format as ingestion (docs/05-lld.md section 8)
+        assertThat(output).contains("outcome=EXPIRED tradeId=T1 version=1 channel=SCHEDULER");
     }
 }
