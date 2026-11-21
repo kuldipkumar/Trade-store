@@ -3,6 +3,7 @@ package com.tradestore.api;
 import java.time.Clock;
 
 import com.tradestore.domain.LowerVersionException;
+import com.tradestore.domain.TradeRejectedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(LowerVersionException.class)
     public ResponseEntity<ApiErrorResponse> lowerVersion(LowerVersionException e, HttpServletRequest request) {
         HttpStatus status = HttpStatus.CONFLICT;
+        return ResponseEntity.status(status).body(new ApiErrorResponse(clock.instant(), status.value(),
+                status.getReasonPhrase(), e.violations().stream().map(ApiErrorResponse.Reason::from).toList(),
+                request.getRequestURI()));
+    }
+
+    @ExceptionHandler(TradeRejectedException.class)
+    public ResponseEntity<ApiErrorResponse> rejected(TradeRejectedException e, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.UNPROCESSABLE_CONTENT;
         return ResponseEntity.status(status).body(new ApiErrorResponse(clock.instant(), status.value(),
                 status.getReasonPhrase(), e.violations().stream().map(ApiErrorResponse.Reason::from).toList(),
                 request.getRequestURI()));
