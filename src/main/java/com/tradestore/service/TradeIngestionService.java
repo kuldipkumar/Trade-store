@@ -19,6 +19,8 @@ import com.tradestore.service.validation.CompositeTradeValidator;
 import com.tradestore.service.validation.MaturityDates;
 import com.tradestore.service.validation.ValidationContext;
 import io.micrometer.core.instrument.Timer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
 
@@ -29,6 +31,8 @@ import org.springframework.transaction.support.TransactionOperations;
  */
 @Service
 public class TradeIngestionService {
+
+    private static final Logger log = LoggerFactory.getLogger(TradeIngestionService.class);
 
     /** One write plus one retry after losing a race to a concurrent higher version (US-106.2). */
     static final int MAX_WRITE_ATTEMPTS = 2;
@@ -63,6 +67,8 @@ public class TradeIngestionService {
         Decision decision = transactions.execute(status -> decide(submission, today));
         metrics.recordOutcome(decision.outcome(), decision.reasons(), submission.channel());
         metrics.stopProcessing(timing, submission.channel());
+        log.info("outcome={} tradeId={} version={} channel={}",
+                decision.outcome(), submission.tradeId(), submission.version(), submission.channel());
         if (decision.rejection() != null) {
             throw decision.rejection();
         }
