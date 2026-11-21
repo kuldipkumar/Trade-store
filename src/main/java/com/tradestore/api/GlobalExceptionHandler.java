@@ -7,6 +7,7 @@ import com.tradestore.domain.LowerVersionException;
 import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.TradeRejectedException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -50,6 +51,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> tooLarge(PayloadTooLargeException e, HttpServletRequest request) {
         return error(HttpStatus.CONTENT_TOO_LARGE, List.of(new ApiErrorResponse.Reason("PAYLOAD_TOO_LARGE", null, e.getMessage())),
                 request);
+    }
+
+    /** Stub: implemented test-first. */
+    public ResponseEntity<ApiErrorResponse> unavailable(DataAccessException e, HttpServletRequest request) {
+        return null;
     }
 
     static HttpStatus statusOf(TradeRejectedException e) {

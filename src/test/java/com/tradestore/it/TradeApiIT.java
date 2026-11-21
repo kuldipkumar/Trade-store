@@ -165,4 +165,19 @@ class TradeApiIT {
         assertThat(response.getResponseBody().path("status").asInt()).isEqualTo(413);
         assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("PAYLOAD_TOO_LARGE");
     }
+
+    @Test
+    @Tag("US-101.2")
+    void should_ignoreCreatedDateAndExpiredSentByTheCaller_when_aTradeIsSubmitted() {
+        // Act: the sender tries to set the store-owned fields
+        EntityExchangeResult<JsonNode> response = post("""
+                {"tradeId":"%s","version":1,"counterPartyId":"CP-1","bookId":"B1","maturityDate":"2099-05-20",
+                 "createdDate":"2015-03-14","expired":"Y"}
+                """.formatted(tradeId));
+
+        // Assert (A-05: the store sets createdDate and expired)
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getResponseBody().path("createdDate").asString()).isEqualTo(LocalDate.now(clock).toString());
+        assertThat(response.getResponseBody().path("expired").asBoolean()).isFalse();
+    }
 }

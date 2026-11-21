@@ -9,6 +9,7 @@ import java.time.ZoneOffset;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -45,5 +46,17 @@ class GlobalExceptionHandlerTest {
 
         // Assert
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONTENT_TOO_LARGE);
+    }
+
+    @Test
+    @Tag("US-401.1")
+    void should_return503_when_theDatabaseIsUnavailable() {
+        // Act (decision D7: nothing was stored or audited, the client may retry)
+        ResponseEntity<ApiErrorResponse> response =
+                handler.unavailable(new DataAccessResourceFailureException("PostgreSQL down"), request);
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getBody().reasons()).extracting(ApiErrorResponse.Reason::reason).containsExactly("SERVICE_UNAVAILABLE");
     }
 }
