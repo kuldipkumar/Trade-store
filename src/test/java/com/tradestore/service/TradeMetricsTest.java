@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.tradestore.domain.Channel;
 import com.tradestore.domain.Outcome;
+import com.tradestore.domain.ReasonCode;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Tag;
@@ -31,5 +32,17 @@ class TradeMetricsTest {
 
         // Assert
         assertThat(outcomes("ACCEPTED", "NONE", "REST")).isEqualTo(1.0);
+    }
+
+    @Test
+    @Tag("US-604.2")
+    void should_countOncePerReason_when_tradeIsRejectedForSeveralReasons() {
+        // Act
+        metrics.recordOutcome(Outcome.REJECTED, List.of(ReasonCode.LOWER_VERSION, ReasonCode.MATURITY_IN_PAST), Channel.STREAM);
+
+        // Assert ("rejections by reason", US-604.2)
+        assertThat(outcomes("REJECTED", "LOWER_VERSION", "STREAM")).isEqualTo(1.0);
+        assertThat(outcomes("REJECTED", "MATURITY_IN_PAST", "STREAM")).isEqualTo(1.0);
+        assertThat(outcomes("REJECTED", "NONE", "STREAM")).isZero();
     }
 }
