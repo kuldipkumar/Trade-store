@@ -17,4 +17,7 @@ public interface OutboxRepository {
     List<AuditEvent> claimBatch(int limit);
 
     void delete(List<String> eventIds);
+
+    /** Stub: implemented test-first. */
+    List<String> pendingTradeIds(int limit);
 }

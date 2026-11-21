@@ -95,4 +95,23 @@ class JdbcOutboxRepositoryIT {
         // Act + Assert: an empty batch must not produce invalid SQL ("IN ()")
         assertThatCode(() -> outbox.delete(List.of())).doesNotThrowAnyException();
     }
+
+    @Test
+    @Tag("US-501.3")
+    void should_nameTheTradesWaitingForTheirAuditEntries_oldestFirstAndOnce() {
+        inRolledBackTransaction(() -> {
+            // Arrange: two events for one trade, then one for another
+            String first = "T-" + UUID.randomUUID();
+            String second = "T-" + UUID.randomUUID();
+            outbox.append(accepted(first));
+            outbox.append(rejected(first));
+            outbox.append(accepted(second));
+
+            // Act
+            List<String> pending = outbox.pendingTradeIds(1000);
+
+            // Assert
+            assertThat(pending).filteredOn(id -> id.equals(first) || id.equals(second)).containsExactly(first, second);
+        });
+    }
 }

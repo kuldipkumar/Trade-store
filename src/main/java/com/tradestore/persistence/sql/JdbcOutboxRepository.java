@@ -59,4 +59,9 @@ public class JdbcOutboxRepository implements OutboxRepository {
                 .param("ids", eventIds.stream().map(UUID::fromString).toList())
                 .update();
     }
+
+    @Override
+    public List<String> pendingTradeIds(int limit) {
+        return List.of(); // stub: implemented test-first
+    }
 }
