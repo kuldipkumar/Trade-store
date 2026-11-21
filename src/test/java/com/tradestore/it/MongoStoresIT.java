@@ -109,6 +109,26 @@ class MongoStoresIT {
     }
 
     @Test
+    @Tag("US-502.2")
+    @Tag("US-502.4")
+    void should_returnTheRequestedPageOfOneOutcome_when_filteringOnOutcomeWithPaging() {
+        // Arrange: three rejections and an acceptance
+        AuditEvent r1 = audited(Outcome.REJECTED, "2026-11-02T10:00:00Z");
+        AuditEvent r2 = audited(Outcome.REJECTED, "2026-11-02T11:00:00Z");
+        AuditEvent r3 = audited(Outcome.REJECTED, "2026-11-02T12:00:00Z");
+        List.of(r1, audited(Outcome.ACCEPTED, "2026-11-02T10:30:00Z"), r2, r3).forEach(auditEvents::insert);
+        AuditQuery rejections = new AuditQuery(null, null, tradeId, Outcome.REJECTED);
+
+        // Act
+        List<AuditEvent> page0 = auditEvents.find(rejections, 0, 2);
+        List<AuditEvent> page1 = auditEvents.find(rejections, 1, 2);
+
+        // Assert
+        assertThat(page0).containsExactly(r1, r2);
+        assertThat(page1).containsExactly(r3);
+    }
+
+    @Test
     @Tag("US-501.1")
     void should_keepOneEntry_when_sameEventIsInsertedTwice() {
         // Arrange: a relay crash after the MongoDB write but before the outbox delete (ADR-005)
