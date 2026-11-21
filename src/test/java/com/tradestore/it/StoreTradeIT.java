@@ -151,4 +151,19 @@ class StoreTradeIT {
         await().atMost(RELAY_TIMEOUT).untilAsserted(() ->
                 assertThat(history.findByTradeId(tradeId)).extracting(e -> e.version()).containsExactly(1, 2));
     }
+
+    @Test
+    @Tag("US-103.2")
+    void should_replaceWithoutError_when_anIdenticalVersionIsRedelivered() {
+        // Arrange
+        ingestion.ingest(submission(2));
+        Trade before = trades.findTrade(tradeId).orElseThrow();
+
+        // Act (A-24: a redelivered duplicate is a harmless same-version replacement)
+        IngestionResult result = ingestion.ingest(submission(2));
+
+        // Assert: same day, so even createdDate is unchanged
+        assertThat(result.outcome()).isEqualTo(Outcome.REPLACED);
+        assertThat(trades.findTrade(tradeId)).contains(before);
+    }
 }
