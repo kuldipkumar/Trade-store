@@ -106,4 +106,46 @@ class TradeApiIT {
         assertThat(response.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("MATURITY_IN_PAST");
     }
+
+    @Test
+    @Tag("US-401.5")
+    void should_return400ListingTheFieldErrors_when_fieldsAreInvalid() {
+        // Act: blank bookId and version 0
+        EntityExchangeResult<JsonNode> response = post("""
+                {"tradeId":"%s","version":0,"counterPartyId":"CP-1","bookId":" ","maturityDate":"2099-05-20"}
+                """.formatted(tradeId));
+
+        // Assert
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getResponseBody().path("reasons").findValuesAsString("field")).containsExactly("bookId", "version");
+    }
+
+    @Test
+    @Tag("US-401.5")
+    void should_return400WithTheStandardErrorShape_when_theBodyIsNotValidJson() {
+        // Act
+        EntityExchangeResult<JsonNode> response = post("{\"tradeId\": \"T1\", ");
+
+        // Assert
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getResponseBody().path("status").asInt()).isEqualTo(400);
+        assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("MALFORMED_REQUEST");
+    }
+
+    @Test
+    @Tag("US-401.5")
+    void should_return400NotConflict_when_aLowerVersionAlsoHasInvalidFields() {
+        // Arrange (decision D6: 400 > 409 > 422, every reason still listed)
+        post(json(2, "2099-05-20"));
+
+        // Act: lower version and a blank bookId
+        EntityExchangeResult<JsonNode> response = post("""
+                {"tradeId":"%s","version":1,"counterPartyId":"CP-1","bookId":"","maturityDate":"2099-05-20"}
+                """.formatted(tradeId));
+
+        // Assert
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getResponseBody().path("reasons").findValuesAsString("reason"))
+                .containsExactly("INVALID_FIELD", "LOWER_VERSION");
+    }
 }
