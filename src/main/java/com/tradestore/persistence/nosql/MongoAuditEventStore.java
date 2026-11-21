@@ -4,6 +4,7 @@ import java.util.Date;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import com.tradestore.domain.AuditEvent;
 import com.tradestore.domain.Channel;
@@ -70,6 +71,11 @@ public class MongoAuditEventStore implements AuditEventStore {
         mongo.aggregate(aggregation, COLLECTION, Document.class).forEach(group ->
                 counts.put(Outcome.valueOf(group.getString("_id")), ((Number) group.get("count")).longValue()));
         return counts;
+    }
+
+    @Override
+    public Stream<AuditEvent> stream(AuditQuery query) {
+        return Stream.empty();
     }
 
     private static Criteria matching(AuditQuery query) {

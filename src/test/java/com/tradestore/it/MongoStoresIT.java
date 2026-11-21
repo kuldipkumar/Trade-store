@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import com.tradestore.domain.AuditEvent;
 import com.tradestore.domain.Channel;
@@ -158,6 +159,24 @@ class MongoStoresIT {
         // Assert: no in-memory sort of the whole matching set
         String winningPlan = plan.get("queryPlanner", Document.class).get("winningPlan", Document.class).toJson();
         assertThat(winningPlan).contains("IXSCAN").doesNotContain("\"SORT\"");
+    }
+
+    @Test
+    @Tag("US-503.1")
+    void should_streamEveryMatchingEntryOldestFirst_when_exporting() {
+        // Arrange
+        AuditEvent first = audited(Outcome.ACCEPTED, "2026-11-05T10:00:00Z");
+        AuditEvent second = audited(Outcome.REJECTED, "2026-11-05T11:00:00Z");
+        List.of(second, first).forEach(auditEvents::insert);
+
+        // Act
+        List<AuditEvent> streamed;
+        try (Stream<AuditEvent> events = auditEvents.stream(new AuditQuery(null, null, tradeId, null))) {
+            streamed = events.toList();
+        }
+
+        // Assert
+        assertThat(streamed).containsExactly(first, second);
     }
 
     @Test
