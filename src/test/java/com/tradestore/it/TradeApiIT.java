@@ -148,4 +148,21 @@ class TradeApiIT {
         assertThat(response.getResponseBody().path("reasons").findValuesAsString("reason"))
                 .containsExactly("INVALID_FIELD", "LOWER_VERSION");
     }
+
+    @Test
+    @Tag("US-401.6")
+    void should_return413_when_theBodyIsLargerThan1MB() {
+        // Arrange: a valid trade padded with an unknown field to about 1.1 MB
+        String body = """
+                {"tradeId":"%s","version":1,"counterPartyId":"CP-1","bookId":"B1","maturityDate":"2099-05-20","pad":"%s"}
+                """.formatted(tradeId, "x".repeat(1_150_000));
+
+        // Act
+        EntityExchangeResult<JsonNode> response = post(body);
+
+        // Assert (A-47: input capped at 1 MB)
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.CONTENT_TOO_LARGE);
+        assertThat(response.getResponseBody().path("status").asInt()).isEqualTo(413);
+        assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("PAYLOAD_TOO_LARGE");
+    }
 }
