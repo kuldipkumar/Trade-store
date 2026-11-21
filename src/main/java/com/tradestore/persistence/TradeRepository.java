@@ -30,6 +30,6 @@ public interface TradeRepository {
      */
     List<Trade> markExpired(LocalDate today, int limit);
 
-    /** Stub: implemented test-first. */
+    /** One page of trades sorted by tradeId, optionally only expired or only live ones (null = all) (US-403). */
     PageResult<Trade> findPage(Boolean expired, int page, int size);
 }
