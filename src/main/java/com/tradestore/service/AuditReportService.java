@@ -39,7 +39,8 @@ public class AuditReportService {
         int pageSize = Math.min(size, maxPageSize);
         ZoneId zone = clock.getZone();
         AuditQuery query = new AuditQuery(from == null ? null : from.atStartOfDay(zone).toInstant(),
-                to == null ? null : to.plusDays(1).atStartOfDay(zone).toInstant(), tradeId, outcome);
+                to == null ? null : to.plusDays(1).atStartOfDay(zone).toInstant(),
+                tradeId == null || tradeId.isBlank() ? null : tradeId, outcome);
         Map<Outcome, Long> summary = audit.countByOutcome(query);
         long total = summary.values().stream().mapToLong(Long::longValue).sum();
         return new AuditReport(summary, audit.find(query, page, pageSize), page, pageSize, total,
