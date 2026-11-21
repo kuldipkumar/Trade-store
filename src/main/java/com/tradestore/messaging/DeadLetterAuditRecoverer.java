@@ -37,6 +37,8 @@ public class DeadLetterAuditRecoverer implements ConsumerRecordRecoverer {
         Throwable cause = exception instanceof ListenerExecutionFailedException && exception.getCause() != null
                 ? exception.getCause() : exception;
         String position = record.topic() + "-" + record.partition() + "-" + record.offset();
+        registry.counter("trade.deadletter", "type", Outcome.POISON.name()).increment();
+        log.warn("outcome={} position={} error={}", Outcome.POISON, position, cause.getClass().getName());
         try {
             audit.insert(events.deadLettered(position, Outcome.POISON,
                     record.value() == null ? null : record.value().toString(), cause.toString()));
