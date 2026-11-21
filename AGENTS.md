@@ -120,6 +120,14 @@ Repeat until all of that story's acceptance criteria are covered. Commits should
 - Use configuration over hard-coding (cron schedules, thresholds, topic names).
 - Inject a `Clock` wherever logic depends on the current date or time, so tests are deterministic.
 
+### Observability is built in, not bolted on
+Every story adds the signals for the behaviour it introduces, **test-first, in the same story**:
+- **Outcomes:** every path that produces a business outcome increments a counter tagged with the outcome (and the reason, for rejections) and writes one INFO log line with IDs only, never payloads.
+- **Latency:** every use case that serves a caller or the stream records a timer.
+- **Background work and failures:** every scheduled job, retry or fallback exposes a counter or gauge and logs WARN/ERROR with the affected IDs.
+- **Dependencies:** every external system the app needs is covered by a health indicator.
+- **Tests:** assert metrics with a `SimpleMeterRegistry` and log lines with captured output. Metric and log names follow the LLD's observability section.
+
 ---
 
 ## 5. Testing Standards
@@ -216,6 +224,7 @@ The last column is mandatory. It records human judgment over the AI's output.
 ## 10. Definition of Done (per story)
 
 - [ ] Acceptance criteria covered by tests written before the code
+- [ ] Observability for the story's behaviour (metrics, log lines, health) added test-first
 - [ ] All tests green locally and in CI
 - [ ] Coverage gate passed
 - [ ] No critical or blocker vulnerabilities
