@@ -13,3 +13,4 @@ One entry per story that is completed, tested, peer-reviewed and merged. The sam
 | 7 | US-102 Higher version replaces the stored trade | 2026-11-21 | #47 | 3 of 3 | Approve with notes |
 | 8 | US-103 Same version replaces the stored trade | 2026-11-21 | #48 | 2 of 2 | Approve |
 | 9 | US-106 Concurrent updates to the same trade are safe | 2026-11-21 | #50 | 2 of 2 | /code-review: 2 important + 3 nits fixed |
+| 10 | US-202 Mark matured trades as expired automatically | 2026-11-21 | #51 | 4 of 4 | /code-review: 2 important + 4 nits fixed |
