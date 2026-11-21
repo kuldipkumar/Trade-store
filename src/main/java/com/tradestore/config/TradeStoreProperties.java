@@ -25,7 +25,8 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
                         Expiry.DEFAULT_STARTUP_RETRY_INTERVAL, Expiry.DEFAULT_STARTUP_MAX_ATTEMPTS)
                 : expiry;
         api = api == null ? new Api(Api.DEFAULT_MAX_REQUEST_BYTES, Api.DEFAULT_MAX_PAGE_SIZE) : api;
-        kafka = kafka == null ? new Kafka(Kafka.DEFAULT_TOPIC, Kafka.DEFAULT_PARTITIONS, Kafka.DEFAULT_REPLICATION_FACTOR) : kafka;
+        kafka = kafka == null ? new Kafka(Kafka.DEFAULT_TOPIC, Kafka.DEFAULT_PARTITIONS, Kafka.DEFAULT_REPLICATION_FACTOR,
+                Kafka.DEFAULT_DLT_TOPIC) : kafka;
     }
 
     /** @param maxPayloadChars longer payloads are truncated in the audit trail (US-302.2, A-52) */
@@ -92,10 +93,12 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
      * @param partitions        consumers scale up to this count (A-42). Never increase it on a live topic: it
      *                          remaps keys to partitions and can reorder a trade's versions (A-22).
      * @param replicationFactor broker copies of each partition
+     * @param dltTopic          where unprocessable messages are moved, on the same partition number (US-302)
      */
     public record Kafka(@DefaultValue("trades.inbound") String topic, @DefaultValue("6") int partitions,
-                        @DefaultValue("1") short replicationFactor) {
+                        @DefaultValue("1") short replicationFactor, @DefaultValue("") String dltTopic) {
         static final String DEFAULT_TOPIC = "trades.inbound";
+        static final String DEFAULT_DLT_TOPIC = "";
         static final int DEFAULT_PARTITIONS = 6;
         static final short DEFAULT_REPLICATION_FACTOR = 1;
 

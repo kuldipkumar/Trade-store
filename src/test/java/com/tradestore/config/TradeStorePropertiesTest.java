@@ -44,6 +44,19 @@ class TradeStorePropertiesTest {
     }
 
     @Test
+    @Tag("US-302.3")
+    @Tag("A-50")
+    void should_defaultTheDeadLetterTopicAndAllowItToBeConfigured_when_bound() {
+        // Act
+        TradeStoreProperties defaults = bind(Map.of());
+        TradeStoreProperties configured = bind(Map.of("trade-store.kafka.dlt-topic", "trades.dead"));
+
+        // Assert
+        assertThat(defaults.kafka().dltTopic()).isEqualTo("trades.inbound.DLT");
+        assertThat(configured.kafka().dltTopic()).isEqualTo("trades.dead");
+    }
+
+    @Test
     @Tag("A-50")
     void should_useConfiguredValues_when_propertiesAreSet() {
         // Act
