@@ -24,3 +24,4 @@ One entry per story that is completed, tested, peer-reviewed and merged. The sam
 | 18 | US-501 Record every outcome in an append-only audit trail | 2026-11-21 | #55 (+#56, #60) | 3 of 3 | /code-review: 2 important + 7 nits fixed |
 | 19 | US-301 Consume trades from the stream | 2026-11-21 | #60 | 3 of 3 | /code-review: 3 important + 3 nits fixed |
 | 20 | US-304 Business rejections are final on the stream | 2026-11-21 | #60 | 1 of 1 | found and fixed by /code-review of #60 |
+| 21 | US-302 Isolate poison-pill messages | 2026-11-21 | #61 | 3 of 3 | /code-review: 2 important + 5 nits fixed |
