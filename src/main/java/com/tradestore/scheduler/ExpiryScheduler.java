@@ -32,7 +32,7 @@ public class ExpiryScheduler {
             expiry.expireMaturedTrades();
         } catch (RuntimeException e) {
             failures.increment();
-            log.error("Expiry run failed; the next run catches up: {}", e.toString());
+            log.error("Expiry run failed; the next run catches up", e);
         }
     }
 }
