@@ -122,11 +122,11 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
      * @param multiplier      each wait is this many times the previous one
      * @param maxInterval     the longest wait
      */
-    public record Retry(@DefaultValue("1") int maxAttempts, @DefaultValue("1ms") Duration initialInterval,
-                        @DefaultValue("1.0") double multiplier, @DefaultValue("1ms") Duration maxInterval) {
-        static final int DEFAULT_MAX_ATTEMPTS = 1;
-        static final Duration DEFAULT_INITIAL_INTERVAL = Duration.ofMillis(1);
-        static final double DEFAULT_MULTIPLIER = 1.0;
-        static final Duration DEFAULT_MAX_INTERVAL = Duration.ofMillis(1);
+    public record Retry(@DefaultValue("3") int maxAttempts, @DefaultValue("1s") Duration initialInterval,
+                        @DefaultValue("2.0") double multiplier, @DefaultValue("10s") Duration maxInterval) {
+        static final int DEFAULT_MAX_ATTEMPTS = 3;
+        static final Duration DEFAULT_INITIAL_INTERVAL = Duration.ofSeconds(1);
+        static final double DEFAULT_MULTIPLIER = 2.0;
+        static final Duration DEFAULT_MAX_INTERVAL = Duration.ofSeconds(10);
     }
 }
