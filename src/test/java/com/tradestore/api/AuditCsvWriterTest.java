@@ -55,4 +55,14 @@ class AuditCsvWriterTest {
         // Assert: RFC 4180, quotes doubled
         assertThat(line).isEqualTo("e1,2026-11-19T10:15:30Z,\"T,1\",1,REJECTED,REST,\"INVALID_FIELD: say \"\"hi\"\"\nthen go\"\r\n");
     }
+
+    @Test
+    @Tag("US-503.1")
+    void should_neutraliseASpreadsheetFormula_when_aCellStartsWithAFormulaCharacter() throws IOException {
+        // Act: tradeId comes from clients; a spreadsheet would run "=..." as a formula (CSV injection)
+        String line = row("=HYPERLINK(\"http://x\")", List.of());
+
+        // Assert: prefixed with ' so it is shown as text
+        assertThat(line).contains(",\"'=HYPERLINK(\"\"http://x\"\")\",");
+    }
 }
