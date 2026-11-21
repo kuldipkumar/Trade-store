@@ -11,6 +11,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
@@ -122,51 +123,94 @@ class JdbcTradeRepositoryIT {
         assertThat(repository.findById(tradeId)).contains(new StoredTrade(tradeId, 2, false));
     }
 
-    private long sessionsWaitingForAnUpsertLock() {
+    /** The two upsert results of a forced race: who held the row lock first, and who waited on it. */
+    private record Race(UpsertResult holder, UpsertResult waiter) {
+    }
+
+    /**
+     * Forces a deterministic race on one trade row: the holder's transaction writes and keeps the row lock;
+     * the waiter's upsert then blocks on exactly that lock (checked with pg_blocking_pids); then the holder
+     * commits and the waiter re-evaluates the version guard (READ COMMITTED).
+     */
+    private Race race(Trade holderTrade, Trade waiterTrade) throws Exception {
+        CountDownLatch holding = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger holderPid = new AtomicInteger();
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            CompletableFuture<UpsertResult> holder = CompletableFuture.supplyAsync(() -> tx.execute(status -> {
+                holderPid.set(jdbc.sql("SELECT pg_backend_pid()").query(Integer.class).single());
+                UpsertResult result = repository.upsertIfNotOlder(holderTrade);
+                holding.countDown();
+                awaitOrFail(release, "the test never released the lock holder; rolling it back");
+                return result;
+            }), pool);
+            if (!holding.await(10, TimeUnit.SECONDS)) {
+                if (holder.isDone()) {
+                    holder.join(); // rethrows the holder's own failure
+                }
+                throw new AssertionError("the lock holder did not write within 10 s");
+            }
+
+            CompletableFuture<UpsertResult> waiter = CompletableFuture.supplyAsync(
+                    () -> repository.upsertIfNotOlder(waiterTrade), pool);
+            await().atMost(Duration.ofSeconds(10)).until(() -> isBlockedBy(holderPid.get()));
+            release.countDown();
+
+            return new Race(holder.get(10, TimeUnit.SECONDS), waiter.get(10, TimeUnit.SECONDS));
+        } finally {
+            release.countDown();
+            pool.shutdown(); // not shutdownNow: never interrupt a commit in progress
+            pool.awaitTermination(10, TimeUnit.SECONDS);
+        }
+    }
+
+    /** True when some session in this database is waiting on a lock held by the given backend. */
+    private boolean isBlockedBy(int holderPid) {
         return jdbc.sql("""
                 SELECT count(*) FROM pg_stat_activity
-                 WHERE wait_event_type = 'Lock' AND query LIKE 'INSERT INTO trades%'
-                """).query(Long.class).single();
+                 WHERE datname = current_database() AND :holder = ANY(pg_blocking_pids(pid))
+                """).param("holder", holderPid).query(Long.class).single() > 0;
+    }
+
+    private static void awaitOrFail(CountDownLatch latch, String message) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException(message);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(message, e);
+        }
     }
 
     @Test
     @Tag("US-106.1")
     void should_keepTheHigherVersion_when_aLowerVersionWaitsOnAConcurrentHigherWrite() throws Exception {
-        // Arrange: v1 stored; transaction A writes v3 and holds its row lock without committing
+        // Arrange
         repository.upsertIfNotOlder(trade(1, "CP-1", TODAY));
-        CountDownLatch aHoldsTheLock = new CountDownLatch(1);
-        CountDownLatch releaseA = new CountDownLatch(1);
-        ExecutorService pool = Executors.newFixedThreadPool(2);
-        try {
-            CompletableFuture<UpsertResult> a = CompletableFuture.supplyAsync(() -> tx.execute(status -> {
-                UpsertResult result = repository.upsertIfNotOlder(trade(3, "CP-3", TODAY));
-                aHoldsTheLock.countDown();
-                awaitQuietly(releaseA);
-                return result;
-            }), pool);
-            assertThat(aHoldsTheLock.await(10, TimeUnit.SECONDS)).isTrue();
 
-            // Act: B writes v2 and blocks on A's row lock (A-23: guarded at the database level)
-            CompletableFuture<UpsertResult> b = CompletableFuture.supplyAsync(
-                    () -> repository.upsertIfNotOlder(trade(2, "CP-2", TODAY)), pool);
-            await().atMost(Duration.ofSeconds(10)).until(() -> sessionsWaitingForAnUpsertLock() > 0);
-            releaseA.countDown();
+        // Act: v3 holds the row lock; v2 waits on it (A-23: guarded at the database level)
+        Race race = race(trade(3, "CP-3", TODAY), trade(2, "CP-2", TODAY));
 
-            // Assert: v3 wins; v2 writes nothing and reports STALE, which the service turns into LOWER_VERSION (US-106.2)
-            assertThat(a.get(10, TimeUnit.SECONDS)).isEqualTo(UpsertResult.UPDATED);
-            assertThat(b.get(10, TimeUnit.SECONDS)).isEqualTo(UpsertResult.STALE);
-            assertThat(repository.findTrade(tradeId).orElseThrow().version()).isEqualTo(3);
-        } finally {
-            releaseA.countDown();
-            pool.shutdownNow();
-        }
+        // Assert: v3 wins; v2 writes nothing (STALE, which the service turns into LOWER_VERSION, US-106.2)
+        assertThat(race.holder()).isEqualTo(UpsertResult.UPDATED);
+        assertThat(race.waiter()).isEqualTo(UpsertResult.STALE);
+        assertThat(repository.findTrade(tradeId).orElseThrow().version()).isEqualTo(3);
     }
 
-    private static void awaitQuietly(CountDownLatch latch) {
-        try {
-            latch.await(10, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+    @Test
+    @Tag("US-106.1")
+    void should_storeTheHigherVersion_when_itWaitsOnAConcurrentLowerWrite() throws Exception {
+        // Arrange
+        repository.upsertIfNotOlder(trade(1, "CP-1", TODAY));
+
+        // Act: v2 holds the row lock; v3 waits on it
+        Race race = race(trade(2, "CP-2", TODAY), trade(3, "CP-3", TODAY));
+
+        // Assert: v2 was stored first, then replaced by v3 (US-106.1: "or replaced by v3")
+        assertThat(race.holder()).isEqualTo(UpsertResult.UPDATED);
+        assertThat(race.waiter()).isEqualTo(UpsertResult.UPDATED);
+        assertThat(repository.findTrade(tradeId).orElseThrow().version()).isEqualTo(3);
     }
 }

@@ -37,7 +37,7 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-105.1 | Full | `MandatoryFieldsValidatorTest` (each field named; 64-character limit), `TradeIngestionServiceTest` (rejected and audited) | |
 | US-105.2 | Full | `PositiveVersionValidatorTest`. The rejection path is the same one proven for US-105.1. | |
 | US-105.3 | Full | `MaturityDateFormatValidatorTest`, `MaturityDatesTest` (strict format, impossible dates) | |
-| US-106.1 | Full | `JdbcTradeRepositoryIT`: a deterministic race on real PostgreSQL (v2 waits on v3's row lock, then writes nothing); mutation-verified by removing the version guard | |
+| US-106.1 | Full | `JdbcTradeRepositoryIT`: deterministic races on real PostgreSQL in both orderings, the waiter identified with `pg_blocking_pids`: v2 waiting on v3 writes nothing (STALE → LOWER_VERSION in the service, US-106.2); v3 waiting on v2 replaces it. Each ordering is mutation-verified. | |
 | US-106.2 | Full | `TradeIngestionServiceTest`: re-validates after a lost race and retries once | |
 | US-201.1 | Full | `MaturityNotInPastValidatorTest`, `TradeIngestionServiceTest` (rejected, not written, counted as `MATURITY_IN_PAST`) | |
 | US-201.2 | Full | `MaturityNotInPastValidatorTest`: today and later dates are valid (the boundary) | |
