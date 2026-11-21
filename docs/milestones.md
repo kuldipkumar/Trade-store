@@ -19,3 +19,4 @@ One entry per story that is completed, tested, peer-reviewed and merged. The sam
 | 13 | US-107 Assignment example scenario | 2026-11-21 | #54 | 5 of 5 | /code-review: 1 important + 5 nits fixed |
 | 14 | US-401 Submit a trade over REST | 2026-11-21 | #56 | 6 of 6 | /code-review: 7 important + 3 nits fixed |
 | 15 | US-402 Get a trade by ID | 2026-11-21 | #57 | 2 of 2 | /code-review: 1 important + 6 nits handled |
+| 16 | US-403 List trades | 2026-11-21 | #58 | 2 of 2 | /code-review: 5 important + 2 nits handled |

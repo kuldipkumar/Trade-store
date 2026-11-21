@@ -321,4 +321,36 @@ class TradeApiIT {
         // Assert: not 405 from the static-resource handler
         assertThat(response.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
     }
+
+    @Test
+    @Tag("US-404.1")
+    void should_returnEveryAcceptedVersionInOrder_when_historyIsRequested() {
+        // Arrange: v1 then v2 accepted
+        post(json(1, "2099-05-20"));
+        post(json(2, "2099-06-20"));
+
+        // Act + Assert: history arrives through the outbox relay (eventually consistent, ADR-005)
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            EntityExchangeResult<JsonNode> response = get("/trades/" + tradeId + "/history");
+            assertThat(response.getStatus()).isEqualTo(HttpStatus.OK);
+            JsonNode versions = response.getResponseBody();
+            assertThat(versions.findValues("version")).extracting(JsonNode::asInt).containsExactly(1, 2);
+            assertThat(versions.get(0).path("outcome").asString()).isEqualTo("ACCEPTED");
+            assertThat(versions.get(1).path("outcome").asString()).isEqualTo("REPLACED");
+            assertThat(versions.get(1).path("maturityDate").asString()).isEqualTo("2099-06-20");
+            assertThat(versions.get(1).path("channel").asString()).isEqualTo("REST");
+            assertThat(versions.get(1).path("receivedTimestamp").asString()).isNotBlank();
+        });
+    }
+
+    @Test
+    @Tag("US-404.2")
+    void should_return404_when_noHistoryExists() {
+        // Act
+        EntityExchangeResult<JsonNode> response = get("/trades/" + tradeId + "/history");
+
+        // Assert
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("NOT_FOUND");
+    }
 }
