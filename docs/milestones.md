@@ -9,3 +9,4 @@ One entry per story that is completed, tested, peer-reviewed and merged. The sam
 | 3 | US-104 Reject a lower version | 2026-11-20 | #40 | 4 of 4 | before peer review existed |
 | 4 | US-101 Store a new trade | 2026-11-20 | #41 | 3 of 3 | before peer review existed |
 | 5 | US-201 Reject trades with a past maturity date | 2026-11-21 | #44 | 4 of 4 | before peer review existed |
+| 6 | US-205 "Today" follows the configured time zone | 2026-11-21 | #46 | 2 of 2 | Approve with notes |

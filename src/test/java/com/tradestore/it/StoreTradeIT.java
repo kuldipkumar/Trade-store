@@ -125,4 +125,30 @@ class StoreTradeIT {
         assertThat(metrics).contains("trade_outcomes_total{channel=\"REST\",outcome=\"ACCEPTED\",reason=\"NONE\"}");
         assertThat(metrics).contains("trade_processing_seconds_count{channel=\"REST\"}");
     }
+
+    @Test
+    @Tag("US-102.2")
+    void should_storeTheHigherVersion_when_versionsHaveAGap() {
+        // Arrange
+        ingestion.ingest(submission(1));
+
+        // Act (A-07: version gaps are allowed)
+        IngestionResult result = ingestion.ingest(submission(3));
+
+        // Assert
+        assertThat(result.outcome()).isEqualTo(Outcome.REPLACED);
+        assertThat(trades.findTrade(tradeId).orElseThrow().version()).isEqualTo(3);
+    }
+
+    @Test
+    @Tag("US-102.3")
+    void should_keepEveryAcceptedVersionInHistory_when_aHigherVersionReplacesTheTrade() {
+        // Act
+        ingestion.ingest(submission(1));
+        ingestion.ingest(submission(2));
+
+        // Assert: both versions arrive through the relay, ordered by version
+        await().atMost(RELAY_TIMEOUT).untilAsserted(() ->
+                assertThat(history.findByTradeId(tradeId)).extracting(e -> e.version()).containsExactly(1, 2));
+    }
 }
