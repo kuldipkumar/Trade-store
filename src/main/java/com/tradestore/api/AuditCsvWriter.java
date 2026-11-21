@@ -17,9 +17,15 @@ final class AuditCsvWriter {
     private static final String LINE_END = "\r\n"; // RFC 4180
 
     static void writeHeader(Writer out) throws IOException {
+        out.write(HEADER + LINE_END);
     }
 
     static void writeRow(AuditEvent event, Writer out) throws IOException {
+        String reasons = event.reasons().stream().map(v -> v.reason() + ": " + v.message())
+                .collect(Collectors.joining(";"));
+        out.write(String.join(",", event.eventId(), String.valueOf(event.eventTimestamp()),
+                nullToEmpty(event.tradeId()), event.version() == null ? "" : event.version().toString(),
+                event.outcome().name(), event.channel().name(), reasons) + LINE_END);
     }
 
     private static String nullToEmpty(String value) {
