@@ -86,6 +86,13 @@ public class GlobalExceptionHandler {
                 request);
     }
 
+    /** An out-of-range query parameter (US-403). */
+    @ExceptionHandler(InvalidRequestParameterException.class)
+    public ResponseEntity<ApiErrorResponse> invalidParameter(InvalidRequestParameterException e, HttpServletRequest request) {
+        return error(HttpStatus.BAD_REQUEST, List.of(new ApiErrorResponse.Reason("INVALID_PARAMETER", e.parameter(),
+                e.getMessage())), request);
+    }
+
     /** An unknown trade (US-402.2, US-404.2). */
     @ExceptionHandler(TradeNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> notFound(TradeNotFoundException e, HttpServletRequest request) {
