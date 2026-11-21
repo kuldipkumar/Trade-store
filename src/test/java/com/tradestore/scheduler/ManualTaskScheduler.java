@@ -1,7 +1,9 @@
 package com.tradestore.scheduler;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ScheduledFuture;
@@ -15,7 +17,14 @@ class ManualTaskScheduler implements TaskScheduler {
     record Scheduled(Runnable task, Instant at) {
     }
 
+    static final Instant NOW = Instant.parse("2026-11-21T09:00:00Z");
+
     final List<Scheduled> scheduled = new ArrayList<>();
+
+    @Override
+    public Clock getClock() {
+        return Clock.fixed(NOW, ZoneOffset.UTC);
+    }
 
     @Override
     public ScheduledFuture<?> schedule(Runnable task, Instant startTime) {

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -105,5 +106,25 @@ class ExpirySchedulerTest {
 
         // Assert
         verify(expiry, never()).expireMaturedTrades();
+    }
+
+    @Test
+    @Tag("US-203.1")
+    void should_retryTheStartupRunAfterTheInterval_when_itFails() {
+        // Arrange: the first attempt hits a transient database error, the retry succeeds
+        when(expiry.expireMaturedTrades())
+                .thenThrow(new DataAccessResourceFailureException("PostgreSQL not ready"))
+                .thenReturn(2);
+        scheduler.onApplicationReady();
+
+        // Act: first attempt
+        taskScheduler.runNext();
+
+        // Assert: a retry is scheduled one interval later, not left to tomorrow's cron
+        assertThat(taskScheduler.scheduled).singleElement()
+                .satisfies(next -> assertThat(next.at()).isEqualTo(ManualTaskScheduler.NOW.plus(Duration.ofMinutes(1))));
+        taskScheduler.runNext();
+        assertThat(taskScheduler.scheduled).isEmpty();
+        verify(expiry, times(2)).expireMaturedTrades();
     }
 }
