@@ -31,9 +31,14 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
 /**
- * US-107: the assignment's sample trades replayed through the real application (A-01: dates keep the shape of
- * the sample, relative to "today" = 2026-11-19). The steps build on each other, so they run in order and share
- * this instance; trade IDs carry a unique prefix so the audit counts are exact.
+ * US-107: the assignment's sample trades replayed against the real databases and outbox relay, at the level of
+ * the ingestion use case that both channels call (A-01: dates keep the shape of the sample, relative to
+ * "today" = 2026-11-19). The channel is recorded as STREAM because the assignment describes streamed trades; a
+ * replay through Kafka itself follows with US-301.
+ * <p>
+ * Deliberately a stateful scenario: the steps build on each other, so they run in order and share this
+ * instance, and cannot be run one by one (recorded in docs/06-test-review.md). Trade IDs carry a unique prefix
+ * so the audit counts are exact.
  */
 @IntegrationTest
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -82,6 +87,15 @@ class AssignmentScenarioIT {
                 .append("outcome", outcome.name()));
     }
 
+    private long audit(String tradeId, Outcome outcome) {
+        return mongo.getCollection("audit_events").countDocuments(new Document("tradeId", tradeId).append("outcome", outcome.name()));
+    }
+
+    private long rejected(String tradeId, ReasonCode reason) {
+        return mongo.getCollection("audit_events").countDocuments(new Document("tradeId", tradeId)
+                .append("outcome", "REJECTED").append("reasons.reason", reason.name()));
+    }
+
     @Test
     @Order(1)
     @Tag("US-107.1")
@@ -112,7 +126,8 @@ class AssignmentScenarioIT {
     void should_rejectT2v1AsLowerVersion_when_T2v2IsStored() {
         // Act + Assert: T2 v1, CP-1, B1, maturity 2027-05-20
         assertThatThrownBy(() -> ingestion.ingest(trade(t2, 1, "CP-1", "B1", "2027-05-20")))
-                .isInstanceOf(LowerVersionException.class);
+                .isInstanceOf(LowerVersionException.class)
+                .satisfies(e -> assertThat(((TradeRejectedException) e).reasons()).containsExactly(ReasonCode.LOWER_VERSION));
         assertThat(trades.findTrade(t2).orElseThrow().version()).isEqualTo(2);
     }
 
@@ -130,18 +145,33 @@ class AssignmentScenarioIT {
     @Test
     @Order(5)
     @Tag("US-107.5")
-    void should_expireT1AndT2AndAuditEveryOutcome_when_theClockMovesPastMaturity() {
+    void should_expireT1AndT2_when_theClockMovesPastMaturity() {
         // Act: the clock moves to 2027-05-21 and the expiry job runs
         clock.setToday(LocalDate.of(2027, 5, 21));
         expiry.expireMaturedTrades();
 
-        // Assert: T1 and T2 expired; the audit trail holds 2 ACCEPTED, 2 REJECTED and 2 EXPIRED entries
-        assertThat(trades.findById(t1).orElseThrow().expired()).isTrue();
-        assertThat(trades.findById(t2).orElseThrow().expired()).isTrue();
+        // Assert
+        await().atMost(RELAY_TIMEOUT).untilAsserted(() -> {
+            assertThat(trades.findById(t1).orElseThrow().expired()).isTrue();
+            assertThat(trades.findById(t2).orElseThrow().expired()).isTrue();
+        });
+    }
+
+    @Test
+    @Order(6)
+    @Tag("US-107.5")
+    void should_auditEveryOutcomeOfTheScenario_when_itIsComplete() {
+        // Assert: 2 ACCEPTED, 2 REJECTED and 2 EXPIRED entries, each for the right trade and reason
         await().atMost(RELAY_TIMEOUT).untilAsserted(() -> {
             assertThat(audit(Outcome.ACCEPTED)).isEqualTo(2);
             assertThat(audit(Outcome.REJECTED)).isEqualTo(2);
             assertThat(audit(Outcome.EXPIRED)).isEqualTo(2);
+            assertThat(audit(t1, Outcome.ACCEPTED)).isEqualTo(1);
+            assertThat(audit(t2, Outcome.ACCEPTED)).isEqualTo(1);
+            assertThat(rejected(t2, ReasonCode.LOWER_VERSION)).isEqualTo(1);
+            assertThat(rejected(t3, ReasonCode.MATURITY_IN_PAST)).isEqualTo(1);
+            assertThat(audit(t1, Outcome.EXPIRED)).isEqualTo(1);
+            assertThat(audit(t2, Outcome.EXPIRED)).isEqualTo(1);
         });
     }
 }

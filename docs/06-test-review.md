@@ -43,7 +43,7 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-107.2 | Full | `AssignmentScenarioIT` step 2: T2 v2 ACCEPTED | |
 | US-107.3 | Full | `AssignmentScenarioIT` step 3: T2 v1 → LowerVersionException; T2 stays v2 | |
 | US-107.4 | Full | `AssignmentScenarioIT` step 4: T3 v3 (maturity 2026-05-20) → MATURITY_IN_PAST; not stored | |
-| US-107.5 | Full | `AssignmentScenarioIT` step 5: clock to 2027-05-21, expiry → T1 and T2 expired; audit 2 ACCEPTED, 2 REJECTED, 2 EXPIRED (mutation-verified) | |
+| US-107.5 | Full | `AssignmentScenarioIT` steps 5–6: clock to 2027-05-21, expiry → T1 and T2 expired; audit 2 ACCEPTED, 2 REJECTED (T2 LOWER_VERSION, T3 MATURITY_IN_PAST), 2 EXPIRED, each for the right trade (mutation-verified) | A replay through Kafka follows with US-301. |
 | US-201.1 | Full | `MaturityNotInPastValidatorTest`, `TradeIngestionServiceTest` (rejected, not written, counted as `MATURITY_IN_PAST`) | |
 | US-201.2 | Full | `MaturityNotInPastValidatorTest`: today and later dates are valid (the boundary) | |
 | US-201.3 | Full | `TradeIngestionServiceTest`: v2 with past maturity is rejected and no write is attempted, so v1 stays | |
@@ -87,6 +87,7 @@ These criteria belong to stories already started, but no test covers them yet. T
 | Q4 | Inline fully-qualified class names in three tests | Fixed: imports |
 | Q5 | The end-to-end tests used the real system clock; US-107 and US-202 need to move "today". | Fixed in US-202: `MutableClock`, a `@Primary` test bean that tests pin and reset (used by `ExpiryIT` and `AssignmentScenarioIT`). |
 | Q6 | The traceability parser missed tests with multi-line annotations | Fixed test-first (`MultiLineAnnotationTest`) |
+| Q7 | `AssignmentScenarioIT` is a deliberately stateful, ordered scenario (AGENTS.md §5 prefers independent tests). Its steps cannot run alone. | Accepted deviation: the assignment scenario is a sequence by nature. Each step still checks one behaviour. |
 
 ## Decision D8 (accepted: option A, 2026-11-20)
 
