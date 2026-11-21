@@ -28,6 +28,7 @@ public class ExpiryScheduler {
     private final Counter failures;
     private final boolean runAtStartup;
     private final TaskScheduler taskScheduler;
+    private final Duration startupRetryInterval;
 
     @Autowired
     public ExpiryScheduler(ExpiryService expiry, MeterRegistry registry, TaskScheduler taskScheduler,
@@ -42,6 +43,7 @@ public class ExpiryScheduler {
         this.failures = registry.counter("trade.job.failures", "job", "expiry");
         this.runAtStartup = runAtStartup;
         this.taskScheduler = taskScheduler;
+        this.startupRetryInterval = startupRetryInterval;
     }
 
     /** Catches up once at startup, so trades that matured while the service was down are not left stale (US-203). */
@@ -49,19 +51,33 @@ public class ExpiryScheduler {
     public void onApplicationReady() {
         if (runAtStartup) {
             // Off the startup thread: Spring reports readiness only after ready-event listeners return.
-            taskScheduler.schedule(this::runScheduled, taskScheduler.getClock().instant());
+            taskScheduler.schedule(() -> startupAttempt(1), taskScheduler.getClock().instant());
         }
     }
 
     /** Default: daily at 00:05 in the configured zone, or the server's zone if none is set (A-18, US-205). */
     @Scheduled(cron = "${trade-store.expiry.cron:0 5 0 * * *}", zone = "${trade-store.time-zone:}")
     public void runScheduled() {
+        runOnce();
+    }
+
+    private void startupAttempt(int attempt) {
+        if (!runOnce()) {
+            taskScheduler.schedule(() -> startupAttempt(attempt + 1),
+                    taskScheduler.getClock().instant().plus(startupRetryInterval));
+        }
+    }
+
+    /** @return true if the run succeeded */
+    private boolean runOnce() {
         try {
             int expired = expiry.expireMaturedTrades();
             log.info("Expiry run expired {} trades", expired);
+            return true;
         } catch (RuntimeException e) {
             failures.increment();
             log.error("Expiry run failed; the next run catches up", e);
+            return false;
         }
     }
 }
