@@ -26,7 +26,11 @@ end
 
 == GET /trades?expired&page&size ==
 Client -> TradeController : list(expired, page, size)
-TradeController -> TradeQueryService : list(expired, page, min(size, max-page-size))
+alt page < 0 or size < 1
+  TradeController -> GlobalExceptionHandler : InvalidRequestParameterException
+  GlobalExceptionHandler --> Client : 400 INVALID_PARAMETER
+end
+TradeController -> TradeQueryService : list(expired, page, size)  (size capped at max-page-size)
 TradeQueryService -> TradeRepository : findPage(...)  (ORDER BY trade_id)
 TradeController --> Client : 200 PageResponse {content, page, size, totalElements, totalPages}
 
