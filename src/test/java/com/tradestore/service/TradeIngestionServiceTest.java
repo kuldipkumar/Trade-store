@@ -215,4 +215,23 @@ class TradeIngestionServiceTest {
                 .hasMessage("Trade T1 version 2 is lower than stored version 4");
         verify(trades, times(2)).upsertIfNotOlder(any());
     }
+
+    private double outcomes(String outcome, String reason) {
+        var counter = registry.find("trade.outcomes").tags("outcome", outcome, "reason", reason).counter();
+        return counter == null ? 0 : counter.count();
+    }
+
+    @Test
+    @Tag("US-604.2")
+    void should_countTheOutcome_when_tradeIsStored() {
+        // Arrange
+        when(trades.findById("T1")).thenReturn(Optional.empty());
+        when(trades.upsertIfNotOlder(any())).thenReturn(UpsertResult.INSERTED);
+
+        // Act
+        service.ingest(validSubmission());
+
+        // Assert
+        assertThat(outcomes("ACCEPTED", "NONE")).isEqualTo(1.0);
+    }
 }
