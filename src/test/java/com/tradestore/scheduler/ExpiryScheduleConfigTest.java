@@ -1,6 +1,7 @@
 package com.tradestore.scheduler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -94,8 +95,9 @@ class ExpiryScheduleConfigTest {
             // Act: the service has started (the cron is disabled so only the startup run can call it)
             publishApplicationReady(context);
 
-            // Assert
-            verify(context.getBean(ExpiryService.class)).expireMaturedTrades();
+            // Assert: the run happens on the task scheduler, shortly after
+            await().atMost(Duration.ofSeconds(5))
+                    .untilAsserted(() -> verify(context.getBean(ExpiryService.class)).expireMaturedTrades());
         });
     }
 }

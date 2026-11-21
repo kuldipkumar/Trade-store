@@ -83,11 +83,14 @@ class ExpirySchedulerTest {
 
     @Test
     @Tag("US-203.1")
-    void should_runTheExpiryOnce_when_theApplicationIsReady() {
+    void should_runTheExpiryOffTheStartupThread_when_theApplicationIsReady() {
         // Act (catch up after downtime, A-51)
         scheduler.onApplicationReady();
 
-        // Assert
+        // Assert: startup is not held up (readiness is reported only after ready-event listeners return)
+        verify(expiry, never()).expireMaturedTrades();
+        assertThat(taskScheduler.scheduled).hasSize(1);
+        taskScheduler.runNext();
         verify(expiry).expireMaturedTrades();
     }
 
