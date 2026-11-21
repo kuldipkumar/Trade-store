@@ -29,7 +29,8 @@ public class ExpiryScheduler {
     @Scheduled(cron = "${trade-store.expiry.cron:0 5 0 * * *}", zone = "${trade-store.time-zone:}")
     public void runScheduled() {
         try {
-            expiry.expireMaturedTrades();
+            int expired = expiry.expireMaturedTrades();
+            log.info("Expiry run expired {} trades", expired);
         } catch (RuntimeException e) {
             failures.increment();
             log.error("Expiry run failed; the next run catches up", e);
