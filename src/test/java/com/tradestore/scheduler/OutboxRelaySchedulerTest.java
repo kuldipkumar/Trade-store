@@ -1,5 +1,6 @@
 package com.tradestore.scheduler;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -38,5 +39,24 @@ class OutboxRelaySchedulerTest {
 
         // Act + Assert: the events stay in the outbox; the next poll retries them
         assertThatCode(scheduler::poll).doesNotThrowAnyException();
+    }
+
+    private double failedPolls() {
+        var counter = registry.find("trade.job.failures").tag("job", "outbox-relay").counter();
+        return counter == null ? 0 : counter.count();
+    }
+
+    @Test
+    @Tag("US-501.3")
+    void should_countEachFailedPoll_when_theRelayFails() {
+        // Arrange
+        when(relay.relayBatch()).thenThrow(new DataAccessResourceFailureException("MongoDB down"));
+
+        // Act
+        scheduler.poll();
+        scheduler.poll();
+
+        // Assert
+        assertThat(failedPolls()).isEqualTo(2.0);
     }
 }
