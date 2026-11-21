@@ -14,6 +14,8 @@ import org.springframework.dao.TransientDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -69,6 +71,18 @@ public class GlobalExceptionHandler {
         log.warn("Trade store unavailable for {} {}", request.getMethod(), request.getRequestURI(), e);
         return error(HttpStatus.SERVICE_UNAVAILABLE, List.of(new ApiErrorResponse.Reason("SERVICE_UNAVAILABLE", null,
                 "The trade store is temporarily unavailable; nothing was stored. Please retry.")), request);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiErrorResponse> mediaType(HttpMediaTypeNotSupportedException e, HttpServletRequest request) {
+        return error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, List.of(new ApiErrorResponse.Reason("UNSUPPORTED_MEDIA_TYPE", null,
+                "Send the trade as application/json")), request);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiErrorResponse> method(HttpRequestMethodNotSupportedException e, HttpServletRequest request) {
+        return error(HttpStatus.METHOD_NOT_ALLOWED, List.of(new ApiErrorResponse.Reason("METHOD_NOT_ALLOWED", null,
+                e.getMethod() + " is not supported here")), request);
     }
 
     /** Anything else, including permanent database errors: 500 in the standard shape, never "retry". */
