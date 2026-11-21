@@ -15,6 +15,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
@@ -24,6 +26,7 @@ import org.springframework.kafka.support.converter.ConversionException;
 import org.springframework.kafka.support.serializer.DeserializationException;
 import org.springframework.messaging.converter.MessageConversionException;
 import org.springframework.messaging.handler.invocation.MethodArgumentResolutionException;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.util.backoff.ExponentialBackOff;
 
 /**
@@ -50,10 +53,10 @@ public class KafkaConfig {
 
     /**
      * The listener's error handler (ADR-002). A malformed message is never retried (A-27): it is published to the
-     * dead-letter topic with Spring's diagnostic headers and audited as POISON (US-302). Anything else, for
-     * example the database briefly unavailable, is redelivered with exponential backoff (default 1 s, doubling
-     * to 10 s) up to {@code trade-store.retry.max-attempts} deliveries (default 3); the partition waits meanwhile.
-     * Then it is dead-lettered and audited as FAILED (US-303).
+     * dead-letter topic with Spring's diagnostic headers and audited as POISON (US-302). A connection failure (the
+     * database unreachable) is retried with exponential backoff until it succeeds, so an outage never loses a trade
+     * or reorders a key's versions (D9 option C); the partition waits meanwhile. Any other failure is retried up to
+     * {@code trade-store.retry.max-attempts} deliveries (default 3), then dead-lettered and audited as FAILED (US-303).
      */
     @Bean
     DefaultErrorHandler kafkaErrorHandler(KafkaOperations<?, ?> kafka, TradeStoreProperties properties,
@@ -90,6 +93,23 @@ public class KafkaConfig {
         return t;
     }
 
+    private static ExponentialBackOff backOff(TradeStoreProperties.Retry retry) {
+        ExponentialBackOff backOff = new ExponentialBackOff(retry.initialInterval().toMillis(), retry.multiplier());
+        backOff.setMaxInterval(retry.maxInterval().toMillis());
+        return backOff;
+    }
+
+    /** The database is unreachable or briefly unable to answer, anywhere in the cause chain (same set as REST 503). */
+    static boolean isConnectionFailure(Throwable failure) {
+        for (Throwable t = failure; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof DataAccessResourceFailureException || t instanceof TransientDataAccessException
+                    || t instanceof CannotCreateTransactionException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** A failure that retrying can't fix, anywhere in the cause chain: the message itself is unusable (POISON). */
     static boolean isUnreadable(Throwable failure) {
         for (Throwable t = failure; t != null; t = t.getCause() == t ? null : t.getCause()) {
@@ -103,17 +123,20 @@ public class KafkaConfig {
 
     DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer, TradeStoreProperties.Retry retry,
                                      MeterRegistry registry) {
-        ExponentialBackOff backOff = new ExponentialBackOff(retry.initialInterval().toMillis(), retry.multiplier());
-        backOff.setMaxInterval(retry.maxInterval().toMillis());
-        backOff.setMaxAttempts(retry.maxAttempts() - 1); // retries after the first delivery
-        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, backOff);
+        ExponentialBackOff limited = backOff(retry);
+        limited.setMaxAttempts(retry.maxAttempts() - 1); // retries after the first delivery
+        DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, limited);
         NOT_RETRYABLE.forEach(handler::addNotRetryableExceptions);
+        // D9 option C: the database being unreachable is waited out, never dead-lettered; the partition pauses.
+        ExponentialBackOff unlimited = backOff(retry);
+        handler.setBackOffFunction((record, failure) -> isConnectionFailure(failure) ? unlimited : null);
         handler.setRetryListeners((record, failure, attempt) -> {
             // Called for every failed delivery; count only those that will be redelivered (AGENTS.md section 4).
-            if (!isUnreadable(failure) && attempt < retry.maxAttempts()) {
+            if (!isUnreadable(failure) && (isConnectionFailure(failure) || attempt < retry.maxAttempts())) {
                 registry.counter("trade.retries").increment();
-                log.warn("Retrying position={}-{}-{} attempt={} of {}: {}", record.topic(), record.partition(),
-                        record.offset(), attempt, retry.maxAttempts(), rootCause(failure).getClass().getName());
+                log.warn("Retrying position={}-{}-{} attempt={}{}: {}", record.topic(), record.partition(),
+                        record.offset(), attempt, isConnectionFailure(failure) ? " (until the database is back)"
+                                : " of " + retry.maxAttempts(), rootCause(failure).getClass().getName());
             }
         });
         return handler;

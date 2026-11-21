@@ -29,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -36,8 +37,8 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
- * US-303: a transient failure is retried with backoff; when it persists, the message is dead-lettered and audited
- * as FAILED. The SQL store is a spy that fails on demand. Short backoff so the test runs quickly (US-303.3).
+ * US-303: a connection failure is retried with backoff until it recovers (D9); any other failure that persists is
+ * dead-lettered and audited as FAILED. The SQL store is a spy that fails on demand. Short backoff so the test runs quickly (US-303.3).
  */
 @IntegrationTest
 // Startup expiry is off: it would call the spied repository on another thread while @BeforeEach stubs it, and
@@ -75,7 +76,7 @@ class RetryThenDeadLetterIT {
         doAnswer(invocation -> {
             Trade trade = invocation.getArgument(0);
             if (trade.tradeId().equals(broken)) {
-                throw new DataAccessResourceFailureException("PostgreSQL down");
+                throw new InvalidDataAccessResourceUsageException("relation \"trades\" does not exist");
             }
             if (trade.tradeId().equals(flaky) && flakyFailures.getAndIncrement() < 2) {
                 throw new DataAccessResourceFailureException("PostgreSQL restarting");
@@ -136,20 +137,20 @@ class RetryThenDeadLetterIT {
 
     @Test
     @Tag("US-303.2")
-    void should_deadLetterAndAuditAsFailedAfterThreeAttempts_when_theStoreKeepsFailing() throws Exception {
+    void should_deadLetterAndAuditAsFailedAfterThreeAttempts_when_aNonConnectionFailurePersists() throws Exception {
         // Act
         publish(broken);
 
-        // Assert: on the DLT with the cause, audited as FAILED, after exactly 3 attempts (default max-attempts)
+        // Assert: not a connection problem (D9), so after exactly 3 attempts it is on the DLT and audited FAILED
         List<ConsumerRecord<String, String>> dead = deadLetters(broken, TIMEOUT);
         assertThat(dead).hasSize(1);
         assertThat(header(dead.getFirst(), "kafka_dlt-exception-cause-fqcn"))
-                .isEqualTo(DataAccessResourceFailureException.class.getName());
+                .isEqualTo(InvalidDataAccessResourceUsageException.class.getName());
         await().atMost(TIMEOUT).untilAsserted(() -> {
             Document entry = mongo.getCollection("audit_events")
                     .find(new Document("outcome", "FAILED").append("payload", new Document("$regex", broken))).first();
             assertThat(entry).isNotNull();
-            assertThat(entry.getString("error")).contains("DataAccessResourceFailureException");
+            assertThat(entry.getString("error")).contains("InvalidDataAccessResourceUsageException");
         });
         verify(trades, times(3)).upsertIfNotOlder(argThat(t -> t.tradeId().equals(broken)));
         assertThat(trades.findById(broken)).isEmpty();
