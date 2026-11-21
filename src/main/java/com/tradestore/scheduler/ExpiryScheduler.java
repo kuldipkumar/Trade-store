@@ -29,6 +29,7 @@ public class ExpiryScheduler {
     private final boolean runAtStartup;
     private final TaskScheduler taskScheduler;
     private final Duration startupRetryInterval;
+    private final int startupMaxAttempts;
 
     @Autowired
     public ExpiryScheduler(ExpiryService expiry, MeterRegistry registry, TaskScheduler taskScheduler,
@@ -44,6 +45,7 @@ public class ExpiryScheduler {
         this.runAtStartup = runAtStartup;
         this.taskScheduler = taskScheduler;
         this.startupRetryInterval = startupRetryInterval;
+        this.startupMaxAttempts = startupMaxAttempts;
     }
 
     /** Catches up once at startup, so trades that matured while the service was down are not left stale (US-203). */
@@ -62,10 +64,15 @@ public class ExpiryScheduler {
     }
 
     private void startupAttempt(int attempt) {
-        if (!runOnce()) {
-            taskScheduler.schedule(() -> startupAttempt(attempt + 1),
-                    taskScheduler.getClock().instant().plus(startupRetryInterval));
+        if (runOnce()) {
+            return;
         }
+        if (attempt >= startupMaxAttempts) {
+            log.error("Startup expiry catch-up gave up after {} attempts; the scheduled run will catch up", attempt);
+            return;
+        }
+        taskScheduler.schedule(() -> startupAttempt(attempt + 1),
+                taskScheduler.getClock().instant().plus(startupRetryInterval));
     }
 
     /** @return true if the run succeeded */
