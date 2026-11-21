@@ -29,11 +29,6 @@ package "api" {
     + noRoute(NoResourceFoundException) : 404
     + unexpected(Exception) : Spring client errors keep their 4xx; else 500
   }
-  class TradeJsonParser {
-    + parse(body : String, channel) : TradeSubmission
-  }
-  class MalformedTradeException
-  TradeJsonParser ..> MalformedTradeException : throws
   TradeController --> TradeJsonParser
   class RequestSizeLimitFilter <<OncePerRequestFilter>>
   class AuditCsvWriter
@@ -194,6 +189,13 @@ TradeRepository ..> UpsertResult
 
 package "service.validation" {
   class CompositeTradeValidator
+}
+package "service.parsing" {
+  class TradeJsonParser {
+    + parse(body : String, channel) : TradeSubmission
+  }
+  class MalformedTradeException
+  TradeJsonParser ..> MalformedTradeException : throws
 }
 class Clock <<java.time>>
 

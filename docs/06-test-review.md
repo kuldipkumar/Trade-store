@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301; US-304). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -60,6 +60,9 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-301.1 | Full | `StreamIngestionIT` (published → stored and audited as STREAM, real Kafka), `TradeConsumerTest` | |
 | US-301.2 | Full | `StreamIngestionIT`: v1, v2, v3 keyed by tradeId → v3 stored, no REJECTED | |
 | US-301.3 | Full | `StreamIngestionIT`: no auto-commit; the container commits after the listener returns (mutation-verified) | |
+| US-302.1 | Partial | `KafkaErrorHandlingTest` (malformed → recovered at once, no retries), `TradeConsumerTest` (empty message is malformed) | The dead-letter topic and the valid-trade-still-stored check come with **US-302**. |
+| US-303.1 | Partial | `KafkaErrorHandlingTest` (a transient database failure is retried, not recovered) | End to end with a failing store: **US-303**. |
+| US-304.1 | Full | `StreamIngestionIT` (a lower version consumed → exactly one REJECTED, stays one; v2 still stored), `TradeConsumerTest` | |
 | US-302.2 | Partial | `AuditEventFactoryTest`: the payload is capped at the configured size | The POISON entry itself. Closed in **US-302**. |
 | US-401.1 | Full | `TradeApiIT` (201 with the stored trade); `GlobalExceptionHandlerTest` (503 when the database is down, decision D7) | |
 | US-401.2 | Full | `TradeApiIT`: same and higher version → 200 with the stored trade | |
