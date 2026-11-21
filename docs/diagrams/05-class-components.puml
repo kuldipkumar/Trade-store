@@ -7,7 +7,7 @@ left to right direction
 
 package "api" {
   class TradeController {
-    + submit(req : TradeRequest) : ResponseEntity<TradeResponse>
+    + submit(body : String) : ResponseEntity<TradeResponse>
     + get(tradeId) : TradeResponse
     + list(expired : Boolean, page, size) : PageResponse<TradeResponse>
     + history(tradeId) : List<TradeVersionResponse>
@@ -17,11 +17,21 @@ package "api" {
     + reportCsv(query : AuditQuery, out : OutputStream)
   }
   class GlobalExceptionHandler <<@RestControllerAdvice>> {
-    + handleRejected(TradeRejectedException) : ApiErrorResponse
-    + handleNotFound(TradeNotFoundException) : ApiErrorResponse
-    + handleUnreadable(HttpMessageNotReadableException) : ApiErrorResponse
-    + handleTooLarge(PayloadTooLargeException) : ApiErrorResponse
+    + rejected(TradeRejectedException) : 400 | 409 | 422 (D6)
+    + malformed(MalformedTradeException) : 400
+    + unreadable(HttpMessageNotReadableException) : 400 | 413
+    + tooLarge(PayloadTooLargeException) : 413
+    + unavailable(connection/transient/resource failure) : 503 (D7)
+    + mediaType(...) : 415
+    + method(...) : 405
+    + unexpected(Exception) : 500
   }
+  class TradeJsonParser {
+    + parse(body : String, channel) : TradeSubmission
+  }
+  class MalformedTradeException
+  TradeJsonParser ..> MalformedTradeException : throws
+  TradeController --> TradeJsonParser
   class RequestSizeLimitFilter <<OncePerRequestFilter>>
   class AuditCsvWriter
   class PayloadTooLargeException

@@ -8,7 +8,10 @@ import com.tradestore.domain.Violation;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/** US-105.1: tradeId, counterPartyId and bookId must be present, not blank, and fit the 64-character columns. */
+/**
+ * US-105.1: tradeId, counterPartyId and bookId must be present, not blank, fit the 64-character columns, and
+ * contain no control characters (which PostgreSQL would otherwise reject later as a database error).
+ */
 @Component
 @Order(100)
 public class MandatoryFieldsValidator implements TradeValidator {
@@ -30,6 +33,8 @@ public class MandatoryFieldsValidator implements TradeValidator {
             violations.add(Violation.invalidField(field, field + " is required"));
         } else if (value.length() > MAX_ID_LENGTH) {
             violations.add(Violation.invalidField(field, field + " must be at most " + MAX_ID_LENGTH + " characters"));
+        } else if (value.chars().anyMatch(Character::isISOControl)) {
+            violations.add(Violation.invalidField(field, field + " must not contain control characters"));
         }
     }
 }

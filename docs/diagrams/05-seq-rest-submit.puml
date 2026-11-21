@@ -5,38 +5,49 @@ autonumber
 actor Client
 participant RequestSizeLimitFilter
 participant TradeController
+participant TradeJsonParser
 participant TradeIngestionService
 participant GlobalExceptionHandler
 
-Client -> RequestSizeLimitFilter : POST /trades (JSON)
+Client -> RequestSizeLimitFilter : POST /trades
 
-alt body > max-request-bytes (default 1 MB)
+alt Content-Length > max-request-bytes (default 1 MiB)
   RequestSizeLimitFilter --> Client : 413 Payload Too Large (US-401.6)
-else size OK
-  RequestSizeLimitFilter -> TradeController : submit(TradeRequest)
-  alt malformed JSON or wrong JSON types
-    TradeController -> GlobalExceptionHandler : HttpMessageNotReadableException
-    GlobalExceptionHandler --> Client : 400 {timestamp, status, error, reasons[], path}\n(not audited: nothing to identify the trade)
-  else parsed
-    TradeController -> TradeIngestionService : ingest(TradeSubmission, channel = REST)
-    alt ACCEPTED
-      TradeIngestionService --> TradeController : IngestionResult(ACCEPTED, trade)
-      TradeController --> Client : 201 Created + TradeResponse (US-401.1)
-    else REPLACED
-      TradeIngestionService --> TradeController : IngestionResult(REPLACED, trade)
-      TradeController --> Client : 200 OK + TradeResponse (US-401.2)
-    else TradeRejectedException (already audited as REJECTED)
-      TradeIngestionService --> GlobalExceptionHandler : throw
-      alt any INVALID_FIELD
-        GlobalExceptionHandler --> Client : 400 Bad Request, field errors (US-401.5)
-      else LowerVersionException
-        GlobalExceptionHandler --> Client : 409 Conflict (US-401.3)
-      else MATURITY_IN_PAST only
-        GlobalExceptionHandler --> Client : 422 Unprocessable Entity (US-401.4)
+else size OK, or chunked (counted while read)
+  RequestSizeLimitFilter -> TradeController : submit(body as text)
+  alt Content-Type is not application/json, or the method is not POST
+    TradeController -> GlobalExceptionHandler : HttpMediaTypeNotSupported / HttpRequestMethodNotSupported
+    GlobalExceptionHandler --> Client : 415 / 405 {timestamp, status, error, reasons[], path}
+  else chunked body grows past the limit while read
+    RequestSizeLimitFilter -> GlobalExceptionHandler : PayloadTooLargeException (possibly wrapped)
+    GlobalExceptionHandler --> Client : 413 PAYLOAD_TOO_LARGE
+  else body read
+    TradeController -> TradeJsonParser : parse(body, REST)
+    alt not JSON, not an object, or a field of the wrong JSON type (e.g. version 1.9)
+      TradeJsonParser -> GlobalExceptionHandler : MalformedTradeException
+      GlobalExceptionHandler --> Client : 400 MALFORMED_REQUEST\n(not audited: nothing identifies the trade, D3)
+    else parsed (the original text is kept as the audit payload)
+      TradeController -> TradeIngestionService : ingest(TradeSubmission)
+      alt ACCEPTED
+        TradeController --> Client : 201 Created + TradeResponse (US-401.1)
+      else REPLACED
+        TradeController --> Client : 200 OK + TradeResponse (US-401.2)
+      else TradeRejectedException (already audited as REJECTED)
+        TradeIngestionService --> GlobalExceptionHandler : throw
+        alt any INVALID_FIELD
+          GlobalExceptionHandler --> Client : 400 listing every reason (US-401.5)
+        else LowerVersionException
+          GlobalExceptionHandler --> Client : 409 Conflict (US-401.3)
+        else MATURITY_IN_PAST only
+          GlobalExceptionHandler --> Client : 422 Unprocessable Content (US-401.4)
+        end
+      else database unavailable (no connection, transient or resource failure)
+        TradeIngestionService --> GlobalExceptionHandler : throw
+        GlobalExceptionHandler --> Client : 503 SERVICE_UNAVAILABLE, logged (D7; nothing stored or audited)
+      else any other error (e.g. a permanent database error)
+        TradeIngestionService --> GlobalExceptionHandler : throw
+        GlobalExceptionHandler --> Client : 500 INTERNAL_ERROR, logged with stack trace
       end
-    else DataAccessException (database unavailable)
-      TradeIngestionService --> GlobalExceptionHandler : throw
-      GlobalExceptionHandler --> Client : 503 Service Unavailable (nothing stored or audited)
     end
   end
 end
