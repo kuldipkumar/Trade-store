@@ -19,7 +19,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
-/** The expiry job against real PostgreSQL, outbox relay and MongoDB, with "today" pinned to 2026-11-19. */
+/**
+ * The expiry job against real PostgreSQL, outbox relay and MongoDB, with "today" pinned to 2026-11-19.
+ * Pinning the shared test clock and running expiry affect the whole shared test database: every assertion is
+ * scoped to this test's own trade IDs, and pinned-clock ITs must not run in parallel (Failsafe runs test
+ * classes sequentially; do not enable parallel execution).
+ */
 @IntegrationTest
 class ExpiryIT {
 
@@ -102,7 +107,11 @@ class ExpiryIT {
     void should_changeNothingAndWriteNoDuplicateAudit_when_jobRunsAgain() {
         // Arrange
         expiry.expireMaturedTrades();
-        await().atMost(RELAY_TIMEOUT).untilAsserted(() -> assertThat(expiredAuditEntries(maturedYesterday)).isEqualTo(1));
+        // The relay writes MongoDB first and deletes the outbox row on commit: wait for both.
+        await().atMost(RELAY_TIMEOUT).untilAsserted(() -> {
+            assertThat(expiredAuditEntries(maturedYesterday)).isEqualTo(1);
+            assertThat(outboxRows(maturedYesterday)).isZero();
+        });
 
         // Act (A-42: idempotent)
         expiry.expireMaturedTrades();

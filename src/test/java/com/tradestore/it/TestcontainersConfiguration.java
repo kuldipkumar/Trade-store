@@ -1,11 +1,11 @@
 package com.tradestore.it;
 
+import com.tradestore.config.ClockConfig;
+import com.tradestore.config.TradeStoreProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import java.time.ZoneId;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.testcontainers.mongodb.MongoDBContainer;
@@ -52,7 +52,7 @@ public class TestcontainersConfiguration {
     /** Replaces the application's Clock in ITs so a test can pin "today" (see MutableClock). */
     @Bean
     @Primary
-    MutableClock testClock() {
-        return new MutableClock(ZoneId.systemDefault());
+    MutableClock testClock(TradeStoreProperties properties) {
+        return new MutableClock(ClockConfig.zoneOf(properties)); // same zone rule as production (ClockConfig)
     }
 }
