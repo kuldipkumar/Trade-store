@@ -1,8 +1,10 @@
 package com.tradestore.persistence;
 
 import java.util.List;
+import java.util.Map;
 
 import com.tradestore.domain.AuditEvent;
+import com.tradestore.domain.Outcome;
 
 /** The append-only audit trail (A-45). There are deliberately no update or delete operations. */
 public interface AuditEventStore {
@@ -12,4 +14,7 @@ public interface AuditEventStore {
 
     /** One page of matching entries, oldest first (US-502). The trade snapshot is not part of the audit document. */
     List<AuditEvent> find(AuditQuery query, int page, int size);
+
+    /** Matching entries counted per outcome, computed by the database (US-502.3); outcomes with none are absent. */
+    Map<Outcome, Long> countByOutcome(AuditQuery query);
 }

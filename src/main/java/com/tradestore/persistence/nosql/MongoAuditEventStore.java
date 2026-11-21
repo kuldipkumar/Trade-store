@@ -2,6 +2,7 @@ package com.tradestore.persistence.nosql;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import com.tradestore.domain.AuditEvent;
 import com.tradestore.domain.Channel;
@@ -57,6 +58,11 @@ public class MongoAuditEventStore implements AuditEventStore {
         Query mongoQuery = Query.query(matching(query)).with(Sort.by("eventTimestamp", "_id"))
                 .skip((long) page * size).limit(size);
         return mongo.find(mongoQuery, Document.class, COLLECTION).stream().map(MongoAuditEventStore::toEvent).toList();
+    }
+
+    @Override
+    public Map<Outcome, Long> countByOutcome(AuditQuery query) {
+        return Map.of();
     }
 
     private static Criteria matching(AuditQuery query) {

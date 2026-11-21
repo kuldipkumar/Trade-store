@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import com.tradestore.domain.AuditEvent;
@@ -126,6 +127,22 @@ class MongoStoresIT {
         // Assert
         assertThat(page0).containsExactly(r1, r2);
         assertThat(page1).containsExactly(r3);
+    }
+
+    @Test
+    @Tag("US-502.3")
+    void should_countMatchingEntriesPerOutcome_when_summarising() {
+        // Arrange: inside the range 1 accepted and 2 rejected; one rejection outside it
+        List.of(audited(Outcome.ACCEPTED, "2026-11-03T10:00:00Z"), audited(Outcome.REJECTED, "2026-11-03T11:00:00Z"),
+                audited(Outcome.REJECTED, "2026-11-03T12:00:00Z"), audited(Outcome.REJECTED, "2026-11-04T12:00:00Z"))
+                .forEach(auditEvents::insert);
+
+        // Act
+        Map<Outcome, Long> counts = auditEvents.countByOutcome(new AuditQuery(Instant.parse("2026-11-03T00:00:00Z"),
+                Instant.parse("2026-11-04T00:00:00Z"), tradeId, null));
+
+        // Assert
+        assertThat(counts).isEqualTo(Map.of(Outcome.ACCEPTED, 1L, Outcome.REJECTED, 2L));
     }
 
     @Test
