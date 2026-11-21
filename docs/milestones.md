@@ -21,3 +21,6 @@ One entry per story that is completed, tested, peer-reviewed and merged. The sam
 | 15 | US-402 Get a trade by ID | 2026-11-21 | #57 | 2 of 2 | /code-review: 1 important + 6 nits handled |
 | 16 | US-403 List trades | 2026-11-21 | #58 | 2 of 2 | /code-review: 5 important + 2 nits handled |
 | 17 | US-404 View a trade's version history | 2026-11-21 | #59 | 2 of 2 | /code-review: 1 important + 2 nits handled |
+| 18 | US-501 Record every outcome in an append-only audit trail | 2026-11-21 | #55 (+#56, #60) | 3 of 3 | /code-review: 2 important + 7 nits fixed |
+| 19 | US-301 Consume trades from the stream | 2026-11-21 | #60 | 3 of 3 | /code-review: 3 important + 3 nits fixed |
+| 20 | US-304 Business rejections are final on the stream | 2026-11-21 | #60 | 1 of 1 | found and fixed by /code-review of #60 |

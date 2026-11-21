@@ -12,6 +12,7 @@ import java.util.List;
  * @param eventTimestamp when the outcome happened, in UTC (A-53)
  * @param payload        the original input, capped in size; never logged (A-32)
  * @param trade          the stored trade for ACCEPTED, REPLACED and EXPIRED outcomes; null otherwise
+ * @param error          why a POISON or FAILED message was dead-lettered (exception class and message); null otherwise
  */
 public record AuditEvent(
         String eventId,
@@ -22,9 +23,16 @@ public record AuditEvent(
         Channel channel,
         Instant eventTimestamp,
         String payload,
-        Trade trade) {
+        Trade trade,
+        String error) {
 
     public AuditEvent {
         reasons = reasons == null ? List.of() : List.copyOf(reasons);
+    }
+
+    /** An outcome of a readable trade, which never carries an error. */
+    public AuditEvent(String eventId, String tradeId, Integer version, Outcome outcome, List<Violation> reasons,
+                      Channel channel, Instant eventTimestamp, String payload, Trade trade) {
+        this(eventId, tradeId, version, outcome, reasons, channel, eventTimestamp, payload, trade, null);
     }
 }

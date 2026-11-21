@@ -64,6 +64,24 @@ class MongoStoresIT {
     }
 
     @Test
+    @Tag("US-302.2")
+    void should_storeTheErrorOfADeadLetteredMessage_when_aPoisonEntryIsInserted() {
+        // Arrange
+        String position = "trades.inbound-0-" + UUID.randomUUID();
+        AuditEvent event = new AuditEvent(position, null, null, Outcome.POISON, List.of(), Channel.STREAM,
+                Instant.parse("2026-11-21T10:15:30Z"), "not json", null, "MalformedTradeException: not JSON");
+
+        // Act
+        auditEvents.insert(event);
+
+        // Assert
+        Document doc = mongo.getCollection("audit_events").find(new Document("_id", position)).first();
+        assertThat(doc).isNotNull();
+        assertThat(doc.getString("outcome")).isEqualTo("POISON");
+        assertThat(doc.getString("error")).isEqualTo("MalformedTradeException: not JSON");
+    }
+
+    @Test
     @Tag("US-501.1")
     void should_keepOneEntry_when_sameEventIsInsertedTwice() {
         // Arrange: a relay crash after the MongoDB write but before the outbox delete (ADR-005)

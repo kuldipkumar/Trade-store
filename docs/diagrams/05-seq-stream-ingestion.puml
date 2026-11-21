@@ -1,11 +1,11 @@
 @startuml 05-seq-stream-ingestion
-title Kafka ingestion: happy path, business rejection, poison pill, transient failure\n(implemented: happy path, rejection, retry with backoff; dead-letter topic and POISON/FAILED audit: US-302/303)
+title Kafka ingestion: happy path, business rejection, poison pill, transient failure\n(implemented: happy path, rejection, poison pill to the DLT; retry limit and FAILED: US-303; size limit: US-607)
 
 autonumber
 queue "trades.inbound" as Topic
 participant "Listener container\n(DefaultErrorHandler)" as Container
-participant SizeLimitedJsonDeserializer
 participant TradeConsumer
+participant TradeJsonParser
 participant TradeIngestionService
 participant DeadLetterAuditRecoverer
 participant DeadLetterPublishingRecoverer
@@ -13,30 +13,28 @@ queue "trades.inbound.DLT" as DLT
 participant AuditEventStore
 database MongoDB
 
-Topic -> Container : poll() record (key = tradeId)
-Container -> SizeLimitedJsonDeserializer : deserialize(bytes)
-note right of SizeLimitedJsonDeserializer
-  Wrapped by ErrorHandlingDeserializer.
-  Unknown JSON fields are ignored (US-607.2).
-end note
+Topic -> Container : poll() record (key = tradeId, value read as String)
+Container -> TradeConsumer : onMessage(value)
+TradeConsumer -> TradeJsonParser : parse(value, STREAM)
 
-alt bytes > max-message-bytes, not JSON, or wrong JSON types (POISON: US-302, US-607.1)
-  SizeLimitedJsonDeserializer --> Container : DeserializationException (not retryable)
+alt empty, not JSON, or wrong JSON types (POISON: US-302; oversized: US-607.1)
+  TradeJsonParser --> TradeConsumer : MalformedTradeException
+  TradeConsumer --> Container : rethrow (not retryable)
   Container -> DeadLetterAuditRecoverer : accept(record, exception)
   DeadLetterAuditRecoverer -> DeadLetterPublishingRecoverer : accept(record, exception)
-  DeadLetterPublishingRecoverer -> DLT : publish original bytes + headers\n(topic, partition, offset, exception class/message)
-  DeadLetterAuditRecoverer -> AuditEventStore : insert(POISON, _id = "topic-partition-offset", payload capped)
+  DeadLetterPublishingRecoverer -> DLT : publish key + value, partition by key, + headers\n(topic, partition, offset, exception class/message)
+  DeadLetterAuditRecoverer -> DeadLetterAuditRecoverer : count trade.deadletter{type=POISON},\nWARN position (no payload)
+  DeadLetterAuditRecoverer -> AuditEventStore : insert(POISON, _id = "topic-partition-offset", payload capped, error)
   AuditEventStore -> MongoDB : insertOne (duplicate key = already recorded)
   note right of DeadLetterAuditRecoverer
-    A MongoDB failure here is logged at ERROR,
-    not thrown: the DLT record is the durable
+    A MongoDB failure here is logged at ERROR
+    and counted, not thrown: the DLT record is the durable
     fallback (ADR-005 §3).
   end note
   Container -> Topic : commit offset (after the DLT publish)
 
 else valid JSON
-  SizeLimitedJsonDeserializer --> Container : TradeMessage
-  Container -> TradeConsumer : onMessage(record)
+  TradeJsonParser --> TradeConsumer : TradeSubmission
   TradeConsumer -> TradeIngestionService : ingest(TradeSubmission, channel = STREAM)
 
   alt ACCEPTED / REPLACED (US-301)

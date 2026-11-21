@@ -1,14 +1,21 @@
 package com.tradestore.messaging;
 
 import com.tradestore.config.TradeStoreProperties;
+import com.tradestore.persistence.AuditEventStore;
+import com.tradestore.service.AuditEventFactory;
 import com.tradestore.service.parsing.MalformedTradeException;
+import java.util.function.BiFunction;
+
+import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.admin.NewTopic;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.TopicPartition;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.util.backoff.ExponentialBackOff;
 
@@ -19,24 +26,39 @@ import org.springframework.util.backoff.ExponentialBackOff;
 @Configuration(proxyBeanMethods = false)
 public class KafkaConfig {
 
-    private static final Logger log = LoggerFactory.getLogger(KafkaConfig.class);
-
     @Bean
     NewTopic tradesInbound(TradeStoreProperties properties) {
         TradeStoreProperties.Kafka kafka = properties.kafka();
         return TopicBuilder.name(kafka.topic()).partitions(kafka.partitions()).replicas(kafka.replicationFactor()).build();
     }
 
+    /** The dead-letter topic (US-302), sized like the inbound topic; records are partitioned by key. */
+    @Bean
+    NewTopic tradesDeadLetter(TradeStoreProperties properties) {
+        TradeStoreProperties.Kafka kafka = properties.kafka();
+        return TopicBuilder.name(kafka.dltTopic()).partitions(kafka.partitions()).replicas(kafka.replicationFactor()).build();
+    }
+
     /**
-     * The listener's error handler (ADR-002). A malformed message is never retried (A-27). Anything else, for
+     * The listener's error handler (ADR-002). A malformed message is never retried (A-27): it is published to the
+     * dead-letter topic with Spring's diagnostic headers and audited as POISON (US-302). Anything else, for
      * example the database briefly unavailable, is redelivered with exponential backoff (1 s, doubling to 10 s)
-     * until it succeeds, so no trade is dropped; the partition waits meanwhile. US-302/US-303 add the
-     * dead-letter topic and a retry limit.
+     * until it succeeds, so no trade is dropped; the partition waits meanwhile. US-303 adds a retry limit.
      */
     @Bean
-    DefaultErrorHandler kafkaErrorHandler() {
-        return errorHandler((record, e) -> log.error("Unreadable message on {}-{} at offset {} is skipped: {}",
-                record.topic(), record.partition(), record.offset(), e.toString()));
+    DefaultErrorHandler kafkaErrorHandler(KafkaOperations<?, ?> kafka, TradeStoreProperties properties,
+                                          AuditEventFactory events, AuditEventStore audit, MeterRegistry registry) {
+        String deadLetterTopic = properties.kafka().dltTopic();
+        DeadLetterPublishingRecoverer publisher = new DeadLetterPublishingRecoverer(kafka, deadLetterDestination(deadLetterTopic));
+        return errorHandler(new DeadLetterAuditRecoverer(publisher, events, audit, registry));
+    }
+
+    /**
+     * Where a dead letter goes: the producer chooses the partition by key (-1), so it exists even when the inbound
+     * topic has more partitions than the dead-letter topic. The original partition is in the headers (US-302.3).
+     */
+    static BiFunction<ConsumerRecord<?, ?>, Exception, TopicPartition> deadLetterDestination(String topic) {
+        return (record, e) -> new TopicPartition(topic, -1);
     }
 
     DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer) {
