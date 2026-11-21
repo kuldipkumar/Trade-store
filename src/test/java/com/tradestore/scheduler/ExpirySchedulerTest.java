@@ -3,6 +3,7 @@ package com.tradestore.scheduler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -85,5 +86,18 @@ class ExpirySchedulerTest {
 
         // Assert
         verify(expiry).expireMaturedTrades();
+    }
+
+    @Test
+    @Tag("US-203.1")
+    void should_notRunTheExpiryAtStartup_when_runAtStartupIsDisabled() {
+        // Arrange
+        ExpiryScheduler disabled = new ExpiryScheduler(expiry, registry, false);
+
+        // Act
+        disabled.onApplicationReady();
+
+        // Assert
+        verify(expiry, never()).expireMaturedTrades();
     }
 }
