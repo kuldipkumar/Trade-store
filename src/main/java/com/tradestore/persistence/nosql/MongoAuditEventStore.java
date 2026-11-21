@@ -54,7 +54,8 @@ public class MongoAuditEventStore implements AuditEventStore {
 
     @Override
     public List<AuditEvent> find(AuditQuery query, int page, int size) {
-        Query mongoQuery = Query.query(matching(query)).with(Sort.by("eventTimestamp", "_id"));
+        Query mongoQuery = Query.query(matching(query)).with(Sort.by("eventTimestamp", "_id"))
+                .skip((long) page * size).limit(size);
         return mongo.find(mongoQuery, Document.class, COLLECTION).stream().map(MongoAuditEventStore::toEvent).toList();
     }
 
@@ -62,6 +63,9 @@ public class MongoAuditEventStore implements AuditEventStore {
         Criteria criteria = new Criteria();
         if (query.tradeId() != null) {
             criteria = criteria.and("tradeId").is(query.tradeId());
+        }
+        if (query.outcome() != null) {
+            criteria = criteria.and("outcome").is(query.outcome().name());
         }
         if (query.from() != null || query.until() != null) {
             Criteria time = criteria.and("eventTimestamp");
