@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.listener.ConsumerRecordRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 
 /**
  * Kafka topics owned by the trade store (ADR-002). Declared here so they exist with the intended partition
@@ -18,5 +20,10 @@ public class KafkaConfig {
                            @Value("${trade-store.kafka.partitions:6}") int partitions,
                            @Value("${trade-store.kafka.replication-factor:1}") short replicas) {
         return TopicBuilder.name(topic).partitions(partitions).replicas(replicas).build();
+    }
+
+    /** Stub: implemented test-first (KafkaErrorHandlingTest). */
+    DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer) {
+        return new DefaultErrorHandler(recoverer, new org.springframework.util.backoff.FixedBackOff(0, 0));
     }
 }

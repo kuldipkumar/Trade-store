@@ -118,4 +118,21 @@ class StreamIngestionIT {
             assertThat(description.partitions()).hasSize(6);
         }
     }
+
+    @Test
+    @Tag("US-304.1")
+    void should_auditARejectionOnceAndNotRetryIt_when_aLowerVersionIsConsumed() throws Exception {
+        // Arrange
+        publish(2);
+        await().atMost(TIMEOUT).untilAsserted(() -> assertThat(trades.findById(tradeId).map(StoredTrade::version)).contains(2));
+
+        // Act
+        publish(1);
+
+        // Assert: exactly one REJECTED entry, and it stays one (no redelivery); v2 is still stored
+        await().atMost(TIMEOUT).untilAsserted(() -> assertThat(audit("REJECTED")).isEqualTo(1));
+        await().during(Duration.ofSeconds(3)).atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> assertThat(audit("REJECTED")).isEqualTo(1));
+        assertThat(trades.findById(tradeId).map(StoredTrade::version)).contains(2);
+    }
 }
