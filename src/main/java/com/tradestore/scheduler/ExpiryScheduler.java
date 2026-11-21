@@ -1,5 +1,7 @@
 package com.tradestore.scheduler;
 
+import java.time.Duration;
+
 import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.service.ExpiryService;
 import io.micrometer.core.instrument.Counter;
@@ -9,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -26,11 +29,14 @@ public class ExpiryScheduler {
     private final boolean runAtStartup;
 
     @Autowired
-    public ExpiryScheduler(ExpiryService expiry, MeterRegistry registry, TradeStoreProperties properties) {
-        this(expiry, registry, properties.expiry().runAtStartup());
+    public ExpiryScheduler(ExpiryService expiry, MeterRegistry registry, TaskScheduler taskScheduler,
+                           TradeStoreProperties properties) {
+        this(expiry, registry, taskScheduler, properties.expiry().runAtStartup(),
+                properties.expiry().startupRetryInterval(), properties.expiry().startupMaxAttempts());
     }
 
-    ExpiryScheduler(ExpiryService expiry, MeterRegistry registry, boolean runAtStartup) {
+    ExpiryScheduler(ExpiryService expiry, MeterRegistry registry, TaskScheduler taskScheduler, boolean runAtStartup,
+                    Duration startupRetryInterval, int startupMaxAttempts) {
         this.expiry = expiry;
         this.failures = registry.counter("trade.job.failures", "job", "expiry");
         this.runAtStartup = runAtStartup;

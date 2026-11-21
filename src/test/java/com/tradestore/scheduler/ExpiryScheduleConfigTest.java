@@ -19,9 +19,12 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.config.CronTask;
 import org.springframework.scheduling.config.ScheduledTask;
 import org.springframework.scheduling.config.ScheduledTaskHolder;
@@ -31,10 +34,15 @@ import org.springframework.scheduling.support.SimpleTriggerContext;
 class ExpiryScheduleConfigTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withUserConfiguration(SchedulingConfig.class, ExpiryScheduler.class)
+            .withUserConfiguration(SchedulingConfig.class, BindProperties.class, ExpiryScheduler.class)
             .withBean(ExpiryService.class, () -> mock(ExpiryService.class))
             .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
-            .withBean(TradeStoreProperties.class, () -> new TradeStoreProperties(null, null, null, null));
+            .withBean(TaskScheduler.class, ThreadPoolTaskScheduler::new);
+
+    /** Binds trade-store.* exactly as the application does. */
+    @EnableConfigurationProperties(TradeStoreProperties.class)
+    static class BindProperties {
+    }
 
     private static List<CronTask> cronTasks(ApplicationContext context) {
         return context.getBean(ScheduledTaskHolder.class).getScheduledTasks().stream()

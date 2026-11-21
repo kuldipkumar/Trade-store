@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.tradestore.service.ExpiryService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.sql.SQLException;
+import java.time.Duration;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,9 @@ class ExpirySchedulerTest {
 
     private final ExpiryService expiry = mock(ExpiryService.class);
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
-    private final ExpiryScheduler scheduler = new ExpiryScheduler(expiry, registry, true);
+    private final ManualTaskScheduler taskScheduler = new ManualTaskScheduler();
+    private final ExpiryScheduler scheduler =
+            new ExpiryScheduler(expiry, registry, taskScheduler, true, Duration.ofMinutes(1), 3);
 
     @Test
     @Tag("US-202.1")
@@ -92,7 +95,7 @@ class ExpirySchedulerTest {
     @Tag("US-203.1")
     void should_notRunTheExpiryAtStartup_when_runAtStartupIsDisabled() {
         // Arrange
-        ExpiryScheduler disabled = new ExpiryScheduler(expiry, registry, false);
+        ExpiryScheduler disabled = new ExpiryScheduler(expiry, registry, taskScheduler, false, Duration.ofMinutes(1), 3);
 
         // Act
         disabled.onApplicationReady();
