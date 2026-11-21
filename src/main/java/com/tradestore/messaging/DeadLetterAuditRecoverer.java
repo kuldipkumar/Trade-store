@@ -43,6 +43,7 @@ public class DeadLetterAuditRecoverer implements ConsumerRecordRecoverer {
             audit.insert(events.deadLettered(position, Outcome.POISON,
                     record.value() == null ? null : record.value().toString(), cause.toString()));
         } catch (RuntimeException auditFailed) {
+            registry.counter("trade.deadletter.audit.failures").increment();
             log.error("Dead-lettered message {} could not be audited; the dead-letter topic holds it: {}", position,
                     auditFailed.toString());
         }
