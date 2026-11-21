@@ -93,4 +93,17 @@ class ListTradesIT {
         assertThat(zeroSize.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(negativePage.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("INVALID_PARAMETER");
     }
+
+    @Test
+    @Tag("US-403.1")
+    void should_return400NotServerError_when_aParameterHasTheWrongType() {
+        // Act
+        EntityExchangeResult<JsonNode> page = list("?page=abc");
+        EntityExchangeResult<JsonNode> expired = list("?expired=maybe");
+
+        // Assert
+        assertThat(page.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(expired.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(page.getResponseBody().path("reasons").get(0).path("field").asString()).isEqualTo("page");
+    }
 }

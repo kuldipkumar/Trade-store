@@ -307,4 +307,26 @@ class JdbcTradeRepositoryIT {
         assertThat(expired.content()).allMatch(Trade::expired).extracting(Trade::tradeId).contains(tradeId + "-gone");
         assertThat(live.content()).noneMatch(Trade::expired).extracting(Trade::tradeId).contains(tradeId + "-live");
     }
+
+    @Test
+    @Tag("US-403.1")
+    void should_sortByCodePointIndependentOfTheDatabaseLocale_when_listing() {
+        // Arrange: mixed case, where locale-aware and code-point orders differ ("B" < "a" by code point)
+        for (String suffix : List.of("-a", "-B", "-c")) {
+            repository.upsertIfNotOlder(new Trade(tradeId + suffix, 1, "CP-1", "B1", MATURITY, TODAY, false));
+        }
+
+        // Act: page through everything, keep ours
+        List<String> ours = new java.util.ArrayList<>();
+        for (int page = 0; ; page++) {
+            PageResult<Trade> result = repository.findPage(null, page, 500);
+            result.content().stream().map(Trade::tradeId).filter(id -> id.startsWith(tradeId)).forEach(ours::add);
+            if (page + 1 >= result.totalPages()) {
+                break;
+            }
+        }
+
+        // Assert: stable, locale-independent order
+        assertThat(ours).containsExactly(tradeId + "-B", tradeId + "-a", tradeId + "-c");
+    }
 }
