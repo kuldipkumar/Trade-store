@@ -4,6 +4,8 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.tradestore.domain.Channel;
+import com.tradestore.domain.Outcome;
 import com.tradestore.domain.Trade;
 import com.tradestore.persistence.OutboxRepository;
 import com.tradestore.persistence.TradeRepository;
@@ -23,6 +25,7 @@ public class ExpiryService {
     private final AuditEventFactory events;
     private final TransactionOperations transactions;
     private final Clock clock;
+    private final TradeMetrics metrics;
 
     public ExpiryService(TradeRepository trades, OutboxRepository outbox, AuditEventFactory events,
                          TransactionOperations transactions, Clock clock, TradeMetrics metrics) {
@@ -31,6 +34,7 @@ public class ExpiryService {
         this.events = events;
         this.transactions = transactions;
         this.clock = clock;
+        this.metrics = metrics;
     }
 
     /** @return the number of trades newly marked expired */
@@ -41,6 +45,7 @@ public class ExpiryService {
             changed.forEach(trade -> outbox.append(events.expired(trade)));
             return changed;
         });
+        expired.forEach(trade -> metrics.recordOutcome(Outcome.EXPIRED, List.of(), Channel.SCHEDULER));
         return expired.size();
     }
 }
