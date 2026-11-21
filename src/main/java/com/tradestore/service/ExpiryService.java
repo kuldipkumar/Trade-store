@@ -31,6 +31,12 @@ public class ExpiryService {
     private final Clock clock;
     private final TradeMetrics metrics;
 
+    /** Stub constructor: batching implemented test-first. */
+    ExpiryService(TradeRepository trades, OutboxRepository outbox, AuditEventFactory events,
+                  TransactionOperations transactions, Clock clock, TradeMetrics metrics, int batchSize) {
+        this(trades, outbox, events, transactions, clock, metrics);
+    }
+
     public ExpiryService(TradeRepository trades, OutboxRepository outbox, AuditEventFactory events,
                          TransactionOperations transactions, Clock clock, TradeMetrics metrics) {
         this.trades = trades;
