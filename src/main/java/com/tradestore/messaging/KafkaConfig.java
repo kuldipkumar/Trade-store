@@ -51,7 +51,8 @@ public class KafkaConfig {
                                           AuditEventFactory events, AuditEventStore audit, MeterRegistry registry) {
         String deadLetterTopic = properties.kafka().dltTopic();
         DeadLetterPublishingRecoverer publisher = new DeadLetterPublishingRecoverer(kafka, deadLetterDestination(deadLetterTopic));
-        return errorHandler(new DeadLetterAuditRecoverer(publisher, events, audit, registry), properties.retry());
+        return errorHandler(new DeadLetterAuditRecoverer(publisher, events, audit, registry, KafkaConfig::isUnreadable),
+                properties.retry());
     }
 
     /**
@@ -60,6 +61,11 @@ public class KafkaConfig {
      */
     static BiFunction<ConsumerRecord<?, ?>, Exception, TopicPartition> deadLetterDestination(String topic) {
         return (record, e) -> new TopicPartition(topic, -1);
+    }
+
+    /** A failure that retrying can't fix: the message itself is unusable (POISON). */
+    static boolean isUnreadable(Throwable failure) {
+        return failure instanceof MalformedTradeException;
     }
 
     DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer, TradeStoreProperties.Retry retry) {

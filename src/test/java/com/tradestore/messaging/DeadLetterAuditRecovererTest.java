@@ -44,7 +44,7 @@ class DeadLetterAuditRecovererTest {
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final DeadLetterAuditRecoverer recoverer = new DeadLetterAuditRecoverer(publisher,
             new AuditEventFactory(Clock.fixed(NOW, ZoneOffset.UTC), new TradeStoreProperties(null, null, null, null, null, null, null)),
-            audit, registry);
+            audit, registry, KafkaConfig::isUnreadable);
 
     private final ConsumerRecord<String, String> record = new ConsumerRecord<>("trades.inbound", 3, 42L, "T1", "{bad");
     private final Exception failure = new ListenerExecutionFailedException("listener failed",
