@@ -57,7 +57,7 @@ public class KafkaConfig {
         String deadLetterTopic = properties.kafka().dltTopic();
         DeadLetterPublishingRecoverer publisher = new DeadLetterPublishingRecoverer(kafka, deadLetterDestination(deadLetterTopic));
         return errorHandler(new DeadLetterAuditRecoverer(publisher, events, audit, registry, KafkaConfig::isUnreadable),
-                properties.retry());
+                properties.retry(), registry);
     }
 
     /**
@@ -89,7 +89,8 @@ public class KafkaConfig {
         return false;
     }
 
-    DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer, TradeStoreProperties.Retry retry) {
+    DefaultErrorHandler errorHandler(ConsumerRecordRecoverer recoverer, TradeStoreProperties.Retry retry,
+                                     MeterRegistry registry) {
         ExponentialBackOff backOff = new ExponentialBackOff(retry.initialInterval().toMillis(), retry.multiplier());
         backOff.setMaxInterval(retry.maxInterval().toMillis());
         backOff.setMaxAttempts(retry.maxAttempts() - 1); // retries after the first delivery

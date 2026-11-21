@@ -11,11 +11,15 @@ import java.util.stream.Stream;
 
 import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.service.parsing.MalformedTradeException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.kafka.support.serializer.DeserializationException;
@@ -30,8 +34,9 @@ import org.springframework.kafka.listener.MessageListenerContainer;
 class KafkaErrorHandlingTest {
 
     private final ConsumerRecordRecoverer recoverer = mock(ConsumerRecordRecoverer.class);
+    private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
     private final DefaultErrorHandler handler = new KafkaConfig().errorHandler(recoverer,
-            new TradeStoreProperties.Retry(3, Duration.ofMillis(1), 2.0, Duration.ofMillis(2)));
+            new TradeStoreProperties.Retry(3, Duration.ofMillis(1), 2.0, Duration.ofMillis(2)), registry);
     private final ConsumerRecord<String, String> record = new ConsumerRecord<>("trades.inbound", 0, 42L, "T1", "{bad");
 
     private boolean fail(Exception cause) {
@@ -125,5 +130,29 @@ class KafkaErrorHandlingTest {
     void should_notClassifyAsUnreadable_when_theFailureIsTransient() {
         // Act + Assert
         assertThat(KafkaConfig.isUnreadable(new DataAccessResourceFailureException("PostgreSQL down"))).isFalse();
+    }
+
+    @Test
+    @Tag("US-303.1")
+    @Tag("US-604.2")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_countAndLogEachRetry_when_aTransientFailureIsRedelivered(CapturedOutput output) {
+        // Act
+        fail(new DataAccessResourceFailureException("PostgreSQL restarting"));
+
+        // Assert: AGENTS.md section 4, every retry is visible (code review of PR #62)
+        assertThat(registry.counter("trade.retries").count()).isEqualTo(1.0);
+        assertThat(output).contains("WARN").contains("position=trades.inbound-0-42 attempt=1")
+                .contains("DataAccessResourceFailureException").doesNotContain("{bad");
+    }
+
+    @Test
+    @Tag("US-302.1")
+    void should_notCountARetry_when_theFailureIsNotRetryable() {
+        // Act
+        fail(new MalformedTradeException("not JSON"));
+
+        // Assert
+        assertThat(registry.find("trade.retries").counter()).isNull();
     }
 }
