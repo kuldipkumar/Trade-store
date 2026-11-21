@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.client.EntityExchangeResult;
 import org.springframework.test.web.servlet.client.RestTestClient;
 import tools.jackson.databind.JsonNode;
@@ -147,5 +148,30 @@ class AuditReportIT {
         // Assert: the standard error shape
         assertThat(response.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("INVALID_PARAMETER");
+    }
+
+    @Test
+    @Tag("US-503.1")
+    void should_returnACsvWithAHeaderAndOneRowPerEntry_when_csvIsAccepted() {
+        // Arrange
+        record(Outcome.ACCEPTED, "2026-11-19T10:00:00");
+        audit.insert(new AuditEvent(UUID.randomUUID().toString(), tradeId, 2, Outcome.REJECTED,
+                List.of(Violation.lowerVersion(2, 3), Violation.invalidField("bookId", "bookId is required, got \"\"")),
+                Channel.STREAM, local("2026-11-19T11:00:00"), "{}", null));
+
+        // Act
+        EntityExchangeResult<String> response = rest.get().uri("/reports/audit?tradeId=" + tradeId)
+                .accept(MediaType.parseMediaType("text/csv")).exchange().expectBody(String.class).returnResult();
+
+        // Assert: oldest first; the payload is not exported; RFC 4180 quoting
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getResponseHeaders().getContentType().toString()).startsWith("text/csv");
+        List<String> lines = response.getResponseBody().lines().toList();
+        assertThat(lines).hasSize(3);
+        assertThat(lines.get(0)).isEqualTo("eventId,eventTimestamp,tradeId,version,outcome,channel,reasons");
+        assertThat(lines.get(1)).endsWith("," + local("2026-11-19T10:00:00") + "," + tradeId + ",1,ACCEPTED,REST,");
+        assertThat(lines.get(2)).endsWith("," + local("2026-11-19T11:00:00") + "," + tradeId
+                + ",2,REJECTED,STREAM,\"LOWER_VERSION: version 2 is lower than stored version 3;"
+                + "INVALID_FIELD: bookId is required, got \"\"\"\"\"");
     }
 }
