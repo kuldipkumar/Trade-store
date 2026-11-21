@@ -304,4 +304,18 @@ class TradeIngestionServiceTest {
         assertThat(output).contains("outcome=ACCEPTED tradeId=T1 version=1 channel=REST");
         assertThat(output).doesNotContain("PAYLOAD-MARKER");
     }
+
+    @Test
+    @Tag("US-604.3")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_logTheReasons_when_tradeIsRejected(CapturedOutput output) {
+        // Arrange
+        when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 2, false)));
+
+        // Act
+        assertThatThrownBy(() -> service.ingest(withVersion(1))).isInstanceOf(LowerVersionException.class);
+
+        // Assert (format from docs/05-lld.md section 8)
+        assertThat(output).contains("outcome=REJECTED tradeId=T1 version=1 channel=REST reasons=[LOWER_VERSION]");
+    }
 }
