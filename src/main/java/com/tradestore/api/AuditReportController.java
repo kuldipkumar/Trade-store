@@ -27,9 +27,18 @@ public class AuditReportController {
                                       @RequestParam(defaultValue = "0") int page,
                                       @RequestParam(defaultValue = "50") int size) {
         PageParameters.validate(page, size);
+        requireSupportedYear("from", from);
+        requireSupportedYear("to", to);
         if (from != null && to != null && from.isAfter(to)) {
             throw new InvalidRequestParameterException("from", "from must not be after to");
         }
         return AuditReportResponse.from(reports.report(from, to, tradeId, outcome, page, size));
+    }
+
+    /** ISO allows years far beyond what the date arithmetic and MongoDB dates can hold. */
+    private static void requireSupportedYear(String name, LocalDate date) {
+        if (date != null && (date.getYear() < 1 || date.getYear() > 9999)) {
+            throw new InvalidRequestParameterException(name, name + " must be between 0001-01-01 and 9999-12-31");
+        }
     }
 }
