@@ -7,6 +7,8 @@ import com.tradestore.service.parsing.MalformedTradeException;
 import com.tradestore.service.parsing.TradeJsonParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.tradestore.config.TradeStoreProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
@@ -26,10 +28,17 @@ public class TradeConsumer {
 
     private final TradeIngestionService ingestion;
     private final TradeJsonParser parser;
+    private final int maxMessageBytes;
 
-    public TradeConsumer(TradeIngestionService ingestion, TradeJsonParser parser) {
+    @Autowired
+    public TradeConsumer(TradeIngestionService ingestion, TradeJsonParser parser, TradeStoreProperties properties) {
+        this(ingestion, parser, properties.kafka().maxMessageBytes());
+    }
+
+    TradeConsumer(TradeIngestionService ingestion, TradeJsonParser parser, int maxMessageBytes) {
         this.ingestion = ingestion;
         this.parser = parser;
+        this.maxMessageBytes = maxMessageBytes;
     }
 
     @KafkaListener(topics = "${trade-store.kafka.topic:trades.inbound}", groupId = "${spring.kafka.consumer.group-id:trade-store}")

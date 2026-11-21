@@ -28,7 +28,8 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
         api = api == null ? new Api(Api.DEFAULT_MAX_REQUEST_BYTES, Api.DEFAULT_MAX_PAGE_SIZE) : api;
         retry = retry == null ? new Retry(Retry.DEFAULT_MAX_ATTEMPTS, Retry.DEFAULT_INITIAL_INTERVAL,
                 Retry.DEFAULT_MULTIPLIER, Retry.DEFAULT_MAX_INTERVAL) : retry;
-        kafka = kafka == null ? new Kafka(Kafka.DEFAULT_TOPIC, Kafka.DEFAULT_PARTITIONS, Kafka.DEFAULT_REPLICATION_FACTOR, null) : kafka;
+        kafka = kafka == null ? new Kafka(Kafka.DEFAULT_TOPIC, Kafka.DEFAULT_PARTITIONS, Kafka.DEFAULT_REPLICATION_FACTOR, null,
+                Kafka.DEFAULT_MAX_MESSAGE_BYTES) : kafka;
     }
 
     /** @param maxPayloadChars longer payloads are truncated in the audit trail (US-302.2, A-52) */
@@ -96,9 +97,12 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
      *                          remaps keys to partitions and can reorder a trade's versions (A-22).
      * @param replicationFactor broker copies of each partition
      * @param dltTopic          where unprocessable messages are moved (US-302); defaults to {@code <topic>.DLT}
+     * @param maxMessageBytes   larger messages are poison pills, never parsed (US-607.1, A-47)
      */
     public record Kafka(@DefaultValue("trades.inbound") String topic, @DefaultValue("6") int partitions,
-                        @DefaultValue("1") short replicationFactor, String dltTopic) {
+                        @DefaultValue("1") short replicationFactor, String dltTopic,
+                        @DefaultValue("1") int maxMessageBytes) {
+        static final int DEFAULT_MAX_MESSAGE_BYTES = 1;
         static final String DEFAULT_TOPIC = "trades.inbound";
         static final int DEFAULT_PARTITIONS = 6;
         static final short DEFAULT_REPLICATION_FACTOR = 1;

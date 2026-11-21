@@ -178,4 +178,14 @@ class TradeStorePropertiesTest {
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause().hasMessageContaining("trade-store.retry.");
     }
+
+    @Test
+    @Tag("US-607.1")
+    void should_limitStreamMessagesTo1MbByDefault_when_bound() {
+        // Act + Assert (A-47)
+        assertThat(bind(Map.of()).kafka().maxMessageBytes()).isEqualTo(1_048_576);
+        assertThat(bind(Map.of("trade-store.kafka.max-message-bytes", "2048")).kafka().maxMessageBytes()).isEqualTo(2048);
+        assertThatThrownBy(() -> bind(Map.of("trade-store.kafka.max-message-bytes", "0")))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class);
+    }
 }

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.tradestore.service.parsing.TradeJsonParser;
 import java.util.List;
@@ -26,7 +27,7 @@ import tools.jackson.databind.json.JsonMapper;
 class TradeConsumerTest {
 
     private final TradeIngestionService ingestion = mock(TradeIngestionService.class);
-    private final TradeConsumer consumer = new TradeConsumer(ingestion, new TradeJsonParser(JsonMapper.builder().build()));
+    private final TradeConsumer consumer = new TradeConsumer(ingestion, new TradeJsonParser(JsonMapper.builder().build()), 120);
 
     @Test
     @Tag("US-301.1")
@@ -58,5 +59,18 @@ class TradeConsumerTest {
     void should_treatAnEmptyMessageAsMalformed_when_theValueIsNull() {
         // Act + Assert: a tombstone or empty value is not a trade
         assertThatThrownBy(() -> consumer.onMessage(null)).isInstanceOf(MalformedTradeException.class);
+    }
+
+    @Test
+    @Tag("US-607.1")
+    void should_treatTheMessageAsMalformedWithoutParsingIt_when_itIsLargerThanTheLimit() {
+        // Arrange: a valid trade padded past the 120-byte limit
+        String message = "{\"tradeId\":\"T1\",\"version\":1,\"counterPartyId\":\"CP-1\",\"bookId\":\"B1\","
+                + "\"maturityDate\":\"2027-05-20\",\"note\":\"" + "x".repeat(40) + "\"}";
+
+        // Act + Assert: a poison pill (dead-lettered, audited with a capped payload), never ingested
+        assertThatThrownBy(() -> consumer.onMessage(message)).isInstanceOf(MalformedTradeException.class)
+                .hasMessageContaining("larger than 120 bytes");
+        verifyNoInteractions(ingestion);
     }
 }
