@@ -116,4 +116,16 @@ class MandatoryFieldsValidatorTest {
         // Assert
         assertThat(violations).isEmpty();
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"A\u0000", "T\n1", "T\t1", "\u007fT1"})
+    @Tag("US-105.1")
+    void should_reportInvalidField_when_anIdContainsControlCharacters(String tradeId) {
+        // Act: e.g. a NUL that PostgreSQL would reject later as a database error
+        List<Violation> violations = validator.validate(contextFor(withTradeId(tradeId)));
+
+        // Assert
+        assertThat(violations).extracting(Violation::reason, Violation::field)
+                .containsExactly(tuple(ReasonCode.INVALID_FIELD, "tradeId"));
+    }
 }
