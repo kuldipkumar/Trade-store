@@ -17,4 +17,10 @@ public interface OutboxRepository {
     List<AuditEvent> claimBatch(int limit);
 
     void delete(List<String> eventIds);
+
+    /** Up to {@code limit} distinct trade IDs with events still waiting to be relayed, oldest first (US-501.3). */
+    List<String> pendingTradeIds(int limit);
+
+    /** How many events wait to be relayed, and the oldest one's time (A-46: the backlog gauges). */
+    OutboxBacklog backlog();
 }

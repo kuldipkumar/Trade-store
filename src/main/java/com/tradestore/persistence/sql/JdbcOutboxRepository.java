@@ -2,9 +2,11 @@ package com.tradestore.persistence.sql;
 
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.tradestore.domain.AuditEvent;
+import com.tradestore.persistence.OutboxBacklog;
 import com.tradestore.persistence.OutboxRepository;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -58,5 +60,24 @@ public class JdbcOutboxRepository implements OutboxRepository {
         jdbc.sql("DELETE FROM outbox_events WHERE event_id IN (:ids)")
                 .param("ids", eventIds.stream().map(UUID::fromString).toList())
                 .update();
+    }
+
+    @Override
+    public List<String> pendingTradeIds(int limit) {
+        return jdbc.sql("""
+                        SELECT trade_id FROM outbox_events WHERE trade_id IS NOT NULL
+                         GROUP BY trade_id ORDER BY min(id) LIMIT :limit
+                        """)
+                .param("limit", limit)
+                .query(String.class)
+                .list();
+    }
+
+    @Override
+    public OutboxBacklog backlog() {
+        return jdbc.sql("SELECT count(*) AS size, min(created_at) AS oldest FROM outbox_events")
+                .query((rs, n) -> new OutboxBacklog(rs.getLong("size"),
+                        Optional.ofNullable(rs.getTimestamp("oldest")).map(Timestamp::toInstant)))
+                .single();
     }
 }

@@ -41,7 +41,12 @@ loop every outbox.poll-interval (default 1 s, fixed delay)
   alt MongoDB unavailable
     MongoDB --> OutboxRelayService : MongoException
     OutboxRelayService -> PostgreSQL : ROLLBACK (rows stay in the outbox)
-    OutboxRelayService -> OutboxRelayService : log WARN; retried on the next poll
+    OutboxRelayService --> OutboxRelayScheduler : exception
+    OutboxRelayScheduler -> OutboxRelayScheduler : count trade_job_failures_total{job=outbox-relay};\nlog WARN; retried on the next poll
+    opt every alert-after-failed-polls consecutive failures (default 30)
+      OutboxRelayScheduler -> OutboxRepository : pendingTradeIds(20)
+      OutboxRelayScheduler -> OutboxRelayScheduler : log ERROR with the waiting trade IDs (US-501.3)
+    end
     note right of OutboxRelayService
       Nothing is lost (CR-6). The backlog gauges
       (outbox size and oldest age) show the delay.

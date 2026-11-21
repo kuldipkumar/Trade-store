@@ -69,6 +69,9 @@ package "service" {
     + deadLettered(outcome, source, payload, error) : AuditEvent  <<US-302>>
   }
   class TradeMetrics
+  class OutboxMetrics <<MeterBinder>> {
+    + bindTo(registry)
+  }
   class IngestionResult <<record>> {
     + outcome : Outcome
     + trade : Trade
@@ -93,7 +96,13 @@ package "persistence" {
     + claimBatch(limit : int) : List<AuditEvent>
     + delete(eventIds : List<String>)
     + backlog() : OutboxBacklog
+    + pendingTradeIds(limit : int) : List<String>
   }
+  class OutboxBacklog <<record>> {
+    + size : long
+    + oldest : Optional<Instant>
+  }
+  OutboxRepository ..> OutboxBacklog
   interface AuditEventStore {
     + insert(event : AuditEvent)
     + find(query : AuditQuery, page, size) : Page<AuditEvent>
@@ -160,6 +169,8 @@ OutboxRelayService --> TradeHistoryStore
 AuditReportService --> AuditEventStore
 ExpiryScheduler --> ExpiryService
 OutboxRelayScheduler --> OutboxRelayService
+OutboxRelayScheduler --> OutboxRepository : pendingTradeIds, backlog
+OutboxMetrics --> OutboxRepository : backlog()
 
 TradeRepository <|.. JdbcTradeRepository
 OutboxRepository <|.. JdbcOutboxRepository

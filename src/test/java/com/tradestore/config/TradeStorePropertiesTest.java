@@ -1,12 +1,15 @@
 package com.tradestore.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.Map;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
@@ -28,6 +31,7 @@ class TradeStorePropertiesTest {
         assertThat(properties.audit().maxPayloadChars()).isEqualTo(10_000);
         assertThat(properties.outbox().pollInterval()).isEqualTo(Duration.ofSeconds(1));
         assertThat(properties.outbox().batchSize()).isEqualTo(500);
+        assertThat(properties.outbox().alertAfterFailedPolls()).isEqualTo(30);
         assertThat(properties.expiry().batchSize()).isEqualTo(1000);
         assertThat(properties.expiry().runAtStartup()).isTrue();
         assertThat(properties.expiry().startupRetryInterval()).isEqualTo(Duration.ofMinutes(1));
@@ -43,6 +47,7 @@ class TradeStorePropertiesTest {
                 "trade-store.audit.max-payload-chars", "256",
                 "trade-store.outbox.poll-interval", "250ms",
                 "trade-store.outbox.batch-size", "50",
+                "trade-store.outbox.alert-after-failed-polls", "5",
                 "trade-store.expiry.batch-size", "200",
                 "trade-store.expiry.run-at-startup", "false",
                 "trade-store.expiry.startup-retry-interval", "30s",
@@ -53,9 +58,20 @@ class TradeStorePropertiesTest {
         assertThat(properties.audit().maxPayloadChars()).isEqualTo(256);
         assertThat(properties.outbox().pollInterval()).isEqualTo(Duration.ofMillis(250));
         assertThat(properties.outbox().batchSize()).isEqualTo(50);
+        assertThat(properties.outbox().alertAfterFailedPolls()).isEqualTo(5);
         assertThat(properties.expiry().batchSize()).isEqualTo(200);
         assertThat(properties.expiry().runAtStartup()).isFalse();
         assertThat(properties.expiry().startupRetryInterval()).isEqualTo(Duration.ofSeconds(30));
         assertThat(properties.expiry().startupMaxAttempts()).isEqualTo(3);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1"})
+    @Tag("US-501.3")
+    void should_failAtStartup_when_alertAfterFailedPollsIsBelowOne(String value) {
+        // Act + Assert: a fail-fast startup error instead of a division by zero on the first failed poll
+        assertThatThrownBy(() -> bind(Map.of("trade-store.outbox.alert-after-failed-polls", value)))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause().hasMessageContaining("alert-after-failed-polls must be at least 1");
     }
 }

@@ -166,4 +166,18 @@ class StoreTradeIT {
         assertThat(result.outcome()).isEqualTo(Outcome.REPLACED);
         assertThat(trades.findTrade(tradeId)).contains(before);
     }
+
+    @Test
+    @Tag("A-46")
+    void should_exposeOutboxBacklogAndJobFailureMetrics_when_theApplicationRuns() {
+        // Act
+        String metrics = rest.get().uri("/actuator/prometheus").exchange()
+                .expectStatus().isOk().expectBody(String.class).returnResult().getResponseBody();
+
+        // Assert (docs/05-lld.md section 8)
+        assertThat(metrics).contains("trade_outbox_backlog_size");
+        assertThat(metrics).contains("trade_outbox_oldest_age_seconds");
+        assertThat(metrics).contains("trade_job_failures_total{job=\"outbox-relay\"}");
+        assertThat(metrics).contains("trade_job_failures_total{job=\"expiry\"}");
+    }
 }
