@@ -109,4 +109,14 @@ class AuditEventFactoryTest {
         assertThat(event).isEqualTo(new AuditEvent("trades.inbound-0-42", null, null, Outcome.POISON, List.of(),
                 Channel.STREAM, NOW, "not json", null, "Malformed: x"));
     }
+
+    @Test
+    @Tag("US-302.2")
+    void should_capThePayloadAtTheConfiguredSize_when_aMessageIsDeadLettered() {
+        // Act: the factory is configured with a 20-character cap
+        AuditEvent event = factory.deadLettered("t-0-1", Outcome.POISON, "x".repeat(25), "e");
+
+        // Assert
+        assertThat(event.payload()).isEqualTo("x".repeat(20));
+    }
 }
