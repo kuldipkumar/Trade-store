@@ -20,6 +20,8 @@ import com.tradestore.persistence.TradeHistoryStore;
 import org.bson.Document;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.IndexInfo;
 
@@ -143,6 +145,19 @@ class MongoStoresIT {
 
         // Assert
         assertThat(counts).isEqualTo(Map.of(Outcome.ACCEPTED, 1L, Outcome.REJECTED, 2L));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"tradeId\": \"T1\"}", "{\"outcome\": \"REJECTED\"}"})
+    @Tag("US-502.4")
+    void should_sortTheReportFromAnIndex_when_queryingAPage(String filter) {
+        // Act: the report's query shape (code review of PR #63)
+        Document plan = mongo.getCollection("audit_events").find(Document.parse(filter))
+                .sort(new Document("eventTimestamp", 1).append("_id", 1)).skip(50).limit(50).explain();
+
+        // Assert: no in-memory sort of the whole matching set
+        String winningPlan = plan.get("queryPlanner", Document.class).get("winningPlan", Document.class).toJson();
+        assertThat(winningPlan).contains("IXSCAN").doesNotContain("\"SORT\"");
     }
 
     @Test
