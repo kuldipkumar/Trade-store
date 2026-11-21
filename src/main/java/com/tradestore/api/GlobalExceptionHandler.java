@@ -35,14 +35,21 @@ public class GlobalExceptionHandler {
     /** Malformed JSON or wrong JSON types: not a trade, so not audited (decision D3). */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiErrorResponse> unreadable(HttpMessageNotReadableException e, HttpServletRequest request) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof PayloadTooLargeException tooLarge) {
+                return tooLarge(tooLarge, request); // the chunked-body guard tripped inside the JSON parser
+            }
+        }
         return error(HttpStatus.BAD_REQUEST,
                 List.of(new ApiErrorResponse.Reason("MALFORMED_REQUEST", null, "The request body is not a valid trade JSON document")),
                 request);
     }
 
-    /** Stub: implemented test-first. */
+    /** A body over trade-store.api.max-request-bytes (US-401.6). */
+    @ExceptionHandler(PayloadTooLargeException.class)
     public ResponseEntity<ApiErrorResponse> tooLarge(PayloadTooLargeException e, HttpServletRequest request) {
-        return null;
+        return error(HttpStatus.CONTENT_TOO_LARGE, List.of(new ApiErrorResponse.Reason("PAYLOAD_TOO_LARGE", null, e.getMessage())),
+                request);
     }
 
     static HttpStatus statusOf(TradeRejectedException e) {
