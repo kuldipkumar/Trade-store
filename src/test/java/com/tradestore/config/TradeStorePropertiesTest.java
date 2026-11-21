@@ -44,18 +44,18 @@ class TradeStorePropertiesTest {
     @Tag("A-50")
     void should_useConfiguredValues_when_propertiesAreSet() {
         // Act
-        TradeStoreProperties properties = bind(Map.of(
-                "trade-store.time-zone", "Asia/Kolkata",
-                "trade-store.audit.max-payload-chars", "256",
-                "trade-store.outbox.poll-interval", "250ms",
-                "trade-store.outbox.batch-size", "50",
-                "trade-store.outbox.alert-after-failed-polls", "5",
-                "trade-store.expiry.batch-size", "200",
-                "trade-store.expiry.run-at-startup", "false",
-                "trade-store.api.max-request-bytes", "2048",
-                "trade-store.api.max-page-size", "25",
-                "trade-store.expiry.startup-retry-interval", "30s",
-                "trade-store.expiry.startup-max-attempts", "3"));
+        TradeStoreProperties properties = bind(Map.ofEntries(
+                Map.entry("trade-store.time-zone", "Asia/Kolkata"),
+                Map.entry("trade-store.audit.max-payload-chars", "256"),
+                Map.entry("trade-store.outbox.poll-interval", "250ms"),
+                Map.entry("trade-store.outbox.batch-size", "50"),
+                Map.entry("trade-store.outbox.alert-after-failed-polls", "5"),
+                Map.entry("trade-store.expiry.batch-size", "200"),
+                Map.entry("trade-store.expiry.run-at-startup", "false"),
+                Map.entry("trade-store.api.max-request-bytes", "2048"),
+                Map.entry("trade-store.api.max-page-size", "25"),
+                Map.entry("trade-store.expiry.startup-retry-interval", "30s"),
+                Map.entry("trade-store.expiry.startup-max-attempts", "3")));
 
         // Assert
         assertThat(properties.timeZone()).isEqualTo("Asia/Kolkata");
