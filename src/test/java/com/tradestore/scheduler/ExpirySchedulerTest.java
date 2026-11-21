@@ -127,4 +127,22 @@ class ExpirySchedulerTest {
         assertThat(taskScheduler.scheduled).isEmpty();
         verify(expiry, times(2)).expireMaturedTrades();
     }
+
+    @Test
+    @Tag("US-203.1")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_stopRetryingAndSaySo_when_everyStartupAttemptFails(CapturedOutput output) {
+        // Arrange: max 3 attempts; the database stays down
+        when(expiry.expireMaturedTrades()).thenThrow(new DataAccessResourceFailureException("PostgreSQL down"));
+        scheduler.onApplicationReady();
+
+        // Act
+        taskScheduler.runNext();
+        taskScheduler.runNext();
+        taskScheduler.runNext();
+
+        // Assert: no fourth attempt; the cron run remains the fallback
+        assertThat(taskScheduler.scheduled).isEmpty();
+        assertThat(output).contains("Startup expiry catch-up gave up after 3 attempts");
+    }
 }
