@@ -19,7 +19,8 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
         audit = audit == null ? new Audit(Audit.DEFAULT_MAX_PAYLOAD_CHARS) : audit;
         outbox = outbox == null ? new Outbox(Outbox.DEFAULT_POLL_INTERVAL, Outbox.DEFAULT_BATCH_SIZE) : outbox;
         expiry = expiry == null
-                ? new Expiry(Expiry.DEFAULT_BATCH_SIZE, Expiry.DEFAULT_RUN_AT_STARTUP, null, 0) // stub: retry defaults test-first
+                ? new Expiry(Expiry.DEFAULT_BATCH_SIZE, Expiry.DEFAULT_RUN_AT_STARTUP,
+                        Expiry.DEFAULT_STARTUP_RETRY_INTERVAL, Expiry.DEFAULT_STARTUP_MAX_ATTEMPTS)
                 : expiry;
     }
 
@@ -40,11 +41,16 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
     /**
      * @param batchSize    maximum trades expired per transaction, so a large backlog (e.g. after downtime) never
      *                     locks every matured trade at once (US-202, US-203)
-     * @param runAtStartup run the expiry once when the application is ready, to catch up after downtime (US-203)
+     * @param runAtStartup         run the expiry once when the application is ready, to catch up after downtime
+     *                             (US-203)
+     * @param startupRetryInterval wait between attempts when the startup run fails
+     * @param startupMaxAttempts   startup attempts before giving up; the cron run remains the fallback
      */
     public record Expiry(@DefaultValue("1000") int batchSize, @DefaultValue("true") boolean runAtStartup,
-                         Duration startupRetryInterval, int startupMaxAttempts) {
+                         @DefaultValue("1m") Duration startupRetryInterval, @DefaultValue("10") int startupMaxAttempts) {
         static final int DEFAULT_BATCH_SIZE = 1000;
         static final boolean DEFAULT_RUN_AT_STARTUP = true;
+        static final Duration DEFAULT_STARTUP_RETRY_INTERVAL = Duration.ofMinutes(1);
+        static final int DEFAULT_STARTUP_MAX_ATTEMPTS = 10;
     }
 }
