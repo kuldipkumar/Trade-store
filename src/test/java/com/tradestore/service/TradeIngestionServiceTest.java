@@ -17,7 +17,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -359,5 +361,21 @@ class TradeIngestionServiceTest {
                 .isInstanceOf(LowerVersionException.class)
                 .satisfies(e -> assertThat(((TradeRejectedException) e).reasons())
                         .containsExactly(ReasonCode.LOWER_VERSION, ReasonCode.MATURITY_IN_PAST));
+    }
+
+    @Test
+    @Tag("US-205.2")
+    void should_useTheConfiguredZonesDate_when_itIsAlreadyTomorrowThereButNotInUtc() {
+        // Arrange: 2026-11-18T20:00Z is 01:30 on 2026-11-19 in Asia/Kolkata
+        Clock kolkata = Clock.fixed(Instant.parse("2026-11-18T20:00:00Z"), ZoneId.of("Asia/Kolkata"));
+        TradeIngestionService kolkataService = new TradeIngestionService(
+                new CompositeTradeValidator(List.of(new MaturityNotInPastValidator())),
+                trades, outbox, new AuditEventFactory(kolkata, 10_000), tx, kolkata, new TradeMetrics(registry));
+        when(trades.findById("T1")).thenReturn(Optional.empty());
+
+        // Act + Assert: local today is 2026-11-19, so a trade maturing on 2026-11-18 is in the past
+        assertThatThrownBy(() -> kolkataService.ingest(withMaturityDate("2026-11-18")))
+                .isInstanceOf(TradeRejectedException.class)
+                .satisfies(e -> assertThat(((TradeRejectedException) e).reasons()).containsExactly(ReasonCode.MATURITY_IN_PAST));
     }
 }
