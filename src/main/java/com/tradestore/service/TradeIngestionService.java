@@ -61,6 +61,7 @@ public class TradeIngestionService {
         if (decision.rejection() != null) {
             throw decision.rejection();
         }
+        metrics.recordOutcome(decision.result().outcome(), List.of(), submission.channel());
         return decision.result();
     }
 
