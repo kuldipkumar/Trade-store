@@ -11,7 +11,7 @@ participant AuditEventFactory
 participant OutboxRepository
 database PostgreSQL
 
-alt application started (US-203: catch up after downtime)
+alt application started (US-203: catch up after downtime; trade-store.expiry.run-at-startup, default true)
   Spring -> ExpiryScheduler : onApplicationReady()
 else cron fires (default "0 5 0 * * *" in the configured zone: US-202.4)
   Spring -> ExpiryScheduler : runScheduled()
