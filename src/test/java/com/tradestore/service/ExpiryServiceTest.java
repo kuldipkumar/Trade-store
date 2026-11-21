@@ -60,7 +60,7 @@ class ExpiryServiceTest {
     @Tag("US-202.3")
     void should_recordOneExpiredEventPerTrade_when_tradesAreMarkedExpired() {
         // Arrange
-        when(trades.markExpired(TODAY, 2)).thenReturn(List.of(expired("T1"), expired("T2")));
+        when(trades.markExpired(TODAY, 2)).thenReturn(List.of(expired("T1"), expired("T2")), List.of());
 
         // Act
         int count = service.expireMaturedTrades();
@@ -78,7 +78,7 @@ class ExpiryServiceTest {
     @Tag("US-604.2")
     void should_countEachExpiredTrade_when_tradesAreMarkedExpired() {
         // Arrange
-        when(trades.markExpired(TODAY, 2)).thenReturn(List.of(expired("T1"), expired("T2")));
+        when(trades.markExpired(TODAY, 2)).thenReturn(List.of(expired("T1"), expired("T2")), List.of());
 
         // Act
         service.expireMaturedTrades();
