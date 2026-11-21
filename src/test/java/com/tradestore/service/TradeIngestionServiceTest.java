@@ -3,6 +3,7 @@ package com.tradestore.service;
 import static com.tradestore.TestTrades.TODAY;
 import static com.tradestore.TestTrades.validSubmission;
 import static com.tradestore.TestTrades.withBookId;
+import static com.tradestore.TestTrades.withMaturityDate;
 import static com.tradestore.TestTrades.withTradeId;
 import static com.tradestore.TestTrades.withVersion;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +38,7 @@ import com.tradestore.service.validation.CompositeTradeValidator;
 import com.tradestore.service.validation.LowerVersionValidator;
 import com.tradestore.service.validation.MandatoryFieldsValidator;
 import com.tradestore.service.validation.MaturityDateFormatValidator;
+import com.tradestore.service.validation.MaturityNotInPastValidator;
 import com.tradestore.service.validation.PositiveVersionValidator;
 import org.junit.jupiter.api.Tag;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -62,7 +64,7 @@ class TradeIngestionServiceTest {
 
     private final TradeIngestionService service = new TradeIngestionService(
             new CompositeTradeValidator(List.of(new MandatoryFieldsValidator(), new PositiveVersionValidator(),
-                    new MaturityDateFormatValidator(), new LowerVersionValidator())),
+                    new MaturityDateFormatValidator(), new LowerVersionValidator(), new MaturityNotInPastValidator())),
             trades, outbox, new AuditEventFactory(CLOCK, 10_000), tx, CLOCK, new TradeMetrics(registry));
 
     /** Runs the callback directly and records whether it completed (i.e. would have committed). */
@@ -317,5 +319,19 @@ class TradeIngestionServiceTest {
 
         // Assert (format from docs/05-lld.md section 8)
         assertThat(output).contains("outcome=REJECTED tradeId=T1 version=1 channel=REST reasons=[LOWER_VERSION]");
+    }
+
+    @Test
+    @Tag("US-201.1")
+    void should_rejectWithoutStoring_when_maturityDateIsBeforeToday() {
+        // Arrange: today is 2026-11-19
+        when(trades.findById("T1")).thenReturn(Optional.empty());
+
+        // Act + Assert
+        assertThatThrownBy(() -> service.ingest(withMaturityDate("2026-11-18")))
+                .isExactlyInstanceOf(TradeRejectedException.class)
+                .satisfies(e -> assertThat(((TradeRejectedException) e).reasons()).containsExactly(ReasonCode.MATURITY_IN_PAST));
+        verify(trades, never()).upsertIfNotOlder(any());
+        assertThat(outcomes("REJECTED", "MATURITY_IN_PAST")).isEqualTo(1.0);
     }
 }
