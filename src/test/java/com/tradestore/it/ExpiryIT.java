@@ -165,6 +165,11 @@ class ExpiryIT {
         // Assert: replaced, and live again (A-19: only a new valid version resets expired)
         assertThat(result.outcome()).isEqualTo(Outcome.REPLACED);
         assertThat(trades.findById(maturedYesterday)).contains(new StoredTrade(maturedYesterday, 2, false));
+
+        // ...and really extended: the new maturity is stored, so the next expiry run leaves it live
+        assertThat(trades.findTrade(maturedYesterday).orElseThrow().maturityDate()).isEqualTo(LocalDate.of(2027, 1, 1));
+        expiry.expireMaturedTrades();
+        assertThat(expired(maturedYesterday)).isFalse();
     }
 
     @Test
