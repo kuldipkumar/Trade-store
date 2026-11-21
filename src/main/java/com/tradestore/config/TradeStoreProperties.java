@@ -80,6 +80,9 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
             if (maxRequestBytes <= 0) {
                 throw new IllegalArgumentException("trade-store.api.max-request-bytes must be positive, was " + maxRequestBytes);
             }
+            if (maxPageSize < 1) {
+                throw new IllegalArgumentException("trade-store.api.max-page-size must be at least 1, was " + maxPageSize);
+            }
         }
     }
 }
