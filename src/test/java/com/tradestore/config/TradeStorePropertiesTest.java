@@ -1,12 +1,15 @@
 package com.tradestore.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.Map;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
@@ -60,5 +63,15 @@ class TradeStorePropertiesTest {
         assertThat(properties.expiry().runAtStartup()).isFalse();
         assertThat(properties.expiry().startupRetryInterval()).isEqualTo(Duration.ofSeconds(30));
         assertThat(properties.expiry().startupMaxAttempts()).isEqualTo(3);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1"})
+    @Tag("US-501.3")
+    void should_failAtStartup_when_alertAfterFailedPollsIsBelowOne(String value) {
+        // Act + Assert: a fail-fast startup error instead of a division by zero on the first failed poll
+        assertThatThrownBy(() -> bind(Map.of("trade-store.outbox.alert-after-failed-polls", value)))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause().hasMessageContaining("alert-after-failed-polls must be at least 1");
     }
 }
