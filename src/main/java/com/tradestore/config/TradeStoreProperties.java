@@ -18,7 +18,9 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
     public TradeStoreProperties {
         audit = audit == null ? new Audit(Audit.DEFAULT_MAX_PAYLOAD_CHARS) : audit;
         outbox = outbox == null ? new Outbox(Outbox.DEFAULT_POLL_INTERVAL, Outbox.DEFAULT_BATCH_SIZE) : outbox;
-        expiry = expiry == null ? new Expiry(Expiry.DEFAULT_BATCH_SIZE, true) : expiry;
+        expiry = expiry == null
+                ? new Expiry(Expiry.DEFAULT_BATCH_SIZE, Expiry.DEFAULT_RUN_AT_STARTUP, null, 0) // stub: retry defaults test-first
+                : expiry;
     }
 
     /** @param maxPayloadChars longer payloads are truncated in the audit trail (US-302.2, A-52) */
@@ -40,7 +42,9 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
      *                     locks every matured trade at once (US-202, US-203)
      * @param runAtStartup run the expiry once when the application is ready, to catch up after downtime (US-203)
      */
-    public record Expiry(@DefaultValue("1000") int batchSize, @DefaultValue("true") boolean runAtStartup) {
+    public record Expiry(@DefaultValue("1000") int batchSize, @DefaultValue("true") boolean runAtStartup,
+                         Duration startupRetryInterval, int startupMaxAttempts) {
         static final int DEFAULT_BATCH_SIZE = 1000;
+        static final boolean DEFAULT_RUN_AT_STARTUP = true;
     }
 }
