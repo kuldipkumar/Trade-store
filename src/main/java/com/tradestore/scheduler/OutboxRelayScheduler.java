@@ -11,7 +11,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** Polls the outbox (ADR-005). A failed batch stays in the outbox and is retried on the next poll. */
+/**
+ * Polls the outbox (ADR-005). A failed batch stays in the outbox and is retried on the next poll, so nothing is
+ * lost (US-501.3). Every failed poll is counted ({@code trade_job_failures_total{job="outbox-relay"}}) and logged
+ * at WARN; every {@code alert-after-failed-polls} consecutive failures, the outage is logged at ERROR with the
+ * trades whose audit entries are waiting. A successful poll resets the count.
+ */
 @Component
 public class OutboxRelayScheduler {
 
@@ -41,10 +46,11 @@ public class OutboxRelayScheduler {
     public void poll() {
         try {
             relay.relayBatch();
+            consecutiveFailures = 0;
         } catch (RuntimeException e) {
             failedPolls.increment();
             consecutiveFailures++;
-            if (consecutiveFailures == alertAfterFailedPolls) {
+            if (consecutiveFailures % alertAfterFailedPolls == 0) {
                 log.error("Audit relay has failed for {} consecutive polls; outcomes are kept in the outbox and retried. "
                         + "Trades waiting for their audit entries: {}", consecutiveFailures, outbox.pendingTradeIds(20));
             }
