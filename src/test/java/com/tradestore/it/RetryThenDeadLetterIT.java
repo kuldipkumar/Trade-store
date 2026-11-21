@@ -46,6 +46,7 @@ class RetryThenDeadLetterIT {
     private static final String TOPIC = "trades.inbound";
     private static final String DLT = "trades.inbound.DLT";
     private static final Duration TIMEOUT = Duration.ofSeconds(20);
+    private static final Duration GRACE = Duration.ofSeconds(2);
 
     @MockitoSpyBean
     private TradeRepository trades;
@@ -96,15 +97,19 @@ class RetryThenDeadLetterIT {
                 .formatted(tradeId)).get();
     }
 
+    /** Dead letters for the key: waits up to {@code within} for the first, then 2 s more so a duplicate shows. */
     private List<ConsumerRecord<String, String>> deadLetters(String key, Duration within) {
         List<ConsumerRecord<String, String>> found = new ArrayList<>();
         long deadline = System.nanoTime() + within.toNanos();
-        while (found.isEmpty() && System.nanoTime() < deadline) {
+        while (System.nanoTime() < deadline) {
             dltReader.poll(Duration.ofMillis(500)).forEach(r -> {
                 if (key.equals(r.key())) {
                     found.add(r);
                 }
             });
+            if (!found.isEmpty()) {
+                deadline = Math.min(deadline, System.nanoTime() + GRACE.toNanos());
+            }
         }
         return found;
     }
@@ -122,7 +127,7 @@ class RetryThenDeadLetterIT {
 
         // Assert: stored on the third attempt; nothing on the dead-letter topic
         await().atMost(TIMEOUT).untilAsserted(() -> assertThat(trades.findById(flaky)).contains(new StoredTrade(flaky, 1, false)));
-        assertThat(flakyFailures).hasValueGreaterThanOrEqualTo(3);
+        verify(trades, times(3)).upsertIfNotOlder(argThat(t -> t.tradeId().equals(flaky)));
         assertThat(deadLetters(flaky, Duration.ofSeconds(3))).isEmpty();
     }
 
