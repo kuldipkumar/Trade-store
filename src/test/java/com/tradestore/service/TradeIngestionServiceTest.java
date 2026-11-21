@@ -41,7 +41,10 @@ import com.tradestore.service.validation.PositiveVersionValidator;
 import org.junit.jupiter.api.Tag;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionOperations;
 
@@ -282,5 +285,23 @@ class TradeIngestionServiceTest {
 
         // Assert
         assertThat(timedIngestions("REST")).isEqualTo(1);
+    }
+
+    @Test
+    @Tag("US-604.3")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_logOutcomeWithIdsButNoPayload_when_tradeIsStored(CapturedOutput output) {
+        // Arrange
+        when(trades.findById("T1")).thenReturn(Optional.empty());
+        when(trades.upsertIfNotOlder(any())).thenReturn(UpsertResult.INSERTED);
+        TradeSubmission submission = new TradeSubmission("T1", 1, "CP-1", "B1", "2027-05-20", Channel.REST,
+                "{\"note\":\"PAYLOAD-MARKER\"}");
+
+        // Act
+        service.ingest(submission);
+
+        // Assert (A-32: IDs and outcomes only)
+        assertThat(output).contains("outcome=ACCEPTED tradeId=T1 version=1 channel=REST");
+        assertThat(output).doesNotContain("PAYLOAD-MARKER");
     }
 }
