@@ -42,4 +42,23 @@ class ValidatorWiringTest {
                     tuple(ReasonCode.LOWER_VERSION, "version"));
         }
     }
+
+    @Test
+    @Tag("US-201.4")
+    void should_reportMaturityAfterVersion_when_bothRulesAreBroken() {
+        try (var context = new AnnotationConfigApplicationContext(ValidatorWiringTest.class.getPackageName())) {
+            // Arrange: a lower version that also matures before today
+            CompositeTradeValidator validator = context.getBean(CompositeTradeValidator.class);
+            TradeSubmission submission = new TradeSubmission("T1", 1, "CP-1", "B1", "2026-11-18", Channel.REST, "{}");
+            ValidationContext ctx = new ValidationContext(submission, Optional.of(new StoredTrade("T1", 2, false)),
+                    LocalDate.of(2026, 11, 19));
+
+            // Act
+            List<Violation> violations = validator.validate(ctx);
+
+            // Assert
+            assertThat(violations).extracting(Violation::reason)
+                    .containsExactly(ReasonCode.LOWER_VERSION, ReasonCode.MATURITY_IN_PAST);
+        }
+    }
 }
