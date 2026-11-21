@@ -188,7 +188,7 @@ CREATE TABLE outbox_events (
   "reasons": [ { "reason": "LOWER_VERSION", "field": "version", "message": "Trade T2 version 1 is lower than stored version 2" } ],
   "path": "/trades" }
 ```
-**CSV columns:** `eventId,eventTimestamp,tradeId,version,outcome,channel,reasons`. Reasons are joined with `;`. The payload is excluded from the CSV to keep it readable.
+**CSV** (`Accept: text/csv`, same filters, not paged: the whole filtered set streamed from a MongoDB cursor, `Content-Disposition: attachment; filename="audit-report.csv"`). Columns: `eventId,eventTimestamp,tradeId,version,outcome,channel,reasons`; reasons as `REASON: message` joined with `;`. The payload is excluded to keep it readable. RFC 4180 quoting, CRLF line ends; a cell starting with `= + - @`, tab or CR is prefixed with `'` so spreadsheets show it as text (CSV injection).
 
 ### 6.2 Kafka
 | Item | Contract |
