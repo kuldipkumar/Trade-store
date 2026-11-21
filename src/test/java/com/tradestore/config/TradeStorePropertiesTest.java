@@ -35,6 +35,7 @@ class TradeStorePropertiesTest {
         assertThat(properties.expiry().batchSize()).isEqualTo(1000);
         assertThat(properties.expiry().runAtStartup()).isTrue();
         assertThat(properties.api().maxRequestBytes()).isEqualTo(1_048_576L);
+        assertThat(properties.api().maxPageSize()).isEqualTo(100);
         assertThat(properties.expiry().startupRetryInterval()).isEqualTo(Duration.ofMinutes(1));
         assertThat(properties.expiry().startupMaxAttempts()).isEqualTo(10);
     }
@@ -52,6 +53,7 @@ class TradeStorePropertiesTest {
                 "trade-store.expiry.batch-size", "200",
                 "trade-store.expiry.run-at-startup", "false",
                 "trade-store.api.max-request-bytes", "2048",
+                "trade-store.api.max-page-size", "25",
                 "trade-store.expiry.startup-retry-interval", "30s",
                 "trade-store.expiry.startup-max-attempts", "3"));
 
@@ -64,6 +66,7 @@ class TradeStorePropertiesTest {
         assertThat(properties.expiry().batchSize()).isEqualTo(200);
         assertThat(properties.expiry().runAtStartup()).isFalse();
         assertThat(properties.api().maxRequestBytes()).isEqualTo(2048L);
+        assertThat(properties.api().maxPageSize()).isEqualTo(25);
         assertThat(properties.expiry().startupRetryInterval()).isEqualTo(Duration.ofSeconds(30));
         assertThat(properties.expiry().startupMaxAttempts()).isEqualTo(3);
     }

@@ -24,7 +24,7 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
                 ? new Expiry(Expiry.DEFAULT_BATCH_SIZE, Expiry.DEFAULT_RUN_AT_STARTUP,
                         Expiry.DEFAULT_STARTUP_RETRY_INTERVAL, Expiry.DEFAULT_STARTUP_MAX_ATTEMPTS)
                 : expiry;
-        api = api == null ? new Api(Api.DEFAULT_MAX_REQUEST_BYTES) : api;
+        api = api == null ? new Api(Api.DEFAULT_MAX_REQUEST_BYTES, 0) : api; // maxPageSize: stub
     }
 
     /** @param maxPayloadChars longer payloads are truncated in the audit trail (US-302.2, A-52) */
@@ -69,7 +69,7 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
     }
 
     /** @param maxRequestBytes larger request bodies are refused with 413 (US-401.6, A-47) */
-    public record Api(@DefaultValue("1048576") long maxRequestBytes) {
+    public record Api(@DefaultValue("1048576") long maxRequestBytes, int maxPageSize) {
         static final long DEFAULT_MAX_REQUEST_BYTES = 1_048_576L;
 
         public Api {
