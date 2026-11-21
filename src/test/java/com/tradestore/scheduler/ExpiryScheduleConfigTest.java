@@ -9,6 +9,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 import com.tradestore.config.SchedulingConfig;
+import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.service.ExpiryService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -27,7 +28,8 @@ class ExpiryScheduleConfigTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(SchedulingConfig.class, ExpiryScheduler.class)
             .withBean(ExpiryService.class, () -> mock(ExpiryService.class))
-            .withBean(MeterRegistry.class, SimpleMeterRegistry::new);
+            .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+            .withBean(TradeStoreProperties.class, () -> new TradeStoreProperties(null, null, null, null));
 
     private static List<CronTask> cronTasks(ApplicationContext context) {
         return context.getBean(ScheduledTaskHolder.class).getScheduledTasks().stream()

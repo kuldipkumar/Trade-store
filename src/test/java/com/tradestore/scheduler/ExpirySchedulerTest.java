@@ -22,7 +22,7 @@ class ExpirySchedulerTest {
 
     private final ExpiryService expiry = mock(ExpiryService.class);
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
-    private final ExpiryScheduler scheduler = new ExpiryScheduler(expiry, registry);
+    private final ExpiryScheduler scheduler = new ExpiryScheduler(expiry, registry, true);
 
     @Test
     @Tag("US-202.1")
@@ -75,5 +75,15 @@ class ExpirySchedulerTest {
 
         // Assert (05-seq-expiry: log INFO "expired {count} trades")
         assertThat(output).contains("Expiry run expired 3 trades");
+    }
+
+    @Test
+    @Tag("US-203.1")
+    void should_runTheExpiryOnce_when_theApplicationIsReady() {
+        // Act (catch up after downtime, A-51)
+        scheduler.onApplicationReady();
+
+        // Assert
+        verify(expiry).expireMaturedTrades();
     }
 }

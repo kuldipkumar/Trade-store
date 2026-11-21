@@ -1,10 +1,12 @@
 package com.tradestore.scheduler;
 
+import com.tradestore.config.TradeStoreProperties;
 import com.tradestore.service.ExpiryService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -20,9 +22,18 @@ public class ExpiryScheduler {
     private final ExpiryService expiry;
     private final Counter failures;
 
-    public ExpiryScheduler(ExpiryService expiry, MeterRegistry registry) {
+    @Autowired
+    public ExpiryScheduler(ExpiryService expiry, MeterRegistry registry, TradeStoreProperties properties) {
+        this(expiry, registry, properties.expiry().runAtStartup());
+    }
+
+    ExpiryScheduler(ExpiryService expiry, MeterRegistry registry, boolean runAtStartup) {
         this.expiry = expiry;
         this.failures = registry.counter("trade.job.failures", "job", "expiry");
+    }
+
+    /** Stub: implemented test-first (US-203). */
+    public void onApplicationReady() {
     }
 
     /** Default: daily at 00:05 in the configured zone, or the server's zone if none is set (A-18, US-205). */
