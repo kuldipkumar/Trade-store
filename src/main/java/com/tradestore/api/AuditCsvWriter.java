@@ -30,8 +30,10 @@ final class AuditCsvWriter {
                 .map(AuditCsvWriter::cell).collect(Collectors.joining(",")) + LINE_END);
     }
 
-    /** RFC 4180: a field with a comma, quote or line break is quoted, and its quotes doubled. */
-    private static String cell(String value) {
+    /** Formula characters neutralised; RFC 4180: a field with a comma, quote or line break is quoted, and its quotes doubled. */
+    private static String cell(String raw) {
+        // OWASP CSV injection: a leading = + - @ tab or CR makes spreadsheets evaluate the cell; ' shows it as text.
+        String value = !raw.isEmpty() && "=+-@\t\r".indexOf(raw.charAt(0)) >= 0 ? "'" + raw : raw;
         if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
