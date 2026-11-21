@@ -14,6 +14,7 @@ import com.tradestore.domain.Outcome;
 import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.Trade;
 import com.tradestore.domain.Violation;
+import com.tradestore.persistence.OutboxBacklog;
 import com.tradestore.persistence.OutboxRepository;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -112,6 +113,24 @@ class JdbcOutboxRepositoryIT {
 
             // Assert
             assertThat(pending).filteredOn(id -> id.equals(first) || id.equals(second)).containsExactly(first, second);
+        });
+    }
+
+    @Test
+    @Tag("A-46")
+    void should_reportSizeAndOldestEvent_when_eventsAreWaiting() {
+        inRolledBackTransaction(() -> {
+            // Arrange: two waiting events, the older recorded at 10:15:30.123456Z (see accepted())
+            outbox.append(accepted("T-" + UUID.randomUUID()));
+            outbox.append(rejected("T-" + UUID.randomUUID()));
+
+            // Act
+            OutboxBacklog backlog = outbox.backlog();
+
+            // Assert (other ITs' rows may be waiting too, so at least ours, and nothing newer than ours is oldest)
+            assertThat(backlog.size()).isGreaterThanOrEqualTo(2);
+            assertThat(backlog.oldest()).hasValueSatisfying(
+                    oldest -> assertThat(oldest).isBeforeOrEqualTo(Instant.parse("2026-11-19T10:15:30.123456Z")));
         });
     }
 }

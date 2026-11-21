@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.tradestore.domain.AuditEvent;
+import com.tradestore.persistence.OutboxBacklog;
 import com.tradestore.persistence.OutboxRepository;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -69,5 +70,10 @@ public class JdbcOutboxRepository implements OutboxRepository {
                 .param("limit", limit)
                 .query(String.class)
                 .list();
+    }
+
+    @Override
+    public OutboxBacklog backlog() {
+        return new OutboxBacklog(0, java.util.Optional.empty()); // stub: implemented test-first
     }
 }
