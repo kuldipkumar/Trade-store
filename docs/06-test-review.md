@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -60,12 +60,14 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-302.2 | Partial | `AuditEventFactoryTest`: the payload is capped at the configured size | The POISON entry itself. Closed in **US-302**. |
 | US-404.1 | Partial | `MongoStoresIT`: ordered by version, then received time | `GET /trades/{id}/history`. Closed in **US-404**. |
 | US-501.1 | Partial | `MongoStoresIT`, `AuditEventFactoryTest`, `JdbcOutboxRepositoryIT`, `OutboxRelayServiceTest`, `StoreTradeIT` (all the fields) | Proven for the REST channel value only. Closed by **US-301** (the STREAM channel). |
-| US-501.3 | Partial | `OutboxRelayServiceTest`, `OutboxRelaySchedulerTest`: a failed relay keeps the events and is retried | Retry is proven. The ERROR log with trade IDs after N failed polls (reworded by D8) is still to build, test-first, in **US-501**. |
+| US-501.2 | Full | `AuditTrailImmutabilityTest`: the audit and history ports and their MongoDB implementations offer only insert and read operations (mutation-verified) | |
+| US-501.3 | Full | `OutboxRelayServiceTest` (failed batch kept), `OutboxRelaySchedulerTest` (each failure counted; ERROR with waiting trade IDs every N consecutive failures; reset on success), `JdbcOutboxRepositoryIT` (`pendingTradeIds`) | |
 | US-603.1 | Full | `@IntegrationTest` + `TestcontainersConfiguration`; every `*IT` runs on real Kafka, PostgreSQL and MongoDB | |
 | US-604.3 | Full | `TradeIngestionServiceTest`: one INFO line per trade with outcome, tradeId, version, channel and reasons; a payload marker never appears in the log | MDC context (`tradeId`, `channel`) is added by the channel adapters (US-401/US-301). |
 | US-604.1 | Partial | `WalkingSkeletonIT`: health is UP with db and mongo | `/actuator/health/readiness` including Kafka. Closed in **US-604**. |
 | US-604.2 | Partial | `TradeMetricsTest` (counter per outcome and per rejection reason; latency timer), `TradeIngestionServiceTest` (recorded for stored and rejected trades), `StoreTradeIT` (visible at `/actuator/prometheus`) | The dead-letter counter (US-302/303) and the outbox backlog gauges (US-501). |
 | A-09 | Full | `LowerVersionValidatorTest`: an expired trade still rejects a lower version | |
+| A-46 (outbox backlog) | Full | `OutboxMetricsTest` (size, oldest age, NaN when the database is down), `JdbcOutboxRepositoryIT` (`backlog`), `StoreTradeIT` (gauges and job-failure counters at `/actuator/prometheus`, mutation-verified) | |
 | A-50 | Full | `TradeStorePropertiesTest`: defaults and overrides | |
 | A-52 | Partial | `MongoStoresIT`: report and history indexes exist | The `trades` partial index is created by Flyway but not asserted. Closed in **US-202** (expiry). |
 
@@ -75,7 +77,6 @@ These criteria belong to stories already started, but no test covers them yet. T
 
 | AC | Gap | Plan |
 |----|-----|------|
-| US-501.2 | No operation updates or deletes audit entries | US-501: architecture test on the `AuditEventStore` and `TradeHistoryStore` interfaces |
 
 ## Test quality findings
 

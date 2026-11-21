@@ -212,7 +212,7 @@ CREATE TABLE outbox_events (
 | `retry.max-attempts` / `retry.initial-interval` / `retry.multiplier` / `retry.max-interval` | `3` / `1s` / `2.0` / `10s` | US-303.3 |
 | `expiry.cron` / `expiry.batch-size` | `0 5 0 * * *` / `1000` | US-202.4 |
 | `expiry.run-at-startup` / `expiry.startup-retry-interval` / `expiry.startup-max-attempts` | `true` / `1m` / `10` | US-203 |
-| `outbox.poll-interval` / `outbox.batch-size` | `1s` / `500` | ADR-005 |
+| `outbox.poll-interval` / `outbox.batch-size` / `outbox.alert-after-failed-polls` | `1s` / `500` / `30` | ADR-005, US-501.3 |
 | `audit.max-payload-chars` | `10000` | US-302.2 |
 | `api.max-request-bytes` / `api.max-page-size` | `1048576` / `100` | US-401.6, US-403 |
 
@@ -239,7 +239,7 @@ CREATE TABLE outbox_events (
 | Counter | `trade_outcomes_total{outcome, reason, channel}`: one increment per reason for rejections |
 | Timer | `trade_processing_seconds{channel}`: ingestion use case latency |
 | Counter | `trade_deadletter_total{type=POISON\|FAILED}` |
-| Counter | `trade_job_failures_total{job}`: failed runs of a scheduled job (`expiry`), each also logged at ERROR |
+| Counter | `trade_job_failures_total{job}`: failed runs of a scheduled job: `expiry` (each logged at ERROR) and `outbox-relay` (each logged at WARN; every `outbox.alert-after-failed-polls` consecutive failures, ERROR with the waiting trade IDs) |
 | Gauges | `trade_outbox_backlog_size`, `trade_outbox_oldest_age_seconds` |
 | Kafka lag | Micrometer's Kafka client metrics (`kafka_consumer_fetch_manager_records_lag_max`) |
 | Health | `readiness` group = `db`, `mongo`, `kafka` (`KafkaHealthIndicator`) (US-604.1); `liveness` = the application state only |
