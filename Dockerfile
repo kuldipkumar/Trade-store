@@ -5,7 +5,8 @@ FROM eclipse-temurin:21.0.13_9-jdk-noble AS build
 WORKDIR /workspace
 COPY mvnw pom.xml ./
 COPY .mvn .mvn
-RUN ./mvnw -B -q dependency:go-offline
+# Retried: a transient download failure from Maven Central should not fail the image build.
+RUN for attempt in 1 2 3; do ./mvnw -B -q dependency:go-offline && exit 0; sleep 15; done; exit 1
 COPY src src
 RUN ./mvnw -B -q package -DskipTests
 

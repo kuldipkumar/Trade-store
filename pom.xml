@@ -205,4 +205,23 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <!-- US-605: performance baseline, on demand only: ./mvnw verify -Pperformance -DskipUnitTests=true -Djacoco.skip=true -->
+        <profile>
+            <id>performance</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <configuration>
+                            <includes>
+                                <include>**/*PT.java</include>
+                            </includes>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
