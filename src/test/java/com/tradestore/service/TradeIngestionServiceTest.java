@@ -22,12 +22,14 @@ import java.util.List;
 import java.util.Optional;
 
 import com.tradestore.domain.AuditEvent;
+import com.tradestore.domain.Channel;
 import com.tradestore.domain.LowerVersionException;
 import com.tradestore.domain.Outcome;
 import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
 import com.tradestore.domain.TradeRejectedException;
+import com.tradestore.domain.TradeSubmission;
 import com.tradestore.persistence.OutboxRepository;
 import com.tradestore.persistence.TradeRepository;
 import com.tradestore.persistence.UpsertResult;
@@ -233,5 +235,20 @@ class TradeIngestionServiceTest {
 
         // Assert
         assertThat(outcomes("ACCEPTED", "NONE")).isEqualTo(1.0);
+    }
+
+    @Test
+    @Tag("US-604.2")
+    void should_countEachRejectionReason_when_tradeIsRejected() {
+        // Arrange: blank bookId and a lower version than stored
+        when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 2, false)));
+        TradeSubmission submission = new TradeSubmission("T1", 1, "CP-1", " ", "2027-05-20", Channel.REST, "{}");
+
+        // Act
+        assertThatThrownBy(() -> service.ingest(submission)).isInstanceOf(LowerVersionException.class);
+
+        // Assert
+        assertThat(outcomes("REJECTED", "INVALID_FIELD")).isEqualTo(1.0);
+        assertThat(outcomes("REJECTED", "LOWER_VERSION")).isEqualTo(1.0);
     }
 }
