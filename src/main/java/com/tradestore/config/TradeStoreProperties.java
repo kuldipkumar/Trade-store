@@ -128,5 +128,14 @@ public record TradeStoreProperties(String timeZone, @DefaultValue Audit audit, @
         static final Duration DEFAULT_INITIAL_INTERVAL = Duration.ofSeconds(1);
         static final double DEFAULT_MULTIPLIER = 2.0;
         static final Duration DEFAULT_MAX_INTERVAL = Duration.ofSeconds(10);
+
+        public Retry {
+            if (maxAttempts < 1) {
+                throw new IllegalArgumentException("trade-store.retry.max-attempts must be at least 1, was " + maxAttempts);
+            }
+            if (multiplier < 1) {
+                throw new IllegalArgumentException("trade-store.retry.multiplier must be at least 1, was " + multiplier);
+            }
+        }
     }
 }
