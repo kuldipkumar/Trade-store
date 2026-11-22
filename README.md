@@ -111,6 +111,15 @@ GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on ev
 8. Upload the test, coverage, traceability and scan reports, plus the rendered diagrams.
 9. A separate `docker compose` smoke job starts the whole stack and stores a trade.
 
+### Performance baseline (US-605)
+
+These tests run on demand, through the *Performance baseline* workflow or `./mvnw verify -Pperformance -DskipUnitTests=true -Djacoco.skip=true`. Results on a single local instance on Testcontainers (2026-11-22):
+
+| Scenario | Result | Target (A-41) |
+|---|---|---|
+| Burst of 10,000 stream trades | All stored in 9.7 s, none lost | Within 60 s, zero loss |
+| REST at 50 requests/s for 60 s | p50 4.7 ms, p95 9.0 ms, p99 17.1 ms, 0 errors | p95 < 200 ms |
+
 ## Assumptions
 
 All 54 assumptions, each agreed with the product owner, are in [ASSUMPTIONS.md](ASSUMPTIONS.md); the open questions behind them are in [docs/01-clarifications.md](docs/01-clarifications.md). The ones that shape behaviour most:

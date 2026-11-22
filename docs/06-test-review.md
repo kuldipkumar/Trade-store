@@ -1,6 +1,6 @@
 # Test review against the requirements
 
-**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301; US-304; US-302; US-303; US-502; US-503; D9; US-603.2; US-604; US-607; US-601; US-602; US-606; US-608; US-609). **Requested in:** PROMPTS.md #26.
+**Date:** 2026-11-20 (after US-105, US-104 and US-101 were merged). **Updated:** 2026-11-21 (ingestion observability; US-201; US-205; US-102; US-103; US-106; US-202; US-203; US-204; US-107; US-501; US-401; US-402; US-403; US-404; US-301; US-304; US-302; US-303; US-502; US-503; D9; US-603.2; US-604; US-607; US-601; US-602; US-606; US-608; US-609; US-605). **Requested in:** PROMPTS.md #26.
 
 ## How completeness and correctness are tracked
 
@@ -92,6 +92,9 @@ The tags were chosen by reading each test against the wording of its criterion. 
 | US-603.2 | Full | Tagged scenarios, all on Testcontainers: `StreamIngestionIT` (stream → stored → audited → `GET /trades/{id}`), `AssignmentScenarioIT` (lower-version and past-maturity rejections, the assignment example and its audit), `PoisonPillIT` (poison pill → DLT), `ExpiryIT` (expiry run). They run on every PR and push to `main` | |
 | US-604.1 | Full | `WalkingSkeletonIT` (`/actuator/health/readiness` UP with `db`, `mongo` and `kafka` components), `KafkaHealthIndicatorTest` (UP with cluster ID and nodes; DOWN when the broker doesn't answer in time) | |
 | US-604.2 | Full | `TradeMetricsTest`, `TradeIngestionServiceTest`, `StoreTradeIT` (outcome counters and latency timer at `/actuator/prometheus`), `PoisonPillIT` (`trade_deadletter_total{type="POISON"}` at `/actuator/prometheus`), `DeadLetterAuditRecovererTest`, `KafkaErrorHandlingTest` (`trade_retries_total`) | |
+| US-605.1 | Full | `PerformanceBaselinePT` (on demand, `-Pperformance`): a burst of 10,000 trades on the stream, all stored with none lost. Local baseline 2026-11-22: **9.7 s, about 1,036 trades/s** (target 60 s) | Single instance on Testcontainers; numbers vary by machine. |
+| US-605.2 | Full | `PerformanceBaselinePT`: REST at 50 requests/s for 60 s, open loop. Local baseline: **3,000 requests, 0 errors, p50 4.7 ms, p95 9.0 ms, p99 17.1 ms** (target p95 < 200 ms) | A request that hits a keep-alive connection Tomcat is closing is retried once and counted (submissions are idempotent by version). |
+| US-605.3 | Full | `CiPipelineConformanceTest`: `performance.yml` is manual-dispatch only, runs `-Pperformance` and uploads `target/performance/summary.md` | |
 | US-607.1 | Full | `TradeConsumerTest` (a message over the limit is malformed and never ingested), `TradeStorePropertiesTest` (`kafka.max-message-bytes` default 1 MB, configurable, positive), `AuditEventFactoryTest` (POISON payload capped), `PoisonPillIT` (malformed → DLT and POISON) | |
 | US-607.2 | Full | `TradeJsonParserTest`: extra fields (scalars, arrays, objects) are ignored and the raw text is kept (mutation-verified) | |
 | US-601.1 | Full | `CiPipelineConformanceTest`: the AGENTS.md §6 stages appear in order; triggers are PRs and pushes to `main` | Each run of the workflow is the live proof. |
