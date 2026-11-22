@@ -180,4 +180,20 @@ class StoreTradeIT {
         assertThat(metrics).contains("trade_job_failures_total{job=\"outbox-relay\"}");
         assertThat(metrics).contains("trade_job_failures_total{job=\"expiry\"}");
     }
+
+    @Test
+    @Tag("US-604.2")
+    void should_publishLatencyHistograms_when_tradesAndRequestsAreProcessed() {
+        // Arrange
+        ingestion.ingest(submission(1));
+        rest.get().uri("/trades/" + tradeId).exchange().expectStatus().isOk();
+
+        // Act
+        String metrics = rest.get().uri("/actuator/prometheus").exchange()
+                .expectStatus().isOk().expectBody(String.class).returnResult().getResponseBody();
+
+        // Assert: buckets, so dashboards can compute p95/p99 across instances (histogram_quantile)
+        assertThat(metrics).contains("trade_processing_seconds_bucket{channel=\"REST\"");
+        assertThat(metrics).contains("http_server_requests_seconds_bucket{");
+    }
 }
