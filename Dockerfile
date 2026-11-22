@@ -8,7 +8,9 @@ COPY .mvn .mvn
 # Retried: a transient download failure from Maven Central should not fail the image build.
 RUN for attempt in 1 2 3; do ./mvnw -B -q dependency:go-offline && exit 0; sleep 15; done; exit 1
 COPY src src
-RUN ./mvnw -B -q package -DskipTests
+# Tests are skipped entirely (not compiled): CI runs them before the image is built. -DskipTests alone is not
+# enough because the pom ties the surefire skip to skipUnitTests.
+RUN ./mvnw -B -q package -Dmaven.test.skip=true
 
 FROM eclipse-temurin:21.0.13_9-jre-noble
 # Run as a non-root user (A-47, US-606.2).
