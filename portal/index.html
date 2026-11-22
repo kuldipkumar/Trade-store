@@ -1,0 +1,695 @@
+<title>Trade Store Portal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Trade Store end to end: requirements, backlog, tests, design, pipeline, code, security and observability in one view.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a sticky journey rail (requirement -> operate) over one long, scannable page; every card links out. */
+:root {
+  --bg: #f3f5f7; --surface: #ffffff; --surface-2: #eef1f4; --ink: #0f1a27; --muted: #546273; --line: #d8dee6;
+  --accent: #0a6b68; --accent-soft: #dcefed; --accent-ink: #ffffff;
+  --ok: #1d7a3a; --ok-soft: #e1f2e6; --warn: #a45a00; --warn-soft: #fbeedb; --bad: #b42323; --bad-soft: #f9e1e1;
+  --run: #2758b0; --run-soft: #e2eafa; --idle: #7a8594; --idle-soft: #eceff3;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0b1118; --surface: #121b25; --surface-2: #172230; --ink: #e5ecf3; --muted: #95a3b4; --line: #243243;
+  --accent: #3fbdb3; --accent-soft: #123333; --accent-ink: #06201f;
+  --ok: #4cc27a; --ok-soft: #12301e; --warn: #f0a44b; --warn-soft: #33240f; --bad: #f07070; --bad-soft: #3a1717;
+  --run: #7aa7ff; --run-soft: #17233d; --idle: #8b97a6; --idle-soft: #1b2532; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0b1118; --surface: #121b25; --surface-2: #172230; --ink: #e5ecf3; --muted: #95a3b4; --line: #243243;
+  --accent: #3fbdb3; --accent-soft: #123333; --accent-ink: #06201f;
+  --ok: #4cc27a; --ok-soft: #12301e; --warn: #f0a44b; --warn-soft: #33240f; --bad: #f07070; --bad-soft: #3a1717;
+  --run: #7aa7ff; --run-soft: #17233d; --idle: #8b97a6; --idle-soft: #1b2532; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 1.75rem; font-weight: 700; }
+h3 { font-size: 1.1rem; font-weight: 600; }
+p { margin: 0; }
+code, .mono { font-family: var(--mono); font-size: 0.86em; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.eyebrow { font: 600 0.72rem/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+
+/* Journey rail */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+.rail { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 9; background: var(--surface); border-bottom: 1px solid var(--line); }
+.rail .wrap { display: flex; align-items: center; gap: 16px; padding-block: 10px; }
+.brand { font: 700 1rem/1 var(--display); white-space: nowrap; display: flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; }
+.brand-mark { width: 22px; height: 22px; border-radius: 6px; background: var(--accent); display: grid; place-items: center; color: var(--accent-ink); font: 700 0.7rem/1 var(--mono); }
+.steps { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+.steps::-webkit-scrollbar { display: none; }
+.steps a { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; font: 500 0.82rem/1 var(--body); color: var(--muted); text-decoration: none; white-space: nowrap; }
+.steps a .n { font: 600 0.68rem/1 var(--mono); color: var(--muted); }
+.steps a:hover, .steps a.on { background: var(--accent-soft); color: var(--ink); }
+.steps a.on .n { color: var(--accent); }
+.live { display: flex; align-items: center; gap: 8px; font: 500 0.78rem/1 var(--mono); white-space: nowrap; color: var(--muted); }
+
+/* Hero */
+.hero { padding-block: 44px 28px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.hero h1 { font-size: clamp(2.2rem, 4.4vw, 3.4rem); line-height: 1.02; font-weight: 700; }
+.hero h1 span { color: var(--accent); }
+.hero .lede { margin-top: 14px; font-size: 1.06rem; max-width: 62ch; color: var(--muted); }
+.rules { margin-top: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rule { display: flex; gap: 10px; align-items: baseline; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; font-size: 0.9rem; }
+.rule b { font: 600 0.72rem/1 var(--mono); color: var(--accent); min-width: 30px; }
+.tape { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.tape-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.tape table { width: 100%; border-collapse: collapse; font: 0.84rem/1.3 var(--mono); }
+.tape td, .tape th { padding: 8px 14px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tape th { font: 600 0.68rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.tape tr:last-child td { border-bottom: 0; }
+.tape-foot { padding: 10px 14px; font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--line); }
+
+/* KPI strip */
+.kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; padding-bottom: 8px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: var(--ink); }
+a.kpi:hover { border-color: var(--accent); }
+.kpi .v { font: 600 1.7rem/1 var(--mono); font-variant-numeric: tabular-nums; }
+.kpi .v small { font-size: 0.55em; color: var(--muted); font-weight: 500; }
+.kpi .l { font-size: 0.8rem; color: var(--muted); }
+
+/* Sections */
+section.block { padding-block: 40px 8px; scroll-margin-top: 64px; }
+.block-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+.block-head .eyebrow { display: block; margin-bottom: 6px; }
+.block-head p { max-width: 70ch; color: var(--muted); margin-top: 6px; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.card.link { text-decoration: none; color: var(--ink); }
+.card.link:hover { border-color: var(--accent); }
+.card .meta { font: 0.78rem/1.3 var(--mono); color: var(--muted); }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.spread { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 500 0.84rem/1 var(--body); text-decoration: none; cursor: pointer; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { color: var(--accent-ink); filter: brightness(1.08); }
+
+/* Pills */
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font: 600 0.72rem/1.4 var(--mono); letter-spacing: 0.02em; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.run { background: var(--run-soft); color: var(--run); }
+.pill.run::before { animation: pulse 1.2s ease-in-out infinite; }
+.pill.idle { background: var(--idle-soft); color: var(--idle); }
+.tag { display: inline-block; padding: 2px 7px; border-radius: 6px; background: var(--surface-2); color: var(--muted); font: 500 0.72rem/1.4 var(--mono); }
+@keyframes pulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .pill.run::before { animation: none; } html { scroll-behavior: auto; } }
+
+/* Requirements */
+.req { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: baseline; }
+.req:last-child { border-bottom: 0; }
+.req .id { font: 600 0.82rem/1 var(--mono); color: var(--accent); }
+.epic .stories { display: flex; flex-direction: column; gap: 2px; }
+.story { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 8px; padding: 6px 8px; border-radius: 6px; text-decoration: none; color: var(--ink); font-size: 0.88rem; align-items: baseline; }
+.story:hover { background: var(--surface-2); }
+.story .sid { font: 600 0.76rem/1 var(--mono); color: var(--accent); }
+.story .ac { font: 0.72rem/1 var(--mono); color: var(--muted); white-space: nowrap; }
+.epic-head { display: flex; gap: 10px; align-items: baseline; }
+.epic-head .eid { font: 700 1.3rem/1 var(--display); color: var(--accent); }
+
+/* Tests */
+.bar { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--ok); border-radius: 999px; }
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+table.data { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+table.data th, table.data td { padding: 8px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+table.data th { font: 600 0.7rem/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); position: sticky; top: 0; }
+table.data td.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+table.data tr:last-child td { border-bottom: 0; }
+.filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.filters button { border: 1px solid var(--line); background: var(--surface); color: var(--muted); padding: 6px 12px; border-radius: 999px; font: 500 0.82rem/1 var(--body); cursor: pointer; }
+.filters button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.scroll-y { max-height: 460px; overflow: auto; }
+
+/* Design */
+.diagrams { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; text-decoration: none; color: var(--ink); display: flex; flex-direction: column; }
+.diagram:hover { border-color: var(--accent); }
+.diagram .thumb { aspect-ratio: 4 / 3; max-width: 100%; background: #ffffff; display: grid; place-items: center; padding: 8px; overflow: hidden; }
+.diagram .thumb img { max-height: 100%; object-fit: contain; }
+.diagram .cap { padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 0.84rem; border-top: 1px solid var(--line); }
+
+/* Pipeline */
+.lane { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px dashed var(--line); }
+.lane:last-child { border-bottom: 0; }
+.lane-name { display: flex; flex-direction: column; gap: 6px; }
+.lane-name b { font: 600 0.9rem/1.2 var(--display); }
+.flow { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding-bottom: 4px; }
+.node { flex: 0 0 auto; min-width: 118px; max-width: 150px; background: var(--surface); border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+.node .t { font: 600 0.8rem/1.2 var(--body); }
+.node .s { font: 500 0.7rem/1 var(--mono); color: var(--muted); }
+.node.ok { border-left-color: var(--ok); }
+.node.bad { border-left-color: var(--bad); background: var(--bad-soft); }
+.node.run { border-left-color: var(--run); }
+.node.idle { border-left-color: var(--idle); }
+.node.skip { border-left-color: var(--line); opacity: 0.7; }
+.arrow { flex: 0 0 18px; display: grid; place-items: center; color: var(--muted); font: 0.9rem/1 var(--mono); }
+.gate { font: 600 0.62rem/1 var(--mono); letter-spacing: 0.06em; color: var(--bad); text-transform: uppercase; }
+
+/* Security / severity */
+.sev { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.sev div { border-radius: 6px; padding: 6px 4px; text-align: center; background: var(--surface-2); }
+.sev b { display: block; font: 600 1.05rem/1.1 var(--mono); font-variant-numeric: tabular-nums; }
+.sev span { font: 500 0.62rem/1 var(--mono); color: var(--muted); letter-spacing: 0.05em; }
+.sev .hit.c { background: var(--bad-soft); } .sev .hit.c b { color: var(--bad); }
+.sev .hit.h { background: var(--warn-soft); } .sev .hit.h b { color: var(--warn); }
+.owasp td:first-child { font-family: var(--mono); white-space: nowrap; color: var(--accent); }
+
+/* Observability */
+.panel-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.panel code { color: var(--muted); font-size: 0.74rem; word-break: break-word; }
+.big { font: 600 2rem/1 var(--mono); font-variant-numeric: tabular-nums; }
+pre.cmd { margin: 0; background: var(--surface-2); border-radius: 8px; padding: 12px; overflow-x: auto; font: 0.82rem/1.5 var(--mono); }
+
+footer { padding-block: 40px; color: var(--muted); font-size: 0.84rem; }
+footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 18px; }
+.notice { border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--radius); padding: 10px 14px; font-size: 0.86rem; color: var(--muted); }
+
+@media (max-width: 1020px) {
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .g4, .diagrams, .panel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .kpis, .g2, .g3, .g4, .diagrams, .panel-grid, .rules { grid-template-columns: minmax(0, 1fr); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lane { grid-template-columns: minmax(0, 1fr); }
+  .req { grid-template-columns: 48px minmax(0, 1fr); }
+  .req > :last-child { grid-column: 2; }
+  .live span.txt { display: none; }
+}
+</style>
+
+<header class="rail">
+  <div class="wrap">
+    <a class="brand" href="#overview"><span class="brand-mark">TS</span>Trade Store</a>
+    <nav class="steps" aria-label="Journey">
+      <a href="#requirements"><span class="n">1</span>Requirements</a>
+      <a href="#clarify"><span class="n">2</span>Clarify</a>
+      <a href="#tests"><span class="n">3</span>Tests</a>
+      <a href="#design"><span class="n">4</span>Design</a>
+      <a href="#pipeline"><span class="n">5</span>Pipeline</a>
+      <a href="#modules"><span class="n">6</span>Code</a>
+      <a href="#security"><span class="n">7</span>Security</a>
+      <a href="#observability"><span class="n">8</span>Operate</a>
+    </nav>
+    <div class="live" id="live-badge"><span class="pill idle">loading</span><span class="txt">pipeline</span></div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap" id="overview">
+    <div class="hero">
+      <div>
+        <span class="eyebrow">Java 21 · Spring Boot 4 · Kafka · PostgreSQL · MongoDB</span>
+        <h1 style="margin-top:10px">Every trade version checked, stored and <span>audited</span>, from stream to report.</h1>
+        <p class="lede">The Trade Store takes trades from a Kafka stream and a REST API, enforces the version and maturity rules, expires matured trades every night, and keeps an append-only audit of every outcome. This page follows the work from the business requirement to the running system; every card opens the real document, test, pipeline run or report.</p>
+        <div class="rules">
+          <div class="rule"><b>R-03</b><span>A <strong>lower version</strong> than the stored one is rejected</span></div>
+          <div class="rule"><b>R-03</b><span>The <strong>same version</strong> replaces the stored trade</span></div>
+          <div class="rule"><b>R-04</b><span>A <strong>maturity date before today</strong> is rejected</span></div>
+          <div class="rule"><b>R-05</b><span>Trades past maturity are <strong>marked expired</strong></span></div>
+        </div>
+      </div>
+      <div class="tape" aria-label="The assignment's example, as the system handles it">
+        <div class="tape-head"><span class="eyebrow">Assignment example, replayed</span><a href="https://github.com/kuldipkumar/Trade-store/blob/main/src/test/java/com/tradestore/it/AssignmentScenarioIT.java" class="mono" style="font-size:.78rem">AssignmentScenarioIT</a></div>
+        <table>
+          <thead><tr><th>Trade</th><th>Ver</th><th>Maturity</th><th>Outcome</th></tr></thead>
+          <tbody>
+            <tr><td>T1</td><td>1</td><td>20/05/2027</td><td><span class="pill ok">ACCEPTED</span></td></tr>
+            <tr><td>T2</td><td>2</td><td>20/05/2027</td><td><span class="pill ok">ACCEPTED</span></td></tr>
+            <tr><td>T2</td><td>1</td><td>20/05/2027</td><td><span class="pill bad">LOWER_VERSION</span></td></tr>
+            <tr><td>T3</td><td>3</td><td>20/05/2014</td><td><span class="pill bad">MATURITY_IN_PAST</span></td></tr>
+            <tr><td>T1, T2</td><td></td><td>clock → 21/05/2027</td><td><span class="pill idle">EXPIRED</span></td></tr>
+          </tbody>
+        </table>
+        <div class="tape-foot">Each row is one step of an integration test on real Kafka, PostgreSQL and MongoDB, run on every change.</div>
+      </div>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <p class="muted" id="data-note" style="font-size:.8rem;margin-top:8px"></p>
+  </div>
+
+  <!-- 1. Requirements -->
+  <section class="block" id="requirements"><div class="wrap">
+    <div class="block-head">
+      <div><span class="eyebrow">1 · From business need to backlog</span><h2>Requirements, epics and user stories</h2>
+        <p>The assignment is the BRD. Each requirement is traced to the epics and stories that deliver it; every story has Given/When/Then criteria, and each criterion is a test.</p></div>
+      <div class="row">
+        <a class="btn primary" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/Requirements.md">Open the BRD</a>
+        <a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/02-backlog.md">Backlog</a>
+        <a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/02-po-review.md">PO review</a>
+        <a class="btn" target="_blank" rel="noopener" href="https://github.com/users/kuldipkumar/projects/3">Board</a>
+      </div>
+    </div>
+    <div class="card" style="padding:0;gap:0" id="req-list"></div>
+    <h3 style="margin:26px 0 12px">Epics and stories</h3>
+    <div class="grid g3" id="epics"></div>
+  </div></section>
+
+  <!-- 2. Clarify -->
+  <section class="block" id="clarify"><div class="wrap">
+    <div class="block-head">
+      <div><span class="eyebrow">2 · Ambiguity removed before design</span><h2>Clarifications, assumptions and decisions</h2>
+        <p>Every gap or contradiction in the brief became a question with a proposed assumption and its impact if wrong. Design-time choices are recorded as decisions with the reason.</p></div>
+    </div>
+    <div class="grid g3" id="clarify-cards"></div>
+    <div class="card" style="margin-top:12px"><div class="spread"><h3>Decisions taken during design and build</h3><a target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/05-lld.md#10-design-decisions-accepted-by-the-human-on-2026-11-20">LLD §10</a></div><div class="grid g3" id="decisions"></div></div>
+  </div></section>
+
+  <!-- 3. Tests -->
+  <section class="block" id="tests"><div class="wrap">
+    <div class="block-head">
+      <div><span class="eyebrow">3 · Built test first</span><h2>Unit and integration / regression suites</h2>
+        <p>Every test is tagged with the acceptance criterion it proves. Integration tests run against real Kafka, PostgreSQL and MongoDB in containers; conformance tests check the pipeline, image and documents themselves.</p></div>
+      <div class="row">
+        <a class="btn primary" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/traceability.md">Traceability matrix</a>
+        <a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/06-test-review.md">Test review</a>
+        <a class="btn" id="coverage-link" target="_blank" rel="noopener" href="#">Coverage report</a>
+      </div>
+    </div>
+    <div class="grid g4" id="suite-cards"></div>
+    <div class="spread" style="margin:18px 0 10px;flex-wrap:wrap">
+      <div class="filters" role="group" aria-label="Filter test classes" id="test-filters"></div>
+      <span class="muted mono" style="font-size:.78rem" id="test-count"></span>
+    </div>
+    <div class="tbl-wrap scroll-y"><table class="data" id="test-table"><thead><tr><th>Test class</th><th>Suite</th><th>Criteria proven</th><th class="num">Tests</th><th>Last CI run</th></tr></thead><tbody></tbody></table></div>
+  </div></section>
+
+  <!-- 4. Design -->
+  <section class="block" id="design"><div class="wrap">
+    <div class="block-head">
+      <div><span class="eyebrow">4 · Architecture as code</span><h2>High-level and low-level design</h2>
+        <p>Diagrams are PlantUML sources in the repo, rendered and syntax-checked on every build. Each technology choice has an ADR.</p></div>
+    </div>
+    <div class="grid g4" id="design-docs"></div>
+    <h3 style="margin:26px 0 12px">Architecture decision records</h3>
+    <div class="grid g4" id="adrs"></div>
+    <div class="spread" style="margin:26px 0 12px;flex-wrap:wrap"><h3>Diagrams</h3><div class="filters" role="group" aria-label="Filter diagrams" id="diagram-filters"></div></div>
+    <div class="diagrams" id="diagrams"></div>
+  </div></section>
+
+  <!-- 5. Pipeline -->
+  <section class="block" id="pipeline"><div class="wrap">
+    <div class="block-head">
+      <div><span class="eyebrow">5 · Every change, gated</span><h2>CI/CD pipeline, live</h2>
+        <p>Status of the latest run on <code>main</code>, step by step. A red gate stops the change: a failing test, coverage under 80%, a diagram syntax error, a stale traceability matrix, a critical vulnerability or a high-risk DAST alert.</p></div>
+      <div class="row"><a class="btn primary" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/actions">All runs</a><button class="btn" type="button" id="refresh">Refresh status</button></div>
+    </div>
+    <div class="card" id="lanes"></div>
+    <p class="muted" style="font-size:.8rem;margin-top:8px" id="pipeline-note"></p>
+  </div></section>
+
+  <!-- 6. Code -->
+  <section class="block" id="modules"><div class="wrap">
+    <div class="block-head">
+      <div><span class="eyebrow">6 · One deployable, clear layers</span><h2>Code modules and their responsibilities</h2>
+        <p>Domain and services depend only on ports; PostgreSQL, MongoDB and Kafka sit behind adapters (ADR-001, dependency inversion). Line coverage per package comes from the latest CI run.</p></div>
+      <div class="row"><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/tree/main/src/main/java/com/tradestore">Browse the source</a><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/api/openapi.yaml">OpenAPI contract</a></div>
+    </div>
+    <div class="grid g3" id="module-cards"></div>
+  </div></section>
+
+  <!-- 7. Security -->
+  <section class="block" id="security"><div class="wrap">
+    <div class="block-head">
+      <div><span class="eyebrow">7 · Shift-left security</span><h2>SAST, SCA, image and DAST scans</h2>
+        <p>Static analysis of the code, open-source dependency and container image scans, and a dynamic scan of the running API. Critical dependency or image findings, and high-risk DAST alerts, fail the pipeline.</p></div>
+      <div class="row"><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/security/code-scanning">Security tab</a><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/adr/006-trivy-oss-vulnerability-scan.md">ADR-006</a></div>
+    </div>
+    <div class="grid g4" id="security-cards"></div>
+    <h3 style="margin:26px 0 12px">OWASP Top 10 (2021) coverage</h3>
+    <div class="tbl-wrap"><table class="data owasp"><thead><tr><th>Risk</th><th>How the Trade Store addresses it</th><th>Evidence</th></tr></thead><tbody id="owasp"></tbody></table></div>
+  </div></section>
+
+  <!-- 8. Observability -->
+  <section class="block" id="observability"><div class="wrap">
+    <div class="block-head">
+      <div><span class="eyebrow">8 · Run and operate</span><h2>Observability dashboard</h2>
+        <p>Business outcomes, latency, dead letters, retries and the audit backlog are Prometheus metrics; a provisioned Grafana dashboard shows them live. Readiness is UP only when PostgreSQL, MongoDB and Kafka are reachable.</p></div>
+      <div class="row"><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/observability/grafana/dashboards/trade-store.json">Dashboard JSON</a><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/runbook-dead-letter.md">Dead-letter runbook</a></div>
+    </div>
+    <div class="grid g3">
+      <div class="card"><span class="eyebrow">Stream burst (US-605.1)</span><div class="big" id="perf-burst">–</div><p class="muted">10,000 trades published at once, all stored, none lost. Target: 60 s.</p></div>
+      <div class="card"><span class="eyebrow">REST p95 at 50 req/s (US-605.2)</span><div class="big" id="perf-rest">–</div><p class="muted" id="perf-rest-note">Target: under 200 ms.</p></div>
+      <div class="card"><span class="eyebrow">Open the live dashboard</span>
+        <pre class="cmd">docker compose --profile observability up --build -d
+scripts/demo-load.sh        # drive every outcome</pre>
+        <p class="muted" style="font-size:.84rem">Grafana: <code>localhost:3000</code> (dashboard “Trade Store”) · Prometheus: <code>localhost:9090</code></p></div>
+    </div>
+    <h3 style="margin:26px 0 12px">Dashboard panels and the metrics behind them</h3>
+    <div class="panel-grid" id="panels"></div>
+  </div></section>
+</main>
+
+<footer><div class="wrap">
+  <span id="footer-meta">Trade Store portal</span>
+  <span><a target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store">Repository</a> · <a target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/README.md">README</a> · <a target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/PROMPTS.md">AI prompt log</a> · <a target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/milestones.md">Milestones</a></span>
+</div></footer>
+
+<script>
+(function () {
+  "use strict";
+  var REPO = "kuldipkumar/Trade-store";
+  var GH = "https://github.com/" + REPO;
+  var PAGES = "https://kuldipkumar.github.io/Trade-store/";
+  var onPages = /\.github\.io$/.test(location.hostname);
+  var reportBase = onPages ? "" : PAGES;   // reports are published only on GitHub Pages
+  var blob = function (p) { return GH + "/blob/main/" + p; };
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var ext = 'target="_blank" rel="noopener"';
+  var fmt = function (n) { return n == null ? "–" : Number(n).toLocaleString("en-GB"); };
+  var ago = function (iso) {
+    if (!iso) return "";
+    var s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 90) return Math.round(s) + " s ago";
+    if (s < 5400) return Math.round(s / 60) + " min ago";
+    if (s < 129600) return Math.round(s / 3600) + " h ago";
+    return Math.round(s / 86400) + " days ago";
+  };
+  function pill(state, text) { return '<span class="pill ' + state + '">' + esc(text) + "</span>"; }
+  function stateOf(run) {
+    if (!run) return { cls: "idle", text: "no run" };
+    if (run.status !== "completed") return { cls: "run", text: run.status === "queued" ? "queued" : "running" };
+    var c = run.conclusion;
+    if (c === "success") return { cls: "ok", text: "passed" };
+    if (c === "skipped" || c === "cancelled" || c === "neutral") return { cls: "idle", text: c };
+    return { cls: "bad", text: c || "failed" };
+  }
+
+  var data = null, status = null, statusSource = "";
+
+  // ---------- overview ----------
+  function renderKpis() {
+    var c = data.counts, tests = data.tests;
+    var sum = function (kind) { return tests.filter(function (t) { return !kind || t.kind === kind; }).reduce(function (a, t) { return a + t.tests; }, 0); };
+    var ci = status && status.runs && status.runs.CI;
+    var st = stateOf(ci);
+    var crit = data.security.dependencies && data.security.image ? data.security.dependencies.CRITICAL + data.security.image.CRITICAL : null;
+    var items = [
+      { v: c.stories + "<small>/" + c.stories + "</small>", l: "user stories delivered", href: "#requirements" },
+      { v: c.criteriaTested + "<small>/" + c.criteria + "</small>", l: "acceptance criteria tested", href: blob("docs/traceability.md") },
+      { v: fmt(sum()), l: "automated tests (" + fmt(sum("unit")) + " unit · " + fmt(sum("integration")) + " integration)", href: "#tests" },
+      { v: data.coverage && data.coverage.line != null ? data.coverage.line + "<small>%</small>" : "–", l: "line coverage (gate 80%)", href: reportBase + "reports/coverage/index.html" },
+      { v: crit == null ? "–" : String(crit), l: "critical vulnerabilities (gate 0)", href: "#security" },
+      { v: pill(st.cls, st.text), l: "latest pipeline on main" + (ci ? " · " + ago(ci.updated_at) : ""), href: ci ? ci.html_url : GH + "/actions" }
+    ];
+    $("kpis").innerHTML = items.map(function (k) {
+      var external = /^https?:/.test(k.href) ? " " + ext : "";
+      return '<a class="kpi" href="' + esc(k.href) + '"' + external + '><span class="v">' + k.v + '</span><span class="l">' + esc(k.l) + "</span></a>";
+    }).join("");
+    $("data-note").textContent = "Figures from CI run data built " + ago(data.generatedAt) + " (" + new Date(data.generatedAt).toLocaleString("en-GB") + ")" + (data.commit ? " at commit " + data.commit.slice(0, 7) : "") + ".";
+  }
+
+  // ---------- requirements ----------
+  function renderRequirements() {
+    $("req-list").innerHTML = data.requirements.map(function (r) {
+      var stories = r.stories.map(function (s) { return '<a class="tag" ' + ext + ' href="' + storyLink(s) + '">' + esc(s) + "</a>"; }).join(" ");
+      return '<div class="req"><span class="id">' + esc(r.id) + '</span><div><div>' + esc(r.text) + '</div><div class="row" style="margin-top:6px">' + stories + '</div></div>' +
+        '<span class="pill ' + (/^(\d+) of \1/.test(r.tested) ? "ok" : "warn") + '">' + esc(r.tested) + " tested</span></div>";
+    }).join("");
+    $("epics").innerHTML = data.epics.map(function (e) {
+      var crit = e.stories.reduce(function (a, s) { return a + s.criteria; }, 0);
+      return '<div class="card epic"><div class="epic-head"><span class="eid">' + esc(e.id) + '</span><h3>' + esc(e.name) + '</h3></div>' +
+        '<div class="meta">' + e.stories.length + " stories · " + crit + " acceptance criteria</div>" +
+        '<div class="stories">' + e.stories.map(function (s) {
+          return '<a class="story" ' + ext + ' href="' + blob("docs/02-backlog.md") + "#" + esc(s.anchor) + '" title="' + esc(s.narrative) + '"><span class="sid">' + esc(s.id) + "</span><span>" + esc(s.title) + '</span><span class="ac">' + s.criteria + " AC</span></a>";
+        }).join("") + "</div>" +
+        '<a ' + ext + ' href="' + GH + '/issues?q=is%3Aissue+label%3Aepic%3A' + esc(e.id) + '" class="mono" style="font-size:.78rem">Issues for ' + esc(e.id) + " →</a></div>";
+    }).join("");
+  }
+  function storyLink(id) {
+    for (var i = 0; i < data.epics.length; i++) for (var j = 0; j < data.epics[i].stories.length; j++) {
+      var s = data.epics[i].stories[j];
+      if (s.id === id) return blob("docs/02-backlog.md") + "#" + s.anchor;
+    }
+    return blob("docs/02-backlog.md");
+  }
+
+  // ---------- clarify ----------
+  function renderClarify() {
+    var c = data.counts;
+    var cards = [
+      { n: c.clarifications, t: "Clarifications", d: "Each ambiguity: question, proposed assumption, impact if wrong.", href: blob("docs/01-clarifications.md") },
+      { n: c.assumptions, t: "Agreed assumptions", d: "The assumption register, including the non-functional requirements.", href: blob("ASSUMPTIONS.md") },
+      { n: c.prompts, t: "Logged AI prompts", d: "Every prompt, the AI's output and the human decision on it.", href: blob("PROMPTS.md") }
+    ];
+    $("clarify-cards").innerHTML = cards.map(function (k) {
+      return '<a class="card link" ' + ext + ' href="' + k.href + '"><span class="big">' + fmt(k.n) + '</span><h3>' + esc(k.t) + '</h3><p class="muted">' + esc(k.d) + "</p></a>";
+    }).join("");
+    $("decisions").innerHTML = data.decisions.map(function (d) {
+      return '<div class="row" style="align-items:baseline;flex-wrap:nowrap"><span class="tag" style="color:var(--accent)">' + esc(d.id) + '</span><span style="font-size:.88rem">' + esc(d.text) + "</span></div>";
+    }).join("");
+  }
+
+  // ---------- tests ----------
+  var testFilter = "all";
+  function renderTests() {
+    var kinds = [
+      { k: "unit", t: "Unit", d: "JUnit 5 + Mockito, no Spring context where avoidable" },
+      { k: "integration", t: "Integration / regression", d: "Testcontainers: Kafka, PostgreSQL, MongoDB" },
+      { k: "conformance", t: "Conformance", d: "Pipeline, image, secrets, prompt log and docs" },
+      { k: "performance", t: "Performance", d: "On demand: stream burst and REST latency" }
+    ];
+    $("suite-cards").innerHTML = kinds.map(function (s) {
+      var rows = data.tests.filter(function (t) { return t.kind === s.k; });
+      var n = rows.reduce(function (a, t) { return a + t.tests; }, 0);
+      var withResult = rows.filter(function (t) { return t.result; });
+      var failed = withResult.reduce(function (a, t) { return a + t.result.failed; }, 0);
+      var state = s.k === "performance" ? pill("idle", "on demand") : withResult.length === 0 ? pill("idle", "no result") : failed ? pill("bad", failed + " failing") : pill("ok", "all passing");
+      return '<div class="card"><div class="spread"><span class="eyebrow">' + esc(s.t) + "</span>" + state + '</div><span class="big">' + fmt(n) + '</span><p class="muted" style="font-size:.86rem">' + rows.length + " classes · " + esc(s.d) + "</p></div>";
+    }).join("");
+    $("test-filters").innerHTML = ["all", "unit", "integration", "conformance", "performance"].map(function (k) {
+      return '<button type="button" data-k="' + k + '" aria-pressed="' + (k === testFilter) + '">' + (k === "all" ? "All" : k[0].toUpperCase() + k.slice(1)) + "</button>";
+    }).join("");
+    var rows = data.tests.filter(function (t) { return testFilter === "all" || t.kind === testFilter; });
+    $("test-count").textContent = rows.length + " classes · " + fmt(rows.reduce(function (a, t) { return a + t.tests; }, 0)) + " tests";
+    $("test-table").querySelector("tbody").innerHTML = rows.map(function (t) {
+      var r = t.result;
+      var res = t.kind === "performance" ? pill("idle", "on demand") : !r ? pill("idle", "–") : r.failed ? pill("bad", r.failed + " failed") : pill("ok", r.run + " passed · " + r.seconds + " s");
+      var tags = t.tags.slice(0, 6).map(function (g) { return '<span class="tag">' + esc(g) + "</span>"; }).join(" ") + (t.tags.length > 6 ? ' <span class="tag">+' + (t.tags.length - 6) + "</span>" : "");
+      return '<tr><td><a ' + ext + ' href="' + blob(t.path) + '" class="mono">' + esc(t.name) + "</a></td><td>" + esc(t.kind) + "</td><td>" + tags + '</td><td class="num">' + t.tests + "</td><td>" + res + "</td></tr>";
+    }).join("");
+    $("coverage-link").href = reportBase + "reports/coverage/index.html";
+  }
+
+  // ---------- design ----------
+  var diagramFilter = "all";
+  function renderDesign() {
+    var docs = [
+      { t: "High-level design", d: "Context, containers, components, deployment and quality attributes.", p: "docs/03-hld.md" },
+      { t: "Low-level design", d: "Classes, contracts, error handling, metrics, configuration and decisions.", p: "docs/05-lld.md" },
+      { t: "REST API contract", d: "OpenAPI 3 for every endpoint and error shape; also drives the DAST scan.", p: "docs/api/openapi.yaml" },
+      { t: "Test review", d: "A verdict for every acceptance criterion, with known limitations.", p: "docs/06-test-review.md" }
+    ];
+    $("design-docs").innerHTML = docs.map(function (k) {
+      return '<a class="card link" ' + ext + ' href="' + blob(k.p) + '"><h3>' + esc(k.t) + '</h3><p class="muted" style="font-size:.88rem">' + esc(k.d) + '</p><span class="meta">' + esc(k.p) + "</span></a>";
+    }).join("");
+    $("adrs").innerHTML = data.design.adrs.map(function (a) {
+      var m = /^(ADR-\d+):\s*(.*)$/.exec(a.title) || [null, "ADR", a.title];
+      return '<a class="card link" ' + ext + ' href="' + blob(a.path) + '"><span class="eyebrow">' + esc(m[1]) + "</span><span>" + esc(m[2]) + "</span></a>";
+    }).join("");
+    var groups = { all: "All", "03": "HLD", "04": "Pipeline", "05": "LLD" };
+    $("diagram-filters").innerHTML = Object.keys(groups).map(function (k) {
+      return '<button type="button" data-k="' + k + '" aria-pressed="' + (k === diagramFilter) + '">' + groups[k] + "</button>";
+    }).join("");
+    var kinds = { c4: "C4", deployment: "Deployment", activity: "Activity", class: "Class", er: "Data model", seq: "Sequence", state: "State" };
+    $("diagrams").innerHTML = data.design.diagrams.filter(function (d) { return diagramFilter === "all" || d.phase === diagramFilter; }).map(function (d) {
+      return '<a class="diagram" ' + ext + ' href="' + esc(d.svg) + '"><div class="thumb"><img loading="lazy" src="' + esc(d.svg) + '" alt="' + esc(d.title) + '"></div>' +
+        '<div class="cap"><span class="eyebrow">' + esc(kinds[d.kind] || d.kind) + " · phase " + esc(d.phase) + "</span><span>" + esc(d.title) + '</span><span class="row"><a ' + ext + ' href="' + blob(d.source) + '" class="mono" style="font-size:.74rem">PlantUML source</a></span></div></a>';
+    }).join("");
+  }
+
+  // ---------- pipeline ----------
+  var LANES = [
+    { name: "CI · build and gates", job: "Build, test, scan, package", file: "ci.yml", nodes: [
+      ["Checkout", "Checkout"], ["Set up JDK 21", "JDK 21"], ["Render PlantUML diagrams", "Diagrams", "syntax"], ["Unit tests", "Unit tests", "fail = stop"],
+      ["Integration tests and coverage gate", "Integration + coverage", "80% gate"], ["Traceability matrix and tag check", "Traceability", "stale = stop"],
+      ["Trivy dependency scan", "Trivy SCA", "critical"], ["Trivy full report", "Full SCA report"], ["Build Docker image", "Image build"],
+      ["Trivy image scan", "Image scan", "critical"], ["Upload reports", "Reports"] ] },
+    { name: "CI · run the stack", job: "docker compose smoke test", file: "ci.yml", nodes: [
+      ["Start the stack and wait for readiness", "Compose up + smoke", "ready"], ["OWASP ZAP API scan", "ZAP DAST"], ["DAST gate (fails on any High risk alert)", "DAST gate", "high risk"],
+      ["Upload DAST report", "DAST report"], ["Stop the stack", "Tear down"] ] }
+  ];
+  var OTHER = [
+    { name: "CodeQL", label: "SAST · CodeQL", file: "codeql.yml", d: "Static analysis, PRs, main and weekly" },
+    { name: "Portal", label: "Portal deploy", file: "portal.yml", d: "Publishes this page and the reports" },
+    { name: "Performance baseline", label: "Performance", file: "performance.yml", d: "On demand: 10,000-trade burst, REST p95" }
+  ];
+  function nodeState(step) {
+    if (!step) return { cls: "idle", text: "not in run" };
+    if (step.status !== "completed") return { cls: "run", text: step.status };
+    if (step.conclusion === "success") return { cls: "ok", text: "passed" };
+    if (step.conclusion === "skipped") return { cls: "skip", text: "skipped" };
+    return { cls: "bad", text: step.conclusion };
+  }
+  function renderPipeline() {
+    var jobs = (status && status.jobs) || [];
+    var ci = status && status.runs && status.runs.CI;
+    var html = LANES.map(function (lane) {
+      var job = jobs.filter(function (j) { return j.name === lane.job; })[0];
+      var js = job ? stateOf(job) : stateOf(null);
+      var nodes = lane.nodes.map(function (n, i) {
+        var step = job ? job.steps.filter(function (s) { return s.name === n[0]; })[0] : null;
+        var st = nodeState(step);
+        return (i ? '<span class="arrow" aria-hidden="true">→</span>' : "") + '<div class="node ' + st.cls + '"><span class="t">' + esc(n[1]) + '</span><span class="s">' + esc(st.text) + "</span>" + (n[2] ? '<span class="gate">gate · ' + esc(n[2]) + "</span>" : "") + "</div>";
+      }).join("");
+      return '<div class="lane"><div class="lane-name"><b>' + esc(lane.name) + "</b>" + pill(js.cls, js.text) + (job ? '<a ' + ext + ' href="' + esc(job.html_url) + '" class="mono" style="font-size:.74rem">job log →</a>' : "") + '</div><div class="flow">' + nodes + "</div></div>";
+    }).join("");
+    html += '<div class="lane"><div class="lane-name"><b>Other workflows</b><span class="muted" style="font-size:.78rem">latest on main</span></div><div class="grid g3">' + OTHER.map(function (w) {
+      var run = status && status.runs && status.runs[w.name];
+      var st = stateOf(run);
+      return '<a class="card link" ' + ext + ' href="' + (run ? esc(run.html_url) : GH + "/actions/workflows/" + w.file) + '" style="padding:12px"><div class="spread"><b style="font:600 .9rem/1.2 var(--display)">' + esc(w.label) + "</b>" + pill(st.cls, st.text) + '</div><span class="muted" style="font-size:.8rem">' + esc(w.d) + (run ? " · " + ago(run.updated_at) : "") + "</span></a>";
+    }).join("") + "</div></div>";
+    $("lanes").innerHTML = html;
+    $("pipeline-note").innerHTML = (statusSource === "live" ? "Live from the GitHub API" : "Snapshot taken " + ago(status && status.fetchedAt) + (onPages ? " (the live call was not available)" : " · open the live portal for real-time status: <a " + ext + ' href="' + PAGES + '">' + PAGES.replace("https://", "") + "</a>")) +
+      (ci ? " · run <a " + ext + ' href="' + esc(ci.html_url) + '">' + esc(String(ci.id)) + "</a> at " + esc((ci.head_sha || "").slice(0, 7)) + ", " + ago(ci.updated_at) : "") + ".";
+    var st = stateOf(ci);
+    $("live-badge").innerHTML = pill(st.cls, st.text) + '<span class="txt">' + (statusSource === "live" ? "live" : "snapshot") + "</span>";
+    renderKpis();
+  }
+
+  // ---------- modules ----------
+  function renderModules() {
+    $("module-cards").innerHTML = data.modules.map(function (m) {
+      var cov = m.coverage;
+      return '<a class="card link" ' + ext + ' href="' + GH + "/tree/main/" + esc(m.path) + '"><div class="spread"><code style="font-size:.9rem;color:var(--accent)">' + esc(m.package) + '</code><span class="meta">' + m.classes.length + " classes · " + fmt(m.loc) + " lines</span></div>" +
+        '<p style="font-size:.9rem">' + esc(m.responsibility) + "</p>" +
+        (cov != null ? '<div><div class="spread meta"><span>line coverage</span><span>' + cov + '%</span></div><div class="bar" style="margin-top:4px"><i style="width:' + cov + '%"></i></div></div>' : "") +
+        '<div class="row">' + m.classes.slice(0, 6).map(function (c) { return '<span class="tag">' + esc(c) + "</span>"; }).join("") + (m.classes.length > 6 ? '<span class="tag">+' + (m.classes.length - 6) + "</span>" : "") + "</div></a>";
+    }).join("");
+  }
+
+  // ---------- security ----------
+  function sevGrid(t) {
+    if (!t) return '<p class="muted" style="font-size:.84rem">No report in the latest data.</p>';
+    return '<div class="sev">' + [["CRITICAL", "c"], ["HIGH", "h"], ["MEDIUM", ""], ["LOW", ""], ["UNKNOWN", ""]].map(function (s) {
+      return '<div class="' + (t[s[0]] ? "hit " + s[1] : "") + '"><b>' + t[s[0]] + "</b><span>" + s[0].slice(0, 4) + "</span></div>";
+    }).join("") + "</div>";
+  }
+  function renderSecurity() {
+    var s = data.security;
+    var codeql = status && status.runs && status.runs.CodeQL;
+    var cq = stateOf(codeql);
+    var dast = s.dast;
+    var dastGrid = dast ? '<div class="sev">' + [["High", "c"], ["Medium", "h"], ["Low", ""], ["Informational", ""]].map(function (r) {
+      return '<div class="' + (dast.counts[r[0]] ? "hit " + r[1] : "") + '"><b>' + dast.counts[r[0]] + "</b><span>" + r[0].slice(0, 4).toUpperCase() + "</span></div>";
+    }).join("") + "</div>" : '<p class="muted" style="font-size:.84rem">Runs in the compose job; results appear after the next run on main.</p>';
+    var gate = function (t) { return t && t.CRITICAL ? pill("bad", "gate failed") : t ? pill("ok", "gate passed") : pill("idle", "no data"); };
+    var cards = [
+      { e: "SAST · CodeQL", h: "Static code analysis", st: pill(cq.cls, cq.text), body: '<p class="muted" style="font-size:.86rem">security-extended queries over the Java source on every PR, push to main and weekly. Alerts are triaged in the Security tab.</p>', links: [["Code scanning alerts", GH + "/security/code-scanning"], ["Workflow", GH + "/actions/workflows/codeql.yml"]] },
+      { e: "SCA · Trivy", h: "Open-source dependencies", st: gate(s.dependencies), body: sevGrid(s.full || s.dependencies) + '<p class="muted" style="font-size:.8rem">All severities shown; the build fails on CRITICAL (CVSS ≥ 9).</p>', links: [["Full report", reportBase + "reports/security/trivy-full-report.txt"], ["Gate report", reportBase + "reports/security/trivy-dependencies.txt"]] },
+      { e: "Image · Trivy", h: "Container image (OS + libraries)", st: gate(s.image), body: sevGrid(s.image) + '<p class="muted" style="font-size:.8rem">Runtime image runs as a non-root user (US-606.2).</p>', links: [["Image report", reportBase + "reports/security/trivy-image.txt"], ["Dockerfile", blob("Dockerfile")]] },
+      { e: "DAST · OWASP ZAP", h: "Running API, from the OpenAPI contract", st: dast ? (dast.counts.High ? pill("bad", "high risk") : pill("ok", "no high risk")) : pill("idle", "pending"), body: dastGrid, links: [["ZAP report", reportBase + "reports/dast/zap-report.html"], ["OpenAPI", blob("docs/api/openapi.yaml")]] }
+    ];
+    $("security-cards").innerHTML = cards.map(function (c) {
+      return '<div class="card"><div class="spread"><span class="eyebrow">' + esc(c.e) + "</span>" + c.st + "</div><h3>" + esc(c.h) + "</h3>" + c.body + '<div class="row" style="margin-top:auto">' + c.links.map(function (l) { return '<a class="btn" ' + ext + ' href="' + esc(l[1]) + '">' + esc(l[0]) + "</a>"; }).join("") + "</div></div>";
+    }).join("");
+    var owasp = [
+      ["A01 Broken access control", "Not addressed: no authentication in this assignment build; recorded as a known limitation and future improvement.", "README · Known limitations", blob("README.md") + "#known-limitations"],
+      ["A02 Cryptographic failures", "No secrets stored by the app; connections configured from the environment. TLS to brokers and databases is future work.", "ContainerAndSecretsConformanceTest", blob("src/test/java/com/tradestore/repo/ContainerAndSecretsConformanceTest.java")],
+      ["A03 Injection", "Parameterised JDBC only; strict JSON type checks; Mongo queries built from typed criteria.", "JdbcTradeRepository, TradeJsonParser", blob("src/main/java/com/tradestore/persistence/sql/JdbcTradeRepository.java")],
+      ["A04 Insecure design", "Threats designed out: size limits, poison-pill isolation, version-guarded writes, append-only audit.", "LLD §7 error handling", blob("docs/05-lld.md") + "#7-error-handling-strategy"],
+      ["A05 Security misconfiguration", "ZAP scan of the running stack; actuator exposes only health, info and metrics; errors never leak stack traces.", "ZAP report, GlobalExceptionHandler", reportBase + "reports/dast/zap-report.html"],
+      ["A06 Vulnerable components", "Trivy fails the build on CRITICAL in dependencies and in the image; full report kept for every run.", "ADR-006", blob("docs/adr/006-trivy-oss-vulnerability-scan.md")],
+      ["A07 Identification and authentication", "Out of scope with A01 (no users in this build).", "Known limitations", blob("README.md") + "#known-limitations"],
+      ["A08 Software and data integrity", "Transactional outbox keeps trade and audit consistent; audit and history are insert-only; actions pinned to versions.", "ADR-005, AuditTrailImmutabilityTest", blob("docs/adr/005-transactional-outbox-for-audit.md")],
+      ["A09 Logging and monitoring", "One structured line per outcome with IDs only (no payloads); metrics and alerts-ready dashboard.", "LLD §8", blob("docs/05-lld.md") + "#8-observability-us-604"],
+      ["A10 Server-side request forgery", "The app makes no outbound calls driven by user input.", "Design (no URL inputs)", blob("docs/03-hld.md")]
+    ];
+    $("owasp").innerHTML = owasp.map(function (o) { return "<tr><td>" + esc(o[0]) + "</td><td>" + esc(o[1]) + '</td><td><a ' + ext + ' href="' + esc(o[3]) + '">' + esc(o[2]) + "</a></td></tr>"; }).join("");
+  }
+
+  // ---------- observability ----------
+  function renderObservability() {
+    var p = data.performance || {};
+    $("perf-burst").textContent = p.burstSeconds != null ? p.burstSeconds + " s" : "–";
+    $("perf-rest").textContent = p.restP95 != null ? p.restP95 + " ms" : "–";
+    if (p.restP50 != null) $("perf-rest-note").textContent = "p50 " + p.restP50 + " ms · p99 " + p.restP99 + " ms · target under 200 ms. Measured " + (p.measured || "") + ".";
+    var panels = [
+      ["Outcomes per minute", "Accepted, replaced, rejected, expired, poison and failed, stacked", "sum by (outcome) (rate(trade_outcomes_total[1m])) * 60"],
+      ["Rejections by reason", "Lower version, maturity in the past, invalid field", 'increase(trade_outcomes_total{outcome="REJECTED"}[5m])'],
+      ["Trade processing latency", "p50 / p95 / p99 of the ingestion use case", "histogram_quantile(0.95, rate(trade_processing_seconds_bucket[1m]))"],
+      ["HTTP latency p95 by endpoint", "Every REST endpoint, actuator excluded", "histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[1m]))"],
+      ["Dead letters and retries", "Poison pills, failed messages, and redeliveries during outages", "increase(trade_deadletter_total[5m]) · trade_retries_total"],
+      ["Audit backlog", "Outbox rows waiting for MongoDB, and the oldest one's age", "trade_outbox_backlog_size · trade_outbox_oldest_age_seconds"],
+      ["Consumer lag", "How far the stream consumer is behind", "kafka_consumer_fetch_manager_records_lag_max"],
+      ["Scheduled job failures", "Expiry and outbox relay", "increase(trade_job_failures_total[1h])"],
+      ["Outcomes by channel", "Stream, REST and the expiry scheduler", "sum by (channel) (rate(trade_outcomes_total[1m]))"]
+    ];
+    $("panels").innerHTML = panels.map(function (x) { return '<div class="panel"><h3 style="font-size:.98rem">' + esc(x[0]) + '</h3><p class="muted" style="font-size:.84rem">' + esc(x[1]) + "</p><code>" + esc(x[2]) + "</code></div>"; }).join("");
+  }
+
+  // ---------- data loading ----------
+  function getJson(url) {
+    return fetch(url, { headers: { Accept: "application/vnd.github+json" } }).then(function (r) { if (!r.ok) throw new Error(url + " " + r.status); return r.json(); });
+  }
+  function liveStatus() {
+    var api = "https://api.github.com/repos/" + REPO;
+    return getJson(api + "/actions/runs?branch=main&per_page=50").then(function (list) {
+      var names = ["CI", "CodeQL", "Portal", "Performance baseline"], runs = {};
+      list.workflow_runs.forEach(function (r) { if (names.indexOf(r.name) >= 0 && !runs[r.name]) runs[r.name] = r; });
+      if (!runs.CI) return { fetchedAt: new Date().toISOString(), runs: runs, jobs: [] };
+      return getJson(api + "/actions/runs/" + runs.CI.id + "/jobs").then(function (j) { return { fetchedAt: new Date().toISOString(), runs: runs, jobs: j.jobs }; });
+    });
+  }
+  function loadStatus() {
+    var cached = null;
+    try { cached = JSON.parse(sessionStorage.getItem("ts-status") || "null"); } catch (e) { cached = null; }
+    if (cached && Date.now() - cached.t < 60000) { status = cached.s; statusSource = "live"; renderPipeline(); renderSecurity(); return; }
+    liveStatus().then(function (s) {
+      status = s; statusSource = "live";
+      try { sessionStorage.setItem("ts-status", JSON.stringify({ t: Date.now(), s: s })); } catch (e) { /* storage unavailable */ }
+    }).catch(function () {
+      return getJson("data/status.json").then(function (s) { status = s; statusSource = "snapshot"; }).catch(function () { status = null; statusSource = "none"; });
+    }).then(function () { renderPipeline(); renderSecurity(); });
+  }
+
+  document.addEventListener("click", function (ev) {
+    var b = ev.target.closest("button[data-k]");
+    if (b && b.parentElement.id === "test-filters") { testFilter = b.getAttribute("data-k"); renderTests(); }
+    if (b && b.parentElement.id === "diagram-filters") { diagramFilter = b.getAttribute("data-k"); renderDesign(); }
+    if (ev.target.id === "refresh") { try { sessionStorage.removeItem("ts-status"); } catch (e) { /* ignore */ } $("live-badge").innerHTML = pill("run", "checking"); loadStatus(); }
+  });
+
+  // Highlight the journey step in view
+  var links = Array.prototype.slice.call(document.querySelectorAll(".steps a"));
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) links.forEach(function (a) { a.classList.toggle("on", a.getAttribute("href") === "#" + e.target.id); });
+      });
+    }, { rootMargin: "-40% 0px -55% 0px" });
+    document.querySelectorAll("section.block").forEach(function (s) { io.observe(s); });
+  }
+
+  getJson("data/portal.json").then(function (d) {
+    data = d;
+    renderKpis(); renderRequirements(); renderClarify(); renderTests(); renderDesign(); renderModules(); renderSecurity(); renderObservability();
+    $("footer-meta").textContent = "Data built " + new Date(d.generatedAt).toLocaleString("en-GB") + (d.commit ? " · commit " + d.commit.slice(0, 7) : "");
+    renderPipeline();
+    loadStatus();
+  }).catch(function (e) {
+    $("kpis").innerHTML = '<div class="notice" style="grid-column:1/-1">The portal data could not be loaded (' + esc(e.message) + "). Open the repository for the documents: <a " + ext + ' href="' + GH + '">' + GH.replace("https://", "") + "</a>.</div>";
+  });
+})();
+</script>

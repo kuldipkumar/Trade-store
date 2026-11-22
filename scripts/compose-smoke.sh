@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # US-606.1: `docker compose up` starts the app, broker, SQL and NoSQL stores, and the app becomes ready (A-49).
 # Usage: scripts/compose-smoke.sh   (exits non-zero if the app is not ready within TIMEOUT seconds)
+#        KEEP_UP=1 scripts/compose-smoke.sh   leaves the stack running (CI runs the ZAP scan against it)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -8,7 +9,9 @@ TIMEOUT="${TIMEOUT:-300}"
 URL="${URL:-http://localhost:8080/actuator/health/readiness}"
 
 cleanup() { docker compose down -v --remove-orphans > /dev/null 2>&1 || true; }
-trap cleanup EXIT
+if [[ "${KEEP_UP:-0}" != "1" ]]; then
+  trap cleanup EXIT
+fi
 
 docker compose up -d --build
 
