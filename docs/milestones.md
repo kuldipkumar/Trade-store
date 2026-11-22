@@ -32,3 +32,10 @@ One entry per story that is completed, tested, peer-reviewed and merged. The sam
 | 26 | US-607 Input hardening on the stream | 2026-11-22 | #66 | 2 of 2 | /code-review: 2 important + 6 nits fixed |
 | 27 | US-604 Observability | 2026-11-22 | #66 | 3 of 3 | /code-review of #66 |
 | 28 | US-603 Automated regression suite on real infrastructure | 2026-11-22 | #66 | 2 of 2 | /code-review of #66 |
+| 29 | US-602 Open-source vulnerability gate | 2026-11-22 | #67 | 2 of 2 | /code-review: 1 important + 8 nits fixed |
+| 30 | US-606 One-command local run and container image | 2026-11-22 | #67 | 3 of 3 | /code-review of #67; smoke job found the Mongo URI key bug |
+| 31 | US-605 Performance baseline | 2026-11-22 | #67 | 3 of 3 | /code-review of #67 |
+| 32 | US-608 Prompt log and design documentation | 2026-11-22 | #67 | 2 of 2 | /code-review of #67 |
+| 33 | US-609 README for a 10-minute onboarding | 2026-11-22 | #67 | 2 of 2 | /code-review of #67 |
+
+US-601 (card 1, Phase 4) gained its conformance tests in #67. **All 32 stories are done; 89 of 89 acceptance criteria are tested.**

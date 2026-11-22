@@ -252,7 +252,7 @@ The last column is mandatory. It records human judgment over the AI's output.
   - A trade with the same version replaces the stored record.
   - Reject a trade whose maturity date is earlier than today.
   - Automatically mark a trade as expired once its maturity date has passed.
-- **Current phase:** 6 (TDD implementation), started 2026-11-20. Phases 4 and 5 approved 2026-11-20. Strict TDD (§3 Phase 6): one test at a time, red shown on an assertion, minimum code, refactor. One story per branch (`story/US-xxx-…`), pull request to main (CI on PR), merge when green. Every test carries `@Tag("US-xxx.y")` or `@Tag("A-nn")`; run `python3 scripts/traceability.py` and commit [docs/traceability.md](docs/traceability.md) (CI checks it); update [docs/06-test-review.md](docs/06-test-review.md) when a story completes. Done: US-105, US-104, US-101 (PRs #39–#41), test backfill and traceability (PR #42), ingestion observability (PR #43), US-201 (PR #44). Next: US-205.2, US-102/103 gaps, US-106.1, US-107, then US-501 and the channels.
+- **Current phase:** Phases 6 to 8 complete on 2026-11-22. All 32 stories have been merged through PRs #39–#67, each with `/code-review`, and all 89 acceptance criteria are tested ([docs/traceability.md](docs/traceability.md)). Decision D9 is option C. The phase gate issues (#4, #5, #6) await the human's approval. Working rules still apply to any follow-up: strict TDD, one test at a time with a red on an assertion; every test tagged `@Tag("US-xxx.y")` or `@Tag("A-nn")`; the traceability matrix regenerated and committed; `/code-review` on each PR; a milestone recorded after each merge.
 
 ---
 
