@@ -3,6 +3,8 @@ title CI/CD Pipeline Flow (.github/workflows/ci.yml)
 
 start
 :Trigger: pull request to main, push to main, or manual run;
+fork
+
 :1. Checkout + set up JDK 21 (Maven cache);
 :2. Render PlantUML diagrams to SVG;
 if (Diagram syntax error?) then (yes)
@@ -34,14 +36,26 @@ if (CRITICAL vulnerability?) then (yes)
   :Fail build; <<#pink>>
   stop
 endif
+:6b. Trivy full report (every severity, never fails; uploaded);
 :8. Build Docker image (non-root);
-:6b. Trivy image scan (OS + libraries);
+:6c. Trivy image scan (OS + libraries);
 if (CRITICAL vulnerability?) then (yes)
   :Fail build; <<#pink>>
   stop
 endif
 :Pipeline green; <<#palegreen>>
 :9. Upload reports (tests, coverage, traceability, scans) and rendered SVGs\n(always, also on failure);
+fork again
+:compose-smoke job: scripts/compose-smoke.sh\n(docker compose up --build, readiness UP, store and read a trade);
+if (Not ready or trade not stored?) then (yes)
+  :Fail build; <<#pink>>
+  stop
+endif
+end fork
+note right
+  Performance baseline (US-605): separate workflow,
+  manual dispatch only; uploads target/performance/summary.md
+end note
 stop
 
 @enduml
