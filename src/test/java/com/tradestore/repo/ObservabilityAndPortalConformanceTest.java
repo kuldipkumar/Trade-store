@@ -42,4 +42,20 @@ class ObservabilityAndPortalConformanceTest {
         assertThat(read("portal/index.html")).contains("data/portal.json").contains("api.github.com");
         assertThat(read("README.md")).contains("kuldipkumar.github.io/Trade-store");
     }
+
+    @Test
+    @Tag("A-47")
+    void should_deployOnlyCodeFromThisRepositorysMain_when_aWorkflowRunTriggersThePortal() {
+        // Arrange
+        String portal = read(".github/workflows/portal.yml");
+        String build = portal.substring(portal.indexOf("  build:"), portal.indexOf("  deploy:"));
+        String deploy = portal.substring(portal.indexOf("  deploy:"));
+
+        // Act + Assert: a fork's PR named main must not reach the deploy (code review of PR #69)
+        assertThat(build).contains("github.event.workflow_run.event == 'push'")
+                .contains("github.event.workflow_run.head_repository.full_name == github.repository");
+        assertThat(build).doesNotContain("pages: write").doesNotContain("id-token: write");
+        assertThat(deploy).contains("pages: write").contains("id-token: write");
+        assertThat(portal.substring(0, portal.indexOf("jobs:"))).doesNotContain("pages: write");
+    }
 }
