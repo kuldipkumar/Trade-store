@@ -406,7 +406,7 @@ scripts/demo-load.sh        # drive every outcome</pre>
     var st = stateOf(ci);
     var crit = data.security.dependencies && data.security.image ? data.security.dependencies.CRITICAL + data.security.image.CRITICAL : null;
     var items = [
-      { v: c.stories + "<small>/" + c.stories + "</small>", l: "user stories delivered", href: "#requirements" },
+      { v: (c.storiesDelivered != null ? c.storiesDelivered : "–") + "<small>/" + c.stories + "</small>", l: "user stories with every criterion tested", href: "#requirements" },
       { v: c.criteriaTested + "<small>/" + c.criteria + "</small>", l: "acceptance criteria tested", href: blob("docs/traceability.md") },
       { v: fmt(sum()), l: "automated tests (" + fmt(sum("unit")) + " unit · " + fmt(sum("integration")) + " integration)", href: "#tests" },
       { v: data.coverage && data.coverage.line != null ? data.coverage.line + "<small>%</small>" : "–", l: "line coverage (gate 80%)", href: reportBase + "reports/coverage/index.html" },
@@ -527,7 +527,7 @@ scripts/demo-load.sh        # drive every outcome</pre>
       ["Trivy dependency scan", "Trivy SCA", "critical"], ["Trivy full report", "Full SCA report"], ["Build Docker image", "Image build"],
       ["Trivy image scan", "Image scan", "critical"], ["Upload reports", "Reports"] ] },
     { name: "CI · run the stack", job: "docker compose smoke test", file: "ci.yml", nodes: [
-      ["Start the stack and wait for readiness", "Compose up + smoke", "ready"], ["OWASP ZAP API scan", "ZAP DAST"], ["DAST gate (fails on any High risk alert)", "DAST gate", "high risk"],
+      ["Start the stack and wait for readiness", "Compose up + smoke", "ready"], ["Observability profile (Prometheus scrapes, Grafana dashboard loads)", "Prometheus + Grafana", "dashboard"], ["OWASP ZAP API scan", "ZAP DAST"], ["DAST gate (fails on any High risk alert)", "DAST gate", "high risk"],
       ["Upload DAST report", "DAST report"], ["Stop the stack", "Tear down"] ] }
   ];
   var OTHER = [
@@ -609,7 +609,7 @@ scripts/demo-load.sh        # drive every outcome</pre>
       ["A02 Cryptographic failures", "No secrets stored by the app; connections configured from the environment. TLS to brokers and databases is future work.", "ContainerAndSecretsConformanceTest", blob("src/test/java/com/tradestore/repo/ContainerAndSecretsConformanceTest.java")],
       ["A03 Injection", "Parameterised JDBC only; strict JSON type checks; Mongo queries built from typed criteria.", "JdbcTradeRepository, TradeJsonParser", blob("src/main/java/com/tradestore/persistence/sql/JdbcTradeRepository.java")],
       ["A04 Insecure design", "Threats designed out: size limits, poison-pill isolation, version-guarded writes, append-only audit.", "LLD §7 error handling", blob("docs/05-lld.md") + "#7-error-handling-strategy"],
-      ["A05 Security misconfiguration", "ZAP scan of the running stack; actuator exposes only health, info and metrics; errors never leak stack traces.", "ZAP report, GlobalExceptionHandler", reportBase + "reports/dast/zap-report.html"],
+      ["A05 Security misconfiguration", "ZAP scan of the running stack; actuator exposes only health, info and prometheus; errors never leak stack traces.", "ZAP report, GlobalExceptionHandler", reportBase + "reports/dast/zap-report.html"],
       ["A06 Vulnerable components", "Trivy fails the build on CRITICAL in dependencies and in the image; full report kept for every run.", "ADR-006", blob("docs/adr/006-trivy-oss-vulnerability-scan.md")],
       ["A07 Identification and authentication", "Out of scope with A01 (no users in this build).", "Known limitations", blob("README.md") + "#known-limitations"],
       ["A08 Software and data integrity", "Transactional outbox keeps trade and audit consistent; audit and history are insert-only; actions pinned to versions.", "ADR-005, AuditTrailImmutabilityTest", blob("docs/adr/005-transactional-outbox-for-audit.md")],
@@ -624,7 +624,7 @@ scripts/demo-load.sh        # drive every outcome</pre>
     var p = data.performance || {};
     $("perf-burst").textContent = p.burstSeconds != null ? p.burstSeconds + " s" : "–";
     $("perf-rest").textContent = p.restP95 != null ? p.restP95 + " ms" : "–";
-    if (p.restP50 != null) $("perf-rest-note").textContent = "p50 " + p.restP50 + " ms · p99 " + p.restP99 + " ms · target under 200 ms. Measured " + (p.measured || "") + ".";
+    if (p.restP50 != null) $("perf-rest-note").textContent = "p50 " + p.restP50 + " ms · p99 " + p.restP99 + " ms · target under 200 ms" + (p.measured ? ". Measured " + p.measured + ", single instance on Testcontainers." : ".");
     var panels = [
       ["Outcomes per minute", "Accepted, replaced, rejected, expired, poison and failed, stacked", "sum by (outcome) (rate(trade_outcomes_total[1m])) * 60"],
       ["Rejections by reason", "Lower version, maturity in the past, invalid field", 'increase(trade_outcomes_total{outcome="REJECTED"}[5m])'],

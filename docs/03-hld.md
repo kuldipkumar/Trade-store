@@ -19,6 +19,9 @@ The Trade Store is **one Spring Boot application** (ADR-001) that receives trade
 | [006](adr/006-trivy-oss-vulnerability-scan.md) | Trivy (dependencies + image) | One fast tool; fails the build on CRITICAL |
 | [007](adr/007-spring-boot-4.md) | Spring Boot 4.1 (Spring Framework 7) | Spring Boot 3.5 / Framework 6.2 had CRITICAL CVEs with no free fix; upgraded before any business code existed |
 | [008](adr/008-plain-jdbc-for-postgresql.md) | Spring `JdbcClient` for PostgreSQL (Phase 5) | Every write is PostgreSQL-specific SQL (guarded upsert, `RETURNING`, `SKIP LOCKED`); an ORM adds nothing |
+| [009](adr/009-codeql-sast-and-owasp-zap-dast.md) | CodeQL (SAST) and OWASP ZAP API scan (DAST) | Static and dynamic application scans; High-risk DAST alerts fail the build |
+| [010](adr/010-prometheus-and-grafana-dashboard.md) | Prometheus + provisioned Grafana dashboard | Operations and live demos from the existing Micrometer metrics, as code |
+| [011](adr/011-project-portal-on-github-pages.md) | Project portal on GitHub Pages | One live view of the journey for every audience |
 
 ## 2. System context
 

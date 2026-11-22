@@ -9,6 +9,8 @@ node "Developer machine" as dev {
     node "kafka container" as kafkac <<KRaft, single broker>>
     database "postgres container" as pgc
     database "mongo container" as mongoc
+    node "prometheus container" as promc <<profile: observability>>
+    node "grafana container" as grafc <<profile: observability>>
   }
 }
 
@@ -24,10 +26,14 @@ node "GitHub Actions runner (ubuntu)" as ci {
   }
   node "Trivy" as trivy
   node "PlantUML render" as puml
+  node "Compose stack + OWASP ZAP" as zap <<DAST>>
+  node "CodeQL" as codeql <<SAST>>
 }
 
 cloud "GitHub" as gh {
   artifact "Build artifacts\n(reports, SVGs, image)" as artifacts
+  artifact "Security tab\n(code scanning)" as sectab
+  node "GitHub Pages\nproject portal" as pages
 }
 
 jar --> kafkac : consume / produce
@@ -40,5 +46,10 @@ it --> tcm
 mvn --> artifacts : test + coverage reports
 trivy --> artifacts : scan report (fails on CRITICAL)
 puml --> artifacts : rendered SVGs
+zap --> artifacts : ZAP report (fails on High)
+codeql --> sectab : SARIF findings
+artifacts --> pages : Portal workflow publishes\npage + reports
+promc --> jar : scrape /actuator/prometheus
+grafc --> promc : PromQL
 
 @enduml

@@ -51,7 +51,22 @@ if (Not ready or trade not stored?) then (yes)
   :Fail build; <<#pink>>
   stop
 endif
+:Observability profile: Prometheus scrapes the app,\nGrafana serves the Trade Store dashboard;
+if (Not scraping or dashboard missing?) then (yes)
+  :Fail build; <<#pink>>
+  stop
+endif
+:DAST: OWASP ZAP API scan of the running stack\n(driven by docs/api/openapi.yaml);
+if (Any High risk alert?) then (yes)
+  :Fail build; <<#pink>>
+  stop
+endif
+:Upload ZAP report; stop the stack;
+fork again
+:CodeQL workflow (SAST, security-extended)\non PRs, pushes to main and weekly;
+:Findings to the Security tab;
 end fork
+:Portal workflow (after a green CI run of a push to main):\nbuild portal data from the run's reports, deploy to GitHub Pages;
 note right
   Performance baseline (US-605): separate workflow,
   manual dispatch only; uploads target/performance/summary.md

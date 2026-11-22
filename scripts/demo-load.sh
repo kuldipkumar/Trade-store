@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Drives every outcome through a running local stack, so the Grafana dashboard moves during a demo.
 # Usage: docker compose --profile observability up --build -d && scripts/demo-load.sh [rounds]
-# Each round, over both channels: 20 new trades, 5 replacements, 3 lower versions, 2 past maturities, 1 poison pill.
+# Each round, over both channels: 20 new trades, 5 replacements, 3 lower versions, 2 past maturities, 1 poison pill (30 stream messages).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -28,7 +28,7 @@ for round in $(seq 1 "$ROUNDS"); do
   codes+=$(post "$(trade "$RUN-R$round-2" 0 2099-02-01)")                                            # 400 invalid version
   codes+=$(post "$(trade "$RUN-R$round-x" 1 2015-01-01)")                                            # 422 past maturity
   curl -s -o /dev/null "$API/trades?size=20"; curl -s -o /dev/null "$API/reports/audit?outcome=REJECTED&size=10"
-  echo "round $round/$ROUNDS: stream 31 messages, REST $codes"
+  echo "round $round/$ROUNDS: stream 30 messages, REST $codes"
   sleep 2
 done
 echo "Done. Grafana: http://localhost:3000  ·  Audit: $API/reports/audit?tradeId=$RUN-S1-1"
