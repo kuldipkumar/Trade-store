@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Tag;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.io.ClassPathResource;
 import org.junit.jupiter.api.Test;
 
 /** US-606.2, US-606.3: the image runs as non-root; no credentials are committed (A-47, A-50). */
@@ -56,5 +58,23 @@ class ContainerAndSecretsConformanceTest {
         // Assert
         assertThat(files).isNotEmpty();
         assertThat(offenders).isEmpty();
+    }
+
+    @Test
+    @Tag("US-606.1")
+    @Tag("US-606.3")
+    void should_bindEachConnectionToTheKeySpringBoot4Reads_when_theConfigIsLoaded() throws IOException {
+        // Arrange: Spring Boot 4 reads spring.mongodb.uri; the old spring.data.mongodb.uri is silently ignored, which
+        // made the app connect to localhost inside docker compose (found by the compose smoke job, PR #67)
+        var sources = new YamlPropertySourceLoader().load("application", new ClassPathResource("application.yml"));
+
+        // Act
+        var config = sources.getFirst();
+
+        // Assert
+        assertThat(config.getProperty("spring.mongodb.uri")).asString().startsWith("${MONGODB_URI:");
+        assertThat(config.getProperty("spring.data.mongodb.uri")).isNull();
+        assertThat(config.getProperty("spring.datasource.url")).asString().startsWith("${POSTGRES_URL:");
+        assertThat(config.getProperty("spring.kafka.bootstrap-servers")).asString().startsWith("${KAFKA_BOOTSTRAP_SERVERS:");
     }
 }
