@@ -9,11 +9,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Read-only by default; only the deploy job (which runs no repository code) can write to Pages.
 permissions:
   contents: read
   actions: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -22,25 +21,34 @@ concurrency:
 jobs:
   build:
     name: Build the portal
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    # Only a green CI run of a push to this repository's main. A fork's pull request from a branch named "main"
+    # also matches `branches: [main]`, so the event and the head repository are checked too.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: Checkout the commit CI tested
-        uses: actions/checkout@v7.0.1
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-
-      - name: Find the CI run
+      - name: Find the CI run and the commit it tested
         id: run
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ -n "${{ github.event.workflow_run.id }}" ]; then
             echo "id=${{ github.event.workflow_run.id }}" >> "$GITHUB_OUTPUT"
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
           else
-            echo "id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --status success -L 1 --json databaseId -q '.[0].databaseId')" >> "$GITHUB_OUTPUT"
+            # Manual run: the latest green CI run of a push to main, so the page and its reports describe one commit
+            gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push --status success -L 1 \
+              --json databaseId,headSha -q '.[0] | "id=\(.databaseId)\nsha=\(.headSha)"' >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Checkout the commit CI tested
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ steps.run.outputs.sha }}
 
       - name: Download that run's reports
         uses: actions/download-artifact@v8.0.2
@@ -52,7 +60,7 @@ jobs:
       - name: Assemble the site
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          PORTAL_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          PORTAL_SHA: ${{ steps.run.outputs.sha }}
           PORTAL_RUN_ID: ${{ steps.run.outputs.id }}
         run: |
           mkdir -p site/data site/diagrams site/reports/coverage site/reports/security site/reports/dast
@@ -79,6 +87,9 @@ jobs:
     name: Deploy to GitHub Pages
     needs: build
     runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
