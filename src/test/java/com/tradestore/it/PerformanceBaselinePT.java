@@ -22,6 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.awaitility.core.ConditionTimeoutException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -67,6 +68,11 @@ class PerformanceBaselinePT {
         System.out.println(section);
     }
 
+    /** The JDK client's message when a reused keep-alive connection was closed by the server before replying. */
+    private static boolean isStaleConnection(IOException failure) {
+        return failure.getMessage() != null && failure.getMessage().contains("header parser received no bytes");
+    }
+
     @Test
     @Tag("US-605.1")
     @Tag("US-605.3")
@@ -82,19 +88,24 @@ class PerformanceBaselinePT {
             sends.add(kafka.send("trades.inbound", tradeId, trade(tradeId)));
         }
         CompletableFuture.allOf(sends.toArray(CompletableFuture[]::new)).get(30, TimeUnit.SECONDS);
-        await().atMost(Duration.ofSeconds(SECONDS)).pollInterval(Duration.ofMillis(250))
-                .until(() -> stored(prefix) == BURST);
+        try {
+            await().atMost(Duration.ofSeconds(SECONDS)).pollInterval(Duration.ofMillis(250))
+                    .until(() -> stored(prefix) == BURST);
+        } catch (ConditionTimeoutException tooSlow) {
+            // Fall through: the summary below records how far it got, then the assertions fail
+        }
         double seconds = (System.nanoTime() - start) / 1e9;
+        long stored = stored(prefix);
 
-        // Assert: all stored, none lost, within 60 s (A-41)
-        assertThat(stored(prefix)).isEqualTo(BURST);
-        assertThat(seconds).isLessThan(SECONDS);
+        // Assert: the summary is written first, so a miss still leaves evidence (code review of PR #67)
         summarise("""
                 ## US-605.1 Stream burst
                 | Trades | Stored | Seconds | Throughput (trades/s) | Target |
                 |---|---|---|---|---|
                 | %d | %d | %.1f | %.0f | all within 60 s, zero loss |
-                """.formatted(BURST, stored(prefix), seconds, BURST / seconds));
+                """.formatted(BURST, stored, seconds, stored / seconds));
+        assertThat(stored).isEqualTo(BURST);
+        assertThat(seconds).isLessThan(SECONDS);
     }
 
     @Test
@@ -131,7 +142,10 @@ class PerformanceBaselinePT {
                         HttpResponse<Void> response;
                         try {
                             response = client.send(request, HttpResponse.BodyHandlers.discarding());
-                        } catch (IOException staleConnection) {
+                        } catch (IOException failed) {
+                            if (!isStaleConnection(failed)) {
+                                throw failed;
+                            }
                             // Keep-alive race: the server closed a pooled connection as the request went out, so it
                             // never arrived. Retried once like any HTTP client; safe because the same version replaces.
                             retries.incrementAndGet();
@@ -152,6 +166,10 @@ class PerformanceBaselinePT {
 
         // Assert: p95 under 200 ms and no failed request (A-41)
         List<Long> sorted = latenciesMicros.stream().sorted().toList();
+        if (sorted.isEmpty()) {
+            summarise("## US-605.2 REST: no request succeeded. Errors: " + errorKinds.stream().distinct().limit(5).toList());
+        }
+        assertThat(sorted).as("successful requests").isNotEmpty();
         double p50 = sorted.get(sorted.size() / 2) / 1000.0;
         double p95 = sorted.get((int) Math.ceil(sorted.size() * 0.95) - 1) / 1000.0;
         double p99 = sorted.get((int) Math.ceil(sorted.size() * 0.99) - 1) / 1000.0;
@@ -165,5 +183,6 @@ class PerformanceBaselinePT {
         assertThat(errors).hasValue(0);
         assertThat(sorted).hasSize(total);
         assertThat(p95).isLessThan(200.0);
+        assertThat(retries.get()).as("stale-connection retries").isLessThanOrEqualTo(total / 100);
     }
 }

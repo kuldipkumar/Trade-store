@@ -18,10 +18,13 @@ class DocumentationConformanceTest {
         // Arrange: the numbered rows of the table
         List<String> rows = read("PROMPTS.md").lines().filter(l -> l.matches("^\\| \\d+ \\|.*")).toList();
 
-        // Act + Assert: the last column (Accepted / Modified / Rejected and why) is filled in (R-09)
+        // Act + Assert: the last column (Accepted / Modified / Rejected and why) is filled in (R-09). A row still
+        // awaiting the human is marked "_Pending human review_", never left empty or guessed by the AI.
         assertThat(rows).hasSizeGreaterThan(30);
         for (String row : rows) {
             String[] cells = row.split("\\|");
+            // "", #, phase, prompt, purpose, summary, decision: a missing column is caught (code review of PR #67)
+            assertThat(cells).as("columns of: %s", row.substring(0, Math.min(40, row.length()))).hasSize(7);
             assertThat(cells[cells.length - 1].isBlank() ? "" : cells[cells.length - 1].trim())
                     .as("decision column of: %s", row.substring(0, Math.min(40, row.length()))).isNotEmpty();
         }

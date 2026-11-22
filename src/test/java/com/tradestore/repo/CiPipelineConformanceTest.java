@@ -78,7 +78,7 @@ class CiPipelineConformanceTest {
     @Tag("US-602.1")
     void should_failTheBuildOnCriticalFindings_when_dependenciesOrTheImageAreScanned() {
         // Act
-        String dependencies = ci.substring(position("Trivy dependency scan"), position("Build Docker image"));
+        String dependencies = ci.substring(position("Trivy dependency scan"), position("Trivy full report"));
         String image = ci.substring(position("Trivy image scan"));
 
         // Assert: CRITICAL is CVSS >= 9.0 (ADR-006); the table report names the package and CVE

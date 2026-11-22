@@ -28,13 +28,13 @@ class ContainerAndSecretsConformanceTest {
     @Test
     @Tag("US-606.3")
     void should_takeEveryConnectionSettingFromTheEnvironment_when_theAppIsConfigured() {
-        // Act
-        String config = read("src/main/resources/application.yml");
+        // Act: every connection line in the config
+        List<String> connectionLines = read("src/main/resources/application.yml").lines()
+                .filter(l -> l.matches("^\\s+(url|username|password|uri|bootstrap-servers):.*")).toList();
 
-        // Assert: each connection value is a ${ENV:local-default} placeholder
-        for (String key : List.of("url:", "username:", "password:", "uri:", "bootstrap-servers:")) {
-            assertThat(config).containsPattern("(?m)^\\s+" + Pattern.quote(key) + " \\$\\{[A-Z_]+:");
-        }
+        // Assert: each one is a ${ENV:local-default} placeholder (code review of PR #67)
+        assertThat(connectionLines).hasSizeGreaterThanOrEqualTo(5);
+        assertThat(connectionLines).allMatch(l -> l.matches("^\\s+[a-z-]+: \\$\\{[A-Z_]+:.*\\}\\s*(#.*)?$"), "uses ${ENV:default}");
     }
 
     @Test
@@ -43,13 +43,15 @@ class ContainerAndSecretsConformanceTest {
         // Arrange: every tracked text file
         Process git = new ProcessBuilder("git", "ls-files").start();
         List<String> files = new String(git.getInputStream().readAllBytes()).lines()
-                .filter(f -> !f.endsWith(".svg") && !f.endsWith(".jar") && !f.endsWith(".png")).toList();
-        git.waitFor();
+                .filter(f -> !f.endsWith(".svg") && !f.endsWith(".jar")).toList();
+        assertThat(git.waitFor()).isZero();
         Pattern secret = Pattern.compile(
                 "(?i)(-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{30,}|xox[baprs]-[A-Za-z0-9-]{10,})");
 
         // Act
-        List<String> offenders = files.stream().filter(f -> RepositoryFiles.exists(f) && secret.matcher(read(f)).find()).toList();
+        // Binary files are decoded leniently rather than failing the scan (code review of PR #67)
+        List<String> offenders = files.stream()
+                .filter(f -> RepositoryFiles.exists(f) && secret.matcher(RepositoryFiles.readLenient(f)).find()).toList();
 
         // Assert
         assertThat(files).isNotEmpty();
