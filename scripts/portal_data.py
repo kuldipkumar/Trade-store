@@ -212,19 +212,29 @@ def metrics():
     return rows
 
 
-def performance(reports):
-    text = ""
-    for candidate in ([os.path.join(reports, "performance", "summary.md")] if reports else []) + ["README.md"]:
-        if os.path.exists(candidate):
-            text = read(candidate)
-            break
+def parse_performance(text):
+    """The baseline figures and their date, from a performance summary or the README table."""
     burst = re.search(r"Burst of 10,000 stream trades \| All stored in ([\d.]+) s", text)
     rest = re.search(r"REST at 50 requests/s for 60 s \| p50 ([\d.]+) ms, p95 ([\d.]+) ms, p99 ([\d.]+) ms", text)
+    when = re.search(r"Testcontainers \((\d{4}-\d{2}-\d{2})\)", text)
     return {"burstSeconds": float(burst.group(1)) if burst else None,
             "restP50": float(rest.group(1)) if rest else None,
             "restP95": float(rest.group(2)) if rest else None,
             "restP99": float(rest.group(3)) if rest else None,
-            "measured": "2026-11-22, single instance on Testcontainers"}
+            "measured": when.group(1) if when else None}
+
+
+def performance(reports):
+    for candidate in ([os.path.join(reports, "performance", "summary.md")] if reports else []) + ["README.md"]:
+        if os.path.exists(candidate):
+            return parse_performance(read(candidate))
+    return parse_performance("")
+
+
+def delivered_stories(traceability):
+    """Stories whose acceptance criteria are all tested, per the traceability matrix."""
+    return [m.group(1) for m in re.finditer(r"^### (US-\d+): .*: (\d+) of (\d+) criteria tested", traceability, re.M)
+            if m.group(2) == m.group(3) and m.group(3) != "0"]
 
 
 def security(reports):
@@ -268,6 +278,7 @@ def build(reports):
         "epics": epics,
         "counts": {
             "stories": sum(len(e["stories"]) for e in epics),
+            "storiesDelivered": len(delivered_stories(traceability)),
             "criteria": int(tested.group(2)) if tested else None,
             "criteriaTested": int(tested.group(1)) if tested else None,
             "clarifications": len(re.findall(r"^\| C-\d+ \|", read("docs/01-clarifications.md"), re.M)),
