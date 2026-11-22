@@ -91,6 +91,26 @@ class TestKindTest(unittest.TestCase):
         self.assertEqual(tags, ["A-47", "US-101.1", "US-101.2"])
 
 
+class DeliveredTest(unittest.TestCase):
+
+    def test_counts_a_story_as_delivered_only_when_all_its_criteria_are_tested(self):
+        matrix = ("### US-101: Store (E1): 3 of 3 criteria tested\n"
+                  "### US-102: Replace (E1): 1 of 2 criteria tested\n"
+                  "### US-103: Same (E1): 0 of 2 criteria tested\n")
+
+        self.assertEqual(portal_data.delivered_stories(matrix), ["US-101"])
+
+
+class PerformanceDateTest(unittest.TestCase):
+
+    def test_takes_the_measurement_date_from_the_source(self):
+        text = ("Results on a single local instance on Testcontainers (2027-01-05):\n"
+                "| Burst of 10,000 stream trades | All stored in 8.1 s, none lost | x |\n")
+
+        self.assertEqual(portal_data.parse_performance(text)["measured"], "2027-01-05")
+        self.assertEqual(portal_data.parse_performance(text)["burstSeconds"], 8.1)
+
+
 class StatusTest(unittest.TestCase):
 
     def test_keeps_the_newest_run_of_each_portal_workflow(self):
