@@ -13,9 +13,9 @@ spring:
     password: ${POSTGRES_PASSWORD:tradestore}
   flyway:
     enabled: true
-  data:
-    mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/tradestore}
+  mongodb:
+    # Spring Boot 4 key (spring.data.mongodb.uri is no longer read)
+    uri: ${MONGODB_URI:mongodb://localhost:27017/tradestore}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
     consumer:
