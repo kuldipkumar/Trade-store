@@ -12,12 +12,16 @@ The Markdown files in this repository are the **source of truth**. GitHub Issues
 | [02-backlog.md](02-backlog.md) | 6 epics and 32 user stories with Given/When/Then acceptance criteria | Approved 2026-11-20 |
 | [02-po-review.md](02-po-review.md) | Product Owner review: requirement coverage, change requests, sign-off | Approved 2026-11-20 |
 
-## Design (upcoming)
+## Design, delivery and operations
 
-| Document | Phase |
-|----------|-------|
-| [03-hld.md](03-hld.md), [adr/](adr/), [diagrams/](diagrams/) | 3: High-level design (awaiting approval) |
-| `05-lld.md` | 5: Low-level design |
+| Document | What it holds | Status |
+|----------|---------------|--------|
+| [03-hld.md](03-hld.md), [adr/](adr/), [diagrams/](diagrams/) | High-level design, 8 ADRs, every PlantUML diagram (rendered to `diagrams/out/`) | Approved |
+| [05-lld.md](05-lld.md) | Low-level design: components, contracts, error handling, metrics, decisions D1 to D9 | Approved; kept in step with the code |
+| [06-test-review.md](06-test-review.md) | A verdict for every acceptance criterion, known limitations, decisions D8 and D9 | Complete |
+| [traceability.md](traceability.md) | Requirements → epics → stories → criteria → tests → code (generated, checked in CI) | 89 of 89 criteria tested |
+| [milestones.md](milestones.md) | One row per story merged, with its PR and review | 32 of 32 stories |
+| [runbook-dead-letter.md](runbook-dead-letter.md) | Inspect, find, fix and replay a dead-lettered message | Operations |
 
 ## Tracking
 
