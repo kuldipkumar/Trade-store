@@ -1,0 +1,153 @@
+openapi: 3.0.3
+info:
+  title: Trade Store API
+  version: 1.0.0
+  description: |
+    REST channel of the Trade Store (docs/05-lld.md section 6.1). Also drives the OWASP ZAP API scan in CI (DAST).
+    Every error uses the ApiErrorResponse shape.
+servers:
+  - url: http://localhost:8080
+paths:
+  /trades:
+    post:
+      summary: Submit a trade (US-401)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TradeRequest' }
+      responses:
+        '201': { description: Stored as a new trade, content: { application/json: { schema: { $ref: '#/components/schemas/TradeResponse' } } } }
+        '200': { description: Replaced the stored version, content: { application/json: { schema: { $ref: '#/components/schemas/TradeResponse' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '415': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+    get:
+      summary: List the latest version of each trade, paged and sorted by tradeId (US-403)
+      parameters:
+        - { name: expired, in: query, schema: { type: boolean } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200': { description: One page, content: { application/json: { schema: { $ref: '#/components/schemas/TradePage' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+  /trades/{tradeId}:
+    get:
+      summary: Get the latest version of a trade (US-402)
+      parameters:
+        - { name: tradeId, in: path, required: true, schema: { type: string, example: T1 } }
+      responses:
+        '200': { description: The trade, content: { application/json: { schema: { $ref: '#/components/schemas/TradeResponse' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /trades/{tradeId}/history:
+    get:
+      summary: Every accepted version, ordered by version (US-404)
+      parameters:
+        - { name: tradeId, in: path, required: true, schema: { type: string, example: T1 } }
+      responses:
+        '200':
+          description: The versions
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TradeVersionResponse' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /reports/audit:
+    get:
+      summary: Audit report as paged JSON with counts per outcome (US-502), or the whole set as CSV (US-503)
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date }, description: First local date included }
+        - { name: to, in: query, schema: { type: string, format: date }, description: Last local date included }
+        - { name: tradeId, in: query, schema: { type: string } }
+        - { name: outcome, in: query, schema: { $ref: '#/components/schemas/Outcome' } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: The report
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/AuditReportResponse' } }
+            text/csv: { schema: { type: string, example: "eventId,eventTimestamp,tradeId,version,outcome,channel,reasons" } }
+        '400': { $ref: '#/components/responses/Error' }
+components:
+  responses:
+    Error:
+      description: Error in the standard shape
+      content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } }
+  schemas:
+    Outcome: { type: string, enum: [ACCEPTED, REPLACED, REJECTED, EXPIRED, POISON, FAILED] }
+    TradeRequest:
+      type: object
+      required: [tradeId, version, counterPartyId, bookId, maturityDate]
+      properties:
+        tradeId: { type: string, example: T1 }
+        version: { type: integer, minimum: 1, example: 1 }
+        counterPartyId: { type: string, example: CP-1 }
+        bookId: { type: string, example: B1 }
+        maturityDate: { type: string, format: date, example: '2027-05-20' }
+    TradeResponse:
+      type: object
+      properties:
+        tradeId: { type: string }
+        version: { type: integer }
+        counterPartyId: { type: string }
+        bookId: { type: string }
+        maturityDate: { type: string, format: date }
+        createdDate: { type: string, format: date }
+        expired: { type: boolean }
+    TradeVersionResponse:
+      type: object
+      properties:
+        tradeId: { type: string }
+        version: { type: integer }
+        counterPartyId: { type: string }
+        bookId: { type: string }
+        maturityDate: { type: string, format: date }
+        createdDate: { type: string, format: date }
+        outcome: { $ref: '#/components/schemas/Outcome' }
+        channel: { type: string, enum: [STREAM, REST, SCHEDULER] }
+        receivedTimestamp: { type: string, format: date-time }
+    TradePage:
+      type: object
+      properties:
+        content: { type: array, items: { $ref: '#/components/schemas/TradeResponse' } }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+    AuditReportResponse:
+      type: object
+      properties:
+        summary: { type: object, additionalProperties: { type: integer } }
+        entries:
+          type: array
+          items:
+            type: object
+            properties:
+              eventId: { type: string }
+              tradeId: { type: string }
+              version: { type: integer }
+              outcome: { $ref: '#/components/schemas/Outcome' }
+              reasons: { type: array, items: { $ref: '#/components/schemas/Reason' } }
+              channel: { type: string }
+              eventTimestamp: { type: string, format: date-time }
+              payload: { type: string }
+              error: { type: string, nullable: true }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+    Reason:
+      type: object
+      properties:
+        reason: { type: string, enum: [INVALID_FIELD, LOWER_VERSION, MATURITY_IN_PAST, INVALID_PARAMETER, MALFORMED_REQUEST, PAYLOAD_TOO_LARGE, NOT_FOUND, UNSUPPORTED_MEDIA_TYPE, METHOD_NOT_ALLOWED, SERVICE_UNAVAILABLE, INTERNAL_ERROR] }
+        field: { type: string }
+        message: { type: string }
+    ApiErrorResponse:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time }
+        status: { type: integer }
+        error: { type: string }
+        reasons: { type: array, items: { $ref: '#/components/schemas/Reason' } }
+        path: { type: string }

@@ -1,5 +1,7 @@
 # Trade Store
 
+**Project portal: https://kuldipkumar.github.io/Trade-store/** shows the whole journey in one view, from the BRD and backlog to tests, design, the live pipeline, code, security scans and observability.
+
 ## Overview
 
 A service that receives trades from a **Kafka stream** and a **REST API**, applies the store rules, and keeps an append-only **audit trail** of every outcome. The rules:
@@ -81,6 +83,19 @@ curl localhost:8080/actuator/prometheus | grep '^trade_'
 
 Settings live under `trade-store.*` ([LLD §6.4](docs/05-lld.md)). Every one can be overridden with an environment variable, for example `TRADE_STORE_TIME_ZONE=Asia/Kolkata`, `TRADE_STORE_EXPIRY_CRON`, `TRADE_STORE_RETRY_MAX_ATTEMPTS`, `TRADE_STORE_KAFKA_MAX_MESSAGE_BYTES`. Connections come from `POSTGRES_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `MONGODB_URI` and `KAFKA_BOOTSTRAP_SERVERS`. The compose defaults are for local use only.
 
+### Observability dashboard
+
+```bash
+docker compose --profile observability up --build -d   # adds Prometheus (localhost:9090) and Grafana (localhost:3000)
+scripts/demo-load.sh                                    # drives every outcome on both channels
+```
+
+Grafana opens on the provisioned **Trade Store** dashboard ([JSON](observability/grafana/dashboards/trade-store.json)). It shows:
+
+- outcomes per minute, rejections by reason, and outcomes by channel
+- trade-processing and HTTP latency (p50, p95, p99)
+- dead letters, retries, outbox backlog, consumer lag and scheduled-job failures
+
 ## Run the tests
 
 Tests need JDK 21 and a running Docker daemon. The integration tests use Testcontainers for Kafka, PostgreSQL and MongoDB, with no in-memory fakes.
@@ -106,10 +121,11 @@ GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on ev
 3. Unit tests.
 4. Integration and regression tests on Testcontainers, then the JaCoCo gate (80% line coverage).
 5. Traceability. A stale matrix, an unknown tag or a failing tagged test fails the build.
-6. Trivy scans of the dependencies and of the image. A **CRITICAL** finding (CVSS ≥ 9) fails the build ([ADR-006](docs/adr/006-trivy-oss-vulnerability-scan.md)). A full report of every severity is uploaded but never fails the build.
+6. **Security:** CodeQL static analysis (SAST) runs in its own workflow on every PR, every push to `main` and weekly. OWASP ZAP scans the running API (DAST), driven by [the OpenAPI contract](docs/api/openapi.yaml), and any High-risk alert fails the build. Trivy scans the dependencies and the image. A **CRITICAL** finding (CVSS ≥ 9) fails the build ([ADR-006](docs/adr/006-trivy-oss-vulnerability-scan.md)). A full report of every severity is uploaded but never fails the build.
 7. Build the Docker image, which runs as a non-root user.
 8. Upload the test, coverage, traceability and scan reports, plus the rendered diagrams.
-9. A separate `docker compose` smoke job starts the whole stack and stores a trade.
+9. A separate `docker compose` job starts the whole stack, stores a trade, checks that Prometheus and Grafana work, and runs the ZAP scan.
+10. After a green run on `main`, the **Portal** workflow publishes the project portal, with that run's reports, to GitHub Pages.
 
 ### Performance baseline (US-605)
 

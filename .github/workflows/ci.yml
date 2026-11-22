@@ -17,7 +17,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Maven Central occasionally refuses or drops downloads on shared runners: retry them
+  MAVEN_ARGS: -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.requestSentEnabled=true
   PLANTUML_IMAGE: plantuml/plantuml:1.2026.9
+  ZAP_IMAGE: ghcr.io/zaproxy/zaproxy:2.16.1
   TRIVY_VERSION: v0.70.0
   IMAGE_NAME: trade-store
 
@@ -148,4 +151,30 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Start the stack and wait for readiness
-        run: scripts/compose-smoke.sh
+        run: KEEP_UP=1 scripts/compose-smoke.sh
+
+      - name: Observability profile (Prometheus scrapes, Grafana dashboard loads)
+        run: scripts/observability-smoke.sh
+
+      # DAST (A-47): OWASP ZAP API scan of the running app, driven by the OpenAPI contract
+      - name: OWASP ZAP API scan
+        run: |
+          mkdir -p zap && chmod 777 zap && cp docs/api/openapi.yaml zap/
+          docker run --rm --network host -v "$PWD/zap:/zap/wrk:rw" "$ZAP_IMAGE" \
+            zap-api-scan.py -t openapi.yaml -f openapi -O http://localhost:8080 \
+            -r zap-report.html -J zap-report.json -w zap-report.md -I
+
+      - name: DAST gate (fails on any High risk alert)
+        run: python3 scripts/zap_gate.py zap/zap-report.json
+
+      - name: Upload DAST report
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: dast
+          if-no-files-found: warn
+          path: zap/zap-report.*
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose --profile observability down -v --remove-orphans
