@@ -27,6 +27,12 @@ server:
   shutdown: graceful
 
 management:
+  metrics:
+    distribution:
+      # Buckets for p95/p99 in Prometheus/Grafana (histogram_quantile), US-604.2
+      percentiles-histogram:
+        trade.processing: true
+        http.server.requests: true
   endpoints:
     web:
       exposure:
