@@ -58,4 +58,30 @@ class ObservabilityAndPortalConformanceTest {
         assertThat(deploy).contains("pages: write").contains("id-token: write");
         assertThat(portal.substring(0, portal.indexOf("jobs:"))).doesNotContain("pages: write");
     }
+
+    @Test
+    @Tag("US-609.1")
+    void should_publishSwaggerDocumentationForTheRestApi_when_thePortalIsBuilt() {
+        // Arrange
+        assertThat(exists("portal/api.html")).isTrue();
+
+        // Act + Assert: Swagger UI over the OpenAPI contract, linked from the portal, published with it
+        assertThat(read("portal/api.html")).contains("swagger-ui-bundle.js").contains("openapi.yaml");
+        assertThat(read("portal/index.html")).contains("api.html");
+        assertThat(read(".github/workflows/portal.yml")).contains("docs/api/openapi.yaml").contains("portal/api.html");
+    }
+
+    @Test
+    @Tag("US-604.2")
+    void should_snapshotTheGrafanaPanelsIntoThePortal_when_ciRunsTheObservabilityStack() {
+        // Act
+        String ci = read(".github/workflows/ci.yml");
+
+        // Assert: demo load, then the dashboard's own queries are evaluated and published (before the ZAP scan)
+        assertThat(ci).contains("scripts/demo-load.sh").contains("scripts/observability_snapshot.py")
+                .contains("observability-snapshot.json");
+        assertThat(ci.indexOf("observability_snapshot.py")).isLessThan(ci.indexOf("zap-api-scan.py"));
+        assertThat(read(".github/workflows/portal.yml")).contains("observability-snapshot.json");
+        assertThat(read("portal/index.html")).contains("data/observability.json");
+    }
 }

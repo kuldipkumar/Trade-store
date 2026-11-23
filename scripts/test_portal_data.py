@@ -111,6 +111,40 @@ class PerformanceDateTest(unittest.TestCase):
         self.assertEqual(portal_data.parse_performance(text)["burstSeconds"], 8.1)
 
 
+class SchemaTest(unittest.TestCase):
+
+    SQL = """
+-- Latest version of each trade: the system of record (A-36).
+CREATE TABLE trades (
+    trade_id         VARCHAR(64) PRIMARY KEY,
+    version          INTEGER     NOT NULL CHECK (version >= 1),
+    expired          BOOLEAN     NOT NULL DEFAULT FALSE
+);
+
+-- The expiry job only scans unexpired trades (A-52).
+CREATE INDEX idx_trades_unexpired_maturity ON trades (maturity_date) WHERE expired = FALSE;
+"""
+
+    def test_reads_tables_columns_and_indexes_from_a_migration(self):
+        tables = portal_data.parse_sql(self.SQL)
+
+        self.assertEqual([t["name"] for t in tables], ["trades"])
+        trades = tables[0]
+        self.assertEqual(trades["comment"], "Latest version of each trade: the system of record (A-36).")
+        self.assertEqual(trades["columns"][0], {"name": "trade_id", "type": "VARCHAR(64)", "constraints": "PRIMARY KEY"})
+        self.assertEqual(trades["columns"][1]["constraints"], "NOT NULL CHECK (version >= 1)")
+        self.assertEqual(trades["indexes"], [{"name": "idx_trades_unexpired_maturity", "columns": "maturity_date",
+                                              "where": "expired = FALSE",
+                                              "comment": "The expiry job only scans unexpired trades (A-52)."}])
+
+    def test_reads_mongo_index_keys_and_names(self):
+        source = """audit.createIndex(new Index().on("outcome", Direction.ASC).on("eventTimestamp", Direction.ASC)
+                .on("_id", Direction.ASC).named("outcome_eventTimestamp_id"));"""
+
+        self.assertEqual(portal_data.parse_mongo_indexes(source),
+                         [{"name": "outcome_eventTimestamp_id", "keys": ["outcome", "eventTimestamp", "_id"]}])
+
+
 class StatusTest(unittest.TestCase):
 
     def test_keeps_the_newest_run_of_each_portal_workflow(self):
