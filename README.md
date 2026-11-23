@@ -87,7 +87,7 @@ Settings live under `trade-store.*` ([LLD §6.4](docs/05-lld.md)). Every one can
 
 ```bash
 docker compose --profile observability up --build -d   # adds Prometheus (localhost:9090) and Grafana (localhost:3000)
-scripts/demo-load.sh                                    # drives every outcome on both channels
+python3 scripts/load_trades.py --rate 100               # streams loadtest/trades-10k.csv into Kafka
 ```
 
 Grafana opens on the provisioned **Trade Store** dashboard ([JSON](observability/grafana/dashboards/trade-store.json)). It shows:
@@ -95,6 +95,29 @@ Grafana opens on the provisioned **Trade Store** dashboard ([JSON](observability
 - outcomes per minute, rejections by reason, and outcomes by channel
 - trade-processing and HTTP latency (p50, p95, p99)
 - dead letters, retries, outbox backlog, consumer lag and scheduled-job failures
+
+### Load: the shared trade file
+
+[`loadtest/trades-10k.csv`](loadtest/trades-10k.csv) holds 10,000 trade messages. Each row records the outcome the store must produce:
+
+| Rows | Expected outcome |
+|---:|---|
+| 6,000 | New trades: `ACCEPTED` |
+| 2,300 | Higher-version replacements and same-version resends: `REPLACED` |
+| 800 | Lower versions: `REJECTED` (`LOWER_VERSION`) |
+| 600 | Maturity dates in the past: `REJECTED` (`MATURITY_IN_PAST`) |
+| 200 | Missing book ID: `REJECTED` (`INVALID_FIELD`) |
+| 100 | Poison pills: sent to the dead-letter topic |
+
+Each trade's rows are in version order, interleaved with other trades as on a real stream. The file is regenerated deterministically with `python3 scripts/generate_trades.py`. The same file drives the demos and the performance baseline (US-605).
+
+```bash
+python3 scripts/load_trades.py                                   # all 10,000 rows into Kafka at 500/s, keyed by tradeId
+python3 scripts/load_trades.py --rate 50 --limit 1500            # a gentler demo
+python3 scripts/load_trades.py --channel rest --rate 50 --limit 3000   # over REST; checks each status code
+```
+
+Each run prefixes the trade IDs (for example `L1124103000-T00001`), so every run starts fresh and gets the same outcomes. On Kafka it writes through the broker container's console producer, so it needs the compose stack running but no Python Kafka library.
 
 ## Run the tests
 
@@ -129,12 +152,12 @@ GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on ev
 
 ### Performance baseline (US-605)
 
-These tests run on demand, through the *Performance baseline* workflow or `./mvnw verify -Pperformance -DskipUnitTests=true -Djacoco.skip=true`. Results on a single local instance on Testcontainers (2026-11-22):
+These tests run on demand, through the *Performance baseline* workflow or `./mvnw verify -Pperformance -DskipUnitTests=true -Djacoco.skip=true`. Results on a single local instance on Testcontainers (2026-11-24), using `loadtest/trades-10k.csv`:
 
 | Scenario | Result | Target (A-41) |
 |---|---|---|
-| Burst of 10,000 stream trades | All stored in 9.7 s, none lost | Within 60 s, zero loss |
-| REST at 50 requests/s for 60 s | p50 4.7 ms, p95 9.0 ms, p99 17.1 ms, 0 errors | p95 < 200 ms |
+| Burst of the 10,000-message trade file | All processed in 11.1 s, every outcome as expected (6,000 accepted, 2,300 replaced, 1,600 rejected, 100 poison) | Within 60 s, zero loss |
+| REST at 50 requests/s for 60 s | p50 5.6 ms, p95 8.6 ms, p99 21.0 ms, every status as expected | p95 < 200 ms |
 
 ## Assumptions
 

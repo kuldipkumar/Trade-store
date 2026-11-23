@@ -394,11 +394,11 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       <div class="row"><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/observability/grafana/dashboards/trade-store.json">Dashboard JSON</a><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/runbook-dead-letter.md">Dead-letter runbook</a></div>
     </div>
     <div class="grid g3">
-      <div class="card"><span class="eyebrow">Stream burst (US-605.1)</span><div class="big" id="perf-burst">–</div><p class="muted">10,000 trades published at once, all stored, none lost. Target: 60 s.</p></div>
+      <div class="card"><span class="eyebrow">Stream burst (US-605.1)</span><div class="big" id="perf-burst">–</div><p class="muted">All 10,000 rows of <a target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/loadtest/trades-10k.csv">the shared trade file</a> published at once, every outcome as expected, none lost. Target: 60 s.</p></div>
       <div class="card"><span class="eyebrow">REST p95 at 50 req/s (US-605.2)</span><div class="big" id="perf-rest">–</div><p class="muted" id="perf-rest-note">Target: under 200 ms.</p></div>
       <div class="card"><span class="eyebrow">Open the live dashboard</span>
         <pre class="cmd">docker compose --profile observability up --build -d
-scripts/demo-load.sh        # drive every outcome</pre>
+python3 scripts/load_trades.py --rate 100   # 10,000-trade file</pre>
         <p class="muted" style="font-size:.84rem">Grafana: <code>localhost:3000</code> (dashboard “Trade Store”) · Prometheus: <code>localhost:9090</code></p></div>
     </div>
     <div class="spread" style="margin:26px 0 12px;flex-wrap:wrap"><h3>Trade Store dashboard</h3><span class="muted mono" style="font-size:.78rem" id="dash-note"></span></div>

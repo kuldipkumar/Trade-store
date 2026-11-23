@@ -105,7 +105,7 @@ class PerformanceDateTest(unittest.TestCase):
 
     def test_takes_the_measurement_date_from_the_source(self):
         text = ("Results on a single local instance on Testcontainers (2027-01-05):\n"
-                "| Burst of 10,000 stream trades | All stored in 8.1 s, none lost | x |\n")
+                "| Burst of the 10,000-message trade file | All processed in 8.1 s, every outcome as expected | x |\n")
 
         self.assertEqual(portal_data.parse_performance(text)["measured"], "2027-01-05")
         self.assertEqual(portal_data.parse_performance(text)["burstSeconds"], 8.1)
