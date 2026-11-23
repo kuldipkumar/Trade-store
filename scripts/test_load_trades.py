@@ -1,5 +1,6 @@
 """US-605: the 10,000-trade load file and the script that streams it (scripts/generate_trades.py, scripts/load_trades.py)."""
 import collections
+import datetime
 import unittest
 
 import generate_trades
@@ -32,7 +33,7 @@ class GenerateTest(unittest.TestCase):
                 expected = ("REJECTED", "INVALID_FIELD")
             elif tid in stored and version < stored[tid]:
                 expected = ("REJECTED", "LOWER_VERSION")
-            elif r["maturityDate"] < "2026-11-24":
+            elif r["maturityDate"] < datetime.date.today().isoformat():   # the real today: the file must stay valid
                 expected = ("REJECTED", "MATURITY_IN_PAST")
             else:
                 expected = ("REPLACED" if tid in stored else "ACCEPTED", "")
@@ -44,6 +45,12 @@ class GenerateTest(unittest.TestCase):
             for value in r.values():
                 self.assertNotIn("|", value)
                 self.assertNotIn("\n", value)
+
+
+    def test_should_keepEveryStoredTradesMaturityFarInTheFuture_when_generated(self):
+        # Code review of PR #71: dates from 2028 would expire and silently change the expected outcomes
+        stored = [r["maturityDate"] for r in self.rows if r["expectedOutcome"] in ("ACCEPTED", "REPLACED")]
+        self.assertGreaterEqual(min(stored), "2090-01-01")
 
 
 class MessageTest(unittest.TestCase):
@@ -67,6 +74,14 @@ class MessageTest(unittest.TestCase):
                  ("REJECTED", "MATURITY_IN_PAST"): 422, ("REJECTED", "INVALID_FIELD"): 400, ("POISON", ""): 400}
         for (outcome, reason), status in cases.items():
             self.assertEqual(load_trades.expected_status(dict(self.ROW, expectedOutcome=outcome, expectedReason=reason)), status)
+
+
+class PrefixTest(unittest.TestCase):
+
+    def test_should_giveEveryRunItsOwnTradeIds_when_runsStartInTheSameSecond(self):
+        # Code review of PR #71
+        prefixes = {load_trades.default_prefix() for _ in range(50)}
+        self.assertEqual(len(prefixes), 50)
 
 
 class PacerTest(unittest.TestCase):
