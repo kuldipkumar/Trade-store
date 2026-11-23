@@ -281,6 +281,7 @@ Test names follow `should_<behaviour>_when_<condition>` and reference the AC ID 
 | **D5** | **`POISON`/`FAILED` IDs are `topic-partition-offset`**, not a hash (§6.3). | A wording change from ADR-005 with the same guarantee. |
 | **D6** | **Status precedence 400 > 409 > 422** when there are several reasons (§7). | The backlog defines each status on its own, not in combination. |
 | **D7** | **REST returns 503 when the database is down.** Nothing is stored or audited, and the client retries. | The backlog doesn't cover this case for REST. |
+| **D10** | **Security controls are out of scope for the PoC** (decided by the human on 2026-11-23): no authentication, authorisation or TLS. The scans (CodeQL, Trivy, ZAP) still run and report. | The goal is a proof of concept of the trade rules and the pipeline. A01/A07 and transport security are required before any production use (README, Known limitations). |
 
 ## 11. Traceability: stories to design
 

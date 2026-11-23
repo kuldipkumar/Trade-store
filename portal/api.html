@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trade Store API</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+  /* Swagger UI renders on white, so this page keeps one light look in either theme. */
+  :root { --bg: #ffffff; --ink: #0f1a27; --muted: #546273; --line: #d8dee6; --accent: #0a6b68; color-scheme: light; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; }
+  .bar { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .bar .in { max-width: 1240px; margin: 0 auto; display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+             padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .bar h1 { margin: 0; font: 700 1.15rem/1.2 "IBM Plex Sans Condensed", "Arial Narrow", Arial, sans-serif; }
+  .bar a { color: var(--accent); font-size: .9rem; text-decoration: none; margin-left: 14px; }
+  .bar a:hover { text-decoration: underline; }
+  .note { max-width: 1240px; margin: 14px auto 0; color: var(--muted); font-size: .88rem;
+          padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .note code { background: #eef1f4; padding: 1px 5px; border-radius: 4px; }
+  #swagger { max-width: 1240px; margin: 0 auto; }
+  .swagger-ui .topbar { display: none; }
+  .swagger-ui .info { margin: 24px 0; }
+  #fallback { max-width: 1240px; margin: 24px auto; padding: 0 16px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="bar"><div class="in">
+    <h1>Trade Store REST API</h1>
+    <nav><a href="index.html">← Portal</a><a href="openapi.yaml" target="_blank" rel="noopener">OpenAPI (YAML)</a><a href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/api/openapi.yaml" target="_blank" rel="noopener">Source on GitHub</a></nav>
+  </div></div>
+  <p class="note">The contract for every endpoint, its parameters, responses and the standard error shape. CI also uses it to drive the OWASP ZAP scan. To try the calls, run the app locally (<code>docker compose up --build</code>) and send them to <code>http://localhost:8080</code>.</p>
+  <div id="swagger"></div>
+  <p id="fallback" hidden>The API viewer could not load. Read the contract directly: <a href="openapi.yaml">openapi.yaml</a>.</p>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-bundle.js"></script>
+  <script>
+    (function () {
+      if (!window.SwaggerUIBundle) { document.getElementById("fallback").hidden = false; return; }
+      window.SwaggerUIBundle({
+        url: "openapi.yaml",
+        dom_id: "#swagger",
+        deepLinking: false,
+        docExpansion: "list",
+        defaultModelsExpandDepth: 0,
+        tryItOutEnabled: false,
+        supportedSubmitMethods: []
+      });
+    })();
+  </script>
+</body>
+</html>

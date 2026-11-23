@@ -15,17 +15,20 @@
   --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --radius: 10px;
+  --s1: #0a6b68; --s2: #2758b0; --s3: #b25e00; --s4: #b42323; --s5: #7a4ab8; --s6: #5f7a1a;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #0b1118; --surface: #121b25; --surface-2: #172230; --ink: #e5ecf3; --muted: #95a3b4; --line: #243243;
   --accent: #3fbdb3; --accent-soft: #123333; --accent-ink: #06201f;
   --ok: #4cc27a; --ok-soft: #12301e; --warn: #f0a44b; --warn-soft: #33240f; --bad: #f07070; --bad-soft: #3a1717;
-  --run: #7aa7ff; --run-soft: #17233d; --idle: #8b97a6; --idle-soft: #1b2532; color-scheme: dark; } }
+  --run: #7aa7ff; --run-soft: #17233d; --idle: #8b97a6; --idle-soft: #1b2532;
+  --s1: #3fbdb3; --s2: #7aa7ff; --s3: #f0a44b; --s4: #f07070; --s5: #b89cf0; --s6: #a9c95a; color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bg: #0b1118; --surface: #121b25; --surface-2: #172230; --ink: #e5ecf3; --muted: #95a3b4; --line: #243243;
   --accent: #3fbdb3; --accent-soft: #123333; --accent-ink: #06201f;
   --ok: #4cc27a; --ok-soft: #12301e; --warn: #f0a44b; --warn-soft: #33240f; --bad: #f07070; --bad-soft: #3a1717;
-  --run: #7aa7ff; --run-soft: #17233d; --idle: #8b97a6; --idle-soft: #1b2532; color-scheme: dark; }
+  --run: #7aa7ff; --run-soft: #17233d; --idle: #8b97a6; --idle-soft: #1b2532;
+  --s1: #3fbdb3; --s2: #7aa7ff; --s3: #f0a44b; --s4: #f07070; --s5: #b89cf0; --s6: #a9c95a; color-scheme: dark; }
 
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
@@ -178,6 +181,27 @@ table.data tr:last-child td { border-bottom: 0; }
 .big { font: 600 2rem/1 var(--mono); font-variant-numeric: tabular-nums; }
 pre.cmd { margin: 0; background: var(--surface-2); border-radius: 8px; padding: 12px; overflow-x: auto; font: 0.82rem/1.5 var(--mono); }
 
+/* Data model */
+.store-head { display: flex; align-items: baseline; gap: 10px; }
+.store-head .kind { font: 600 .72rem/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; padding: 4px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); }
+.entity { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.entity-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; padding: 10px 12px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.entity-head b { font: 600 .95rem/1.2 var(--mono); }
+.entity table { width: 100%; border-collapse: collapse; font: .8rem/1.35 var(--mono); }
+.entity td { padding: 5px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.entity tr:last-child td { border-bottom: 0; }
+.entity td:first-child { color: var(--ink); white-space: nowrap; }
+.entity td + td { color: var(--muted); }
+.entity .idx { padding: 8px 12px; font: .76rem/1.45 var(--mono); color: var(--muted); border-top: 1px solid var(--line); }
+.entity .idx b { color: var(--accent); font-weight: 600; }
+/* Dashboard charts */
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font: .72rem/1.3 var(--mono); color: var(--muted); }
+.chart .legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.chart .axis { font: 10px var(--mono); fill: var(--muted); }
+.chart .gl { stroke: var(--line); stroke-width: 1; }
+.chart .empty { padding: 28px 0; text-align: center; color: var(--muted); font-size: .84rem; }
+
 footer { padding-block: 40px; color: var(--muted); font-size: 0.84rem; }
 footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 18px; }
 .notice { border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--radius); padding: 10px 14px; font-size: 0.86rem; color: var(--muted); }
@@ -206,10 +230,11 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
       <a href="#clarify"><span class="n">2</span>Clarify</a>
       <a href="#tests"><span class="n">3</span>Tests</a>
       <a href="#design"><span class="n">4</span>Design</a>
-      <a href="#pipeline"><span class="n">5</span>Pipeline</a>
-      <a href="#modules"><span class="n">6</span>Code</a>
-      <a href="#security"><span class="n">7</span>Security</a>
-      <a href="#observability"><span class="n">8</span>Operate</a>
+      <a href="#data"><span class="n">5</span>Data</a>
+      <a href="#pipeline"><span class="n">6</span>Pipeline</a>
+      <a href="#modules"><span class="n">7</span>Code</a>
+      <a href="#security"><span class="n">8</span>Security</a>
+      <a href="#observability"><span class="n">9</span>Operate</a>
     </nav>
     <div class="live" id="live-badge"><span class="pill idle">loading</span><span class="txt">pipeline</span></div>
   </div>
@@ -227,6 +252,12 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
           <div class="rule"><b>R-03</b><span>The <strong>same version</strong> replaces the stored trade</span></div>
           <div class="rule"><b>R-04</b><span>A <strong>maturity date before today</strong> is rejected</span></div>
           <div class="rule"><b>R-05</b><span>Trades past maturity are <strong>marked expired</strong></span></div>
+        </div>
+        <div class="row" style="margin-top:18px">
+          <a class="btn primary" href="api.html">REST API reference (Swagger)</a>
+          <a class="btn" href="#data">Database design</a>
+          <a class="btn" href="#observability">Observability dashboard</a>
+          <a class="btn" href="#pipeline">Live pipeline</a>
         </div>
       </div>
       <div class="tape" aria-label="The assignment's example, as the system handles it">
@@ -307,10 +338,25 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
     <div class="diagrams" id="diagrams"></div>
   </div></section>
 
-  <!-- 5. Pipeline -->
+  <!-- 5. Data -->
+  <section class="block" id="data"><div class="wrap">
+    <div class="block-head">
+      <div><span class="eyebrow">5 · Two stores, one consistent record</span><h2>Database design</h2>
+        <p>PostgreSQL is the system of record for the latest version of each trade. MongoDB keeps the append-only audit trail and the version history. The transactional outbox ties them together, so a stored trade is never left unaudited (ADR-005). Tables and indexes below are read from the Flyway migrations and the MongoDB adapters themselves.</p></div>
+      <div class="row">
+        <a class="btn primary" target="_blank" rel="noopener" href="diagrams/05-er-data-model.svg">Data model diagram</a>
+        <a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/05-lld.md#5-trade-lifecycle-and-data-model">LLD §5</a>
+        <a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/tree/main/src/main/resources/db/migration">Migrations</a>
+      </div>
+    </div>
+    <div class="grid g2" id="data-stores"></div>
+    <div class="grid g4" style="margin-top:12px" id="data-adrs"></div>
+  </div></section>
+
+  <!-- 6. Pipeline -->
   <section class="block" id="pipeline"><div class="wrap">
     <div class="block-head">
-      <div><span class="eyebrow">5 · Every change, gated</span><h2>CI/CD pipeline, live</h2>
+      <div><span class="eyebrow">6 · Every change, gated</span><h2>CI/CD pipeline, live</h2>
         <p>Status of the latest run on <code>main</code>, step by step. A red gate stops the change: a failing test, coverage under 80%, a diagram syntax error, a stale traceability matrix, a critical vulnerability or a high-risk DAST alert.</p></div>
       <div class="row"><a class="btn primary" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/actions">All runs</a><button class="btn" type="button" id="refresh">Refresh status</button></div>
     </div>
@@ -321,9 +367,9 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
   <!-- 6. Code -->
   <section class="block" id="modules"><div class="wrap">
     <div class="block-head">
-      <div><span class="eyebrow">6 · One deployable, clear layers</span><h2>Code modules and their responsibilities</h2>
+      <div><span class="eyebrow">7 · One deployable, clear layers</span><h2>Code modules and their responsibilities</h2>
         <p>Domain and services depend only on ports; PostgreSQL, MongoDB and Kafka sit behind adapters (ADR-001, dependency inversion). Line coverage per package comes from the latest CI run.</p></div>
-      <div class="row"><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/tree/main/src/main/java/com/tradestore">Browse the source</a><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/api/openapi.yaml">OpenAPI contract</a></div>
+      <div class="row"><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/tree/main/src/main/java/com/tradestore">Browse the source</a><a class="btn" href="api.html">REST API reference (Swagger)</a></div>
     </div>
     <div class="grid g3" id="module-cards"></div>
   </div></section>
@@ -331,7 +377,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
   <!-- 7. Security -->
   <section class="block" id="security"><div class="wrap">
     <div class="block-head">
-      <div><span class="eyebrow">7 · Shift-left security</span><h2>SAST, SCA, image and DAST scans</h2>
+      <div><span class="eyebrow">8 · Shift-left security</span><h2>SAST, SCA, image and DAST scans</h2>
         <p>Static analysis of the code, open-source dependency and container image scans, and a dynamic scan of the running API. Critical dependency or image findings, and high-risk DAST alerts, fail the pipeline.</p></div>
       <div class="row"><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/security/code-scanning">Security tab</a><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/adr/006-trivy-oss-vulnerability-scan.md">ADR-006</a></div>
     </div>
@@ -343,7 +389,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
   <!-- 8. Observability -->
   <section class="block" id="observability"><div class="wrap">
     <div class="block-head">
-      <div><span class="eyebrow">8 · Run and operate</span><h2>Observability dashboard</h2>
+      <div><span class="eyebrow">9 · Run and operate</span><h2>Observability dashboard</h2>
         <p>Business outcomes, latency, dead letters, retries and the audit backlog are Prometheus metrics; a provisioned Grafana dashboard shows them live. Readiness is UP only when PostgreSQL, MongoDB and Kafka are reachable.</p></div>
       <div class="row"><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/observability/grafana/dashboards/trade-store.json">Dashboard JSON</a><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/runbook-dead-letter.md">Dead-letter runbook</a></div>
     </div>
@@ -355,8 +401,10 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
 scripts/demo-load.sh        # drive every outcome</pre>
         <p class="muted" style="font-size:.84rem">Grafana: <code>localhost:3000</code> (dashboard “Trade Store”) · Prometheus: <code>localhost:9090</code></p></div>
     </div>
-    <h3 style="margin:26px 0 12px">Dashboard panels and the metrics behind them</h3>
-    <div class="panel-grid" id="panels"></div>
+    <div class="spread" style="margin:26px 0 12px;flex-wrap:wrap"><h3>Trade Store dashboard</h3><span class="muted mono" style="font-size:.78rem" id="dash-note"></span></div>
+    <div class="kpis" id="dash-stats"></div>
+    <div class="panel-grid" id="dash-charts" style="margin-top:10px"></div>
+    <details style="margin-top:16px"><summary class="muted" style="cursor:pointer">Panels and the PromQL behind them</summary><div class="panel-grid" id="panels" style="margin-top:10px"></div></details>
   </div></section>
 </main>
 
@@ -498,11 +546,11 @@ scripts/demo-load.sh        # drive every outcome</pre>
     var docs = [
       { t: "High-level design", d: "Context, containers, components, deployment and quality attributes.", p: "docs/03-hld.md" },
       { t: "Low-level design", d: "Classes, contracts, error handling, metrics, configuration and decisions.", p: "docs/05-lld.md" },
-      { t: "REST API contract", d: "OpenAPI 3 for every endpoint and error shape; also drives the DAST scan.", p: "docs/api/openapi.yaml" },
+      { t: "REST API reference", d: "Swagger UI over the OpenAPI 3 contract: every endpoint, parameter, response and error shape.", p: "docs/api/openapi.yaml", href: "api.html" },
       { t: "Test review", d: "A verdict for every acceptance criterion, with known limitations.", p: "docs/06-test-review.md" }
     ];
     $("design-docs").innerHTML = docs.map(function (k) {
-      return '<a class="card link" ' + ext + ' href="' + blob(k.p) + '"><h3>' + esc(k.t) + '</h3><p class="muted" style="font-size:.88rem">' + esc(k.d) + '</p><span class="meta">' + esc(k.p) + "</span></a>";
+      return '<a class="card link" ' + (k.href ? "" : ext) + ' href="' + (k.href || blob(k.p)) + '"><h3>' + esc(k.t) + '</h3><p class="muted" style="font-size:.88rem">' + esc(k.d) + '</p><span class="meta">' + esc(k.href ? "Swagger UI · " + k.p : k.p) + "</span></a>";
     }).join("");
     $("adrs").innerHTML = data.design.adrs.map(function (a) {
       var m = /^(ADR-\d+):\s*(.*)$/.exec(a.title) || [null, "ADR", a.title];
@@ -605,13 +653,13 @@ scripts/demo-load.sh        # drive every outcome</pre>
       return '<div class="card"><div class="spread"><span class="eyebrow">' + esc(c.e) + "</span>" + c.st + "</div><h3>" + esc(c.h) + "</h3>" + c.body + '<div class="row" style="margin-top:auto">' + c.links.map(function (l) { return '<a class="btn" ' + ext + ' href="' + esc(l[1]) + '">' + esc(l[0]) + "</a>"; }).join("") + "</div></div>";
     }).join("");
     var owasp = [
-      ["A01 Broken access control", "Not addressed: no authentication in this assignment build; recorded as a known limitation and future improvement.", "README · Known limitations", blob("README.md") + "#known-limitations"],
-      ["A02 Cryptographic failures", "No secrets stored by the app; connections configured from the environment. TLS to brokers and databases is future work.", "ContainerAndSecretsConformanceTest", blob("src/test/java/com/tradestore/repo/ContainerAndSecretsConformanceTest.java")],
+      ["A01 Broken access control", "Out of scope for the PoC (decision D10): no authentication or authorisation. Required before production.", "Decision D10", blob("docs/05-lld.md") + "#10-design-decisions-accepted-by-the-human-on-2026-11-20"],
+      ["A02 Cryptographic failures", "No secrets stored by the app; connections configured from the environment. TLS to brokers and databases is out of scope for the PoC (D10).", "ContainerAndSecretsConformanceTest", blob("src/test/java/com/tradestore/repo/ContainerAndSecretsConformanceTest.java")],
       ["A03 Injection", "Parameterised JDBC only; strict JSON type checks; Mongo queries built from typed criteria.", "JdbcTradeRepository, TradeJsonParser", blob("src/main/java/com/tradestore/persistence/sql/JdbcTradeRepository.java")],
       ["A04 Insecure design", "Threats designed out: size limits, poison-pill isolation, version-guarded writes, append-only audit.", "LLD §7 error handling", blob("docs/05-lld.md") + "#7-error-handling-strategy"],
       ["A05 Security misconfiguration", "ZAP scan of the running stack; actuator exposes only health, info and prometheus; errors never leak stack traces.", "ZAP report, GlobalExceptionHandler", reportBase + "reports/dast/zap-report.html"],
       ["A06 Vulnerable components", "Trivy fails the build on CRITICAL in dependencies and in the image; full report kept for every run.", "ADR-006", blob("docs/adr/006-trivy-oss-vulnerability-scan.md")],
-      ["A07 Identification and authentication", "Out of scope with A01 (no users in this build).", "Known limitations", blob("README.md") + "#known-limitations"],
+      ["A07 Identification and authentication", "Out of scope for the PoC with A01 (decision D10): no users or identities in this build.", "Decision D10", blob("docs/05-lld.md") + "#10-design-decisions-accepted-by-the-human-on-2026-11-20"],
       ["A08 Software and data integrity", "Transactional outbox keeps trade and audit consistent; audit and history are insert-only; actions pinned to versions.", "ADR-005, AuditTrailImmutabilityTest", blob("docs/adr/005-transactional-outbox-for-audit.md")],
       ["A09 Logging and monitoring", "One structured line per outcome with IDs only (no payloads); metrics and alerts-ready dashboard.", "LLD §8", blob("docs/05-lld.md") + "#8-observability-us-604"],
       ["A10 Server-side request forgery", "The app makes no outbound calls driven by user input.", "Design (no URL inputs)", blob("docs/03-hld.md")]
@@ -633,10 +681,80 @@ scripts/demo-load.sh        # drive every outcome</pre>
       ["Dead letters and retries", "Poison pills, failed messages, and redeliveries during outages", "increase(trade_deadletter_total[5m]) · trade_retries_total"],
       ["Audit backlog", "Outbox rows waiting for MongoDB, and the oldest one's age", "trade_outbox_backlog_size · trade_outbox_oldest_age_seconds"],
       ["Consumer lag", "How far the stream consumer is behind", "kafka_consumer_fetch_manager_records_lag_max"],
-      ["Scheduled job failures", "Expiry and outbox relay", "increase(trade_job_failures_total[1h])"],
+      ["Scheduled job failures", "Expiry and outbox relay", "sum by (exported_job) (increase(trade_job_failures_total[1h]))"],
       ["Outcomes by channel", "Stream, REST and the expiry scheduler", "sum by (channel) (rate(trade_outcomes_total[1m]))"]
     ];
     $("panels").innerHTML = panels.map(function (x) { return '<div class="panel"><h3 style="font-size:.98rem">' + esc(x[0]) + '</h3><p class="muted" style="font-size:.84rem">' + esc(x[1]) + "</p><code>" + esc(x[2]) + "</code></div>"; }).join("");
+  }
+
+  // ---------- data model ----------
+  function renderData() {
+    var db = data.database;
+    if (!db) { $("data-stores").innerHTML = '<div class="notice">No schema in this data build.</div>'; return; }
+    var tables = db.tables.map(function (t) {
+      var cols = t.columns.map(function (c) { return "<tr><td>" + esc(c.name) + "</td><td>" + esc(c.type + (c.constraints ? " · " + c.constraints : "")) + "</td></tr>"; }).join("");
+      var idx = t.indexes.map(function (i) { return "<div><b>" + esc(i.name) + "</b> (" + esc(i.columns) + ")" + (i.where ? " WHERE " + esc(i.where) : "") + (i.comment ? " · " + esc(i.comment) : "") + "</div>"; }).join("");
+      return '<div class="entity"><div class="entity-head"><b>' + esc(t.name) + '</b><a ' + ext + ' class="mono" style="font-size:.72rem" href="' + blob(t.migration) + '">' + esc(t.migration.split("/").pop()) + "</a></div>" +
+        (t.comment ? '<p class="muted" style="font-size:.82rem;padding:8px 12px 0">' + esc(t.comment) + "</p>" : "") + "<table>" + cols + "</table>" + (idx ? '<div class="idx">' + idx + "</div>" : "") + "</div>";
+    }).join("");
+    var cols = db.collections.map(function (c) {
+      var fields = c.fields.map(function (f) { return "<tr><td>" + esc(f) + "</td><td>" + esc(f === "_id" ? (c.name === "audit_events" ? "eventId (UUID), or topic-partition-offset for POISON / FAILED" : "eventId of the outcome") : "") + "</td></tr>"; }).join("");
+      var idx = c.indexes.map(function (i) { return "<div><b>" + esc(i.name) + "</b> {" + esc(i.keys.join(", ")) + "}</div>"; }).join("");
+      return '<div class="entity"><div class="entity-head"><b>' + esc(c.name) + '</b><a ' + ext + ' class="mono" style="font-size:.72rem" href="' + blob(c.store) + '">' + esc(c.store.split("/").pop()) + "</a></div>" +
+        '<p class="muted" style="font-size:.82rem;padding:8px 12px 0">' + esc(c.purpose) + "</p><table>" + fields + "</table>" + (idx ? '<div class="idx">' + idx + "</div>" : "") + "</div>";
+    }).join("");
+    $("data-stores").innerHTML =
+      '<div class="card"><div class="store-head"><span class="kind">PostgreSQL 17</span><h3>System of record</h3></div><p class="muted" style="font-size:.86rem">Latest version per trade, version-guarded upsert, outbox written in the same transaction. Schema owned by Flyway.</p>' + tables + "</div>" +
+      '<div class="card"><div class="store-head"><span class="kind">MongoDB 8</span><h3>Audit and history</h3></div><p class="muted" style="font-size:.86rem">Insert-only collections filled by the outbox relay; indexes created at startup by <a ' + ext + ' href="' + blob(db.indexInitializer) + '">MongoIndexInitializer</a>.</p>' + cols + "</div>";
+    var adrs = [["ADR-003", "PostgreSQL as the system of record", "docs/adr/003-postgresql-system-of-record.md"], ["ADR-004", "MongoDB for audit and history", "docs/adr/004-mongodb-audit-and-history.md"],
+      ["ADR-005", "Transactional outbox for the audit", "docs/adr/005-transactional-outbox-for-audit.md"], ["ADR-008", "Plain JDBC (JdbcClient) for PostgreSQL", "docs/adr/008-plain-jdbc-for-postgresql.md"]];
+    $("data-adrs").innerHTML = adrs.map(function (a) { return '<a class="card link" ' + ext + ' href="' + blob(a[2]) + '"><span class="eyebrow">' + a[0] + "</span><span>" + esc(a[1]) + "</span></a>"; }).join("");
+  }
+
+  // ---------- dashboard snapshot ----------
+  var SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)"];
+  function fmtUnit(v, unit) {
+    if (v == null || isNaN(v)) return "–";
+    if (unit === "s") return v < 1 ? (v * 1000).toFixed(v < 0.01 ? 1 : 0) + " ms" : v.toFixed(2) + " s";
+    var a = Math.abs(v);
+    return a >= 1000 ? (v / 1000).toFixed(1) + "k" : a >= 10 || v === Math.round(v) ? Math.round(v).toString() : v.toFixed(1);
+  }
+  function chart(panel) {
+    var series = panel.series.filter(function (s) { return s.points && s.points.length; });
+    if (!series.length) return '<div class="empty">No data in this window</div>';
+    var W = 360, H = 150, L = 44, R = 8, T = 8, B = 20;
+    var t0 = Infinity, t1 = -Infinity, max = 0;
+    series.forEach(function (s) { s.points.forEach(function (p) { t0 = Math.min(t0, p[0]); t1 = Math.max(t1, p[0]); max = Math.max(max, p[1]); }); });
+    if (max <= 0) max = 1; if (t1 === t0) t1 = t0 + 1;
+    var x = function (t) { return L + (t - t0) / (t1 - t0) * (W - L - R); };
+    var y = function (v) { return T + (1 - v / max) * (H - T - B); };
+    var grid = [0, 0.5, 1].map(function (f) { var v = max * f; return '<line class="gl" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '"/><text class="axis" x="' + (L - 6) + '" y="' + (y(v) + 3).toFixed(1) + '" text-anchor="end">' + esc(fmtUnit(v, panel.unit)) + "</text>"; }).join("");
+    var time = function (t) { var d = new Date(t * 1000); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); };
+    var axis = '<text class="axis" x="' + L + '" y="' + (H - 4) + '">' + time(t0) + '</text><text class="axis" x="' + (W - R) + '" y="' + (H - 4) + '" text-anchor="end">' + time(t1) + "</text>";
+    var lines = series.slice(0, 6).map(function (s, i) {
+      var d = s.points.map(function (p, j) { return (j ? "L" : "M") + x(p[0]).toFixed(1) + " " + y(p[1]).toFixed(1); }).join(" ");
+      var last = s.points[s.points.length - 1];
+      return '<path d="' + d + '" fill="none" stroke="' + SERIES[i] + '" stroke-width="1.8" stroke-linejoin="round"/><circle cx="' + x(last[0]).toFixed(1) + '" cy="' + y(last[1]).toFixed(1) + '" r="2.6" fill="' + SERIES[i] + '"/>';
+    }).join("");
+    var legend = series.slice(0, 6).map(function (s, i) { var last = s.points[s.points.length - 1][1]; return '<span><i style="background:' + SERIES[i] + '"></i>' + esc(s.label) + " " + esc(fmtUnit(last, panel.unit)) + "</span>"; }).join("");
+    return '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(panel.title) + '">' + grid + axis + lines + '</svg><div class="legend">' + legend + "</div>";
+  }
+  function renderDashboard(snap) {
+    if (!snap || !snap.panels) {
+      $("dash-note").textContent = "The charts appear after the next CI run on main";
+      $("dash-stats").innerHTML = ""; $("dash-charts").innerHTML = '<div class="notice" style="grid-column:1/-1">No dashboard snapshot yet. CI evaluates the Grafana panels after a demo load on every push to main.</div>';
+      return;
+    }
+    $("dash-note").textContent = "Snapshot of the Grafana panels from CI, " + new Date(snap.takenAt).toLocaleString("en-GB") + " · last " + snap.minutes + " min after a demo load";
+    var stats = snap.panels.filter(function (p) { return p.type === "stat"; });
+    $("dash-stats").innerHTML = stats.map(function (p) {
+      var v = p.series.length ? p.series[0].value : null;
+      if (v != null && p.unit === "short") v = Math.round(v);   // counts: increase() extrapolates fractions
+      return '<div class="kpi"><span class="v">' + esc(fmtUnit(v, p.unit)) + '</span><span class="l">' + esc(p.title) + "</span></div>";
+    }).join("");
+    $("dash-charts").innerHTML = snap.panels.filter(function (p) { return p.type === "timeseries"; }).map(function (p) {
+      return '<div class="panel chart"><h3 style="font-size:.95rem">' + esc(p.title) + "</h3>" + chart(p) + "</div>";
+    }).join("");
   }
 
   // ---------- data loading ----------
@@ -684,7 +802,8 @@ scripts/demo-load.sh        # drive every outcome</pre>
 
   getJson("data/portal.json").then(function (d) {
     data = d;
-    renderKpis(); renderRequirements(); renderClarify(); renderTests(); renderDesign(); renderModules(); renderSecurity(); renderObservability();
+    renderKpis(); renderRequirements(); renderClarify(); renderTests(); renderDesign(); renderData(); renderModules(); renderSecurity(); renderObservability();
+    getJson("data/observability.json").then(renderDashboard).catch(function () { renderDashboard(null); });
     $("footer-meta").textContent = "Data built " + new Date(d.generatedAt).toLocaleString("en-GB") + (d.commit ? " · commit " + d.commit.slice(0, 7) : "");
     renderPipeline();
     loadStatus();

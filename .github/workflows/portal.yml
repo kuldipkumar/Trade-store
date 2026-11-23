@@ -64,7 +64,10 @@ jobs:
           PORTAL_RUN_ID: ${{ steps.run.outputs.id }}
         run: |
           mkdir -p site/data site/diagrams site/reports/coverage site/reports/security site/reports/dast
-          cp portal/index.html site/
+          cp portal/index.html portal/api.html site/
+          cp docs/api/openapi.yaml site/openapi.yaml
+          snapshot=$(find ci-reports -name 'observability-snapshot.json' | head -1)
+          if [ -n "$snapshot" ]; then cp "$snapshot" site/data/observability.json; fi
           python3 scripts/portal_data.py --reports ci-reports --out site/data/portal.json
           python3 scripts/portal_status.py --out site/data/status.json || echo '{}' > site/data/status.json
           find ci-reports -name '*.svg' -exec cp {} site/diagrams/ \;

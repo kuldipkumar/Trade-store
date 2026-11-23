@@ -256,6 +256,63 @@ def security(reports):
     return result
 
 
+def parse_sql(text):
+    """Tables (with the comment above them, columns and constraints) and their indexes, from a Flyway migration."""
+    tables, by_name = [], {}
+    for m in re.finditer(r"((?:^--[^\n]*\n)*)CREATE TABLE (\w+) \((.*?)\n\);", text, re.M | re.S):
+        columns = []
+        for line in m.group(3).strip().splitlines():
+            parts = line.strip().rstrip(",").split(None, 2)
+            if len(parts) >= 2:
+                columns.append({"name": parts[0], "type": parts[1], "constraints": parts[2] if len(parts) > 2 else ""})
+        table = {"name": m.group(2), "comment": _comment(m.group(1)), "columns": columns, "indexes": []}
+        tables.append(table)
+        by_name[table["name"]] = table
+    for m in re.finditer(r"((?:^--[^\n]*\n)*)CREATE (?:UNIQUE )?INDEX (\w+) ON (\w+) \(([^)]*)\)(?: WHERE ([^;]+))?;", text, re.M):
+        if m.group(3) in by_name:
+            by_name[m.group(3)]["indexes"].append({"name": m.group(2), "columns": m.group(4),
+                                                   "where": (m.group(5) or "").strip(), "comment": _comment(m.group(1))})
+    return tables
+
+
+def _comment(block):
+    return " ".join(line.lstrip("-").strip() for line in block.strip().splitlines()).strip()
+
+
+def parse_mongo_indexes(source):
+    found = []
+    for m in re.finditer(r"createIndex\((new Index\(\).*?)\);", source, re.S):
+        keys = re.findall(r'\.on\("(\w+)"', m.group(1))
+        name = re.search(r'\.named\("(\w+)"\)', m.group(1))
+        found.append({"name": name.group(1) if name else "", "keys": keys})
+    return found
+
+
+def database():
+    """PostgreSQL tables from the migrations; MongoDB collections from the store adapters and the index initializer."""
+    tables = []
+    migrations = sorted(glob.glob("src/main/resources/db/migration/V*__*.sql"))
+    for path in migrations:
+        for table in parse_sql(read(path)):
+            table["migration"] = path
+            tables.append(table)
+    init = read("src/main/java/com/tradestore/persistence/nosql/MongoIndexInitializer.java")
+    indexes = parse_mongo_indexes(init)
+    collections = []
+    for store, name, purpose in (
+            ("MongoAuditEventStore", "audit_events", "Append-only audit trail: one entry per outcome (ACCEPTED, REPLACED, REJECTED, EXPIRED, POISON, FAILED)"),
+            ("MongoTradeHistoryStore", "trade_history", "Every accepted version of each trade, for GET /trades/{id}/history")):
+        path = f"src/main/java/com/tradestore/persistence/nosql/{store}.java"
+        source = read(path)
+        fields = ["_id"] + [f for f in dict.fromkeys(re.findall(r'append\("(\w+)"', source)) if f not in ("reason", "field", "message")]
+        prefix = {"audit_events": ("eventTimestamp", "outcome", "tradeId"), "trade_history": ("tradeId",)}[name]
+        collections.append({"name": name, "purpose": purpose, "fields": fields, "store": path,
+                            "indexes": [i for i in indexes if i["keys"] and i["keys"][0] in prefix
+                                        and (name == "audit_events") == (i["name"] != "tradeId_version_receivedTimestamp")]})
+    return {"tables": tables, "migrations": migrations, "collections": collections, "indexInitializer":
+            "src/main/java/com/tradestore/persistence/nosql/MongoIndexInitializer.java"}
+
+
 def git_sha():
     try:
         return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
@@ -292,6 +349,7 @@ def build(reports):
         "design": design(),
         "security": security(reports),
         "metrics": metrics(),
+        "database": database(),
         "performance": performance(reports),
     }
 
