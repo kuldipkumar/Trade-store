@@ -57,16 +57,24 @@ def evaluate(base, minutes, dashboard):
     start = end - minutes * 60
     result = []
     for panel in panels(dashboard):
-        series = []
+        series, error = [], None
         for target in panel["targets"]:
-            if panel["type"] == "stat":
-                for r in query(base, "query", {"query": target["expr"], "time": end}):
-                    value = points([r["value"]])
-                    series.append({"label": legend(target["legend"], r["metric"]), "value": value[0][1] if value else None})
-            else:
-                for r in query(base, "query_range", {"query": target["expr"], "start": start, "end": end, "step": 5}):
-                    series.append({"label": legend(target["legend"], r["metric"]), "points": points(r["values"])})
-        result.append({"title": panel["title"], "type": panel["type"], "unit": panel["unit"], "series": series})
+            try:
+                if panel["type"] == "stat":
+                    for r in query(base, "query", {"query": target["expr"], "time": end}):
+                        value = points([r["value"]])
+                        series.append({"label": legend(target["legend"], r["metric"]), "value": value[0][1] if value else None})
+                else:
+                    for r in query(base, "query_range", {"query": target["expr"], "start": start, "end": end, "step": 5}):
+                        series.append({"label": legend(target["legend"], r["metric"]), "points": points(r["values"])})
+            except (OSError, ValueError, KeyError) as failed:   # URLError/HTTPError are OSErrors
+                # One bad query leaves that panel empty; it never fails CI or blocks the portal
+                error = f"{target['expr']}: {failed}"
+                print(f"WARN panel '{panel['title']}' query failed: {error}")
+        entry = {"title": panel["title"], "type": panel["type"], "unit": panel["unit"], "series": series}
+        if error:
+            entry["error"] = error
+        result.append(entry)
     return result
 
 

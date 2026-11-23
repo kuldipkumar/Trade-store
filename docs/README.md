@@ -17,7 +17,7 @@ The Markdown files in this repository are the **source of truth**. GitHub Issues
 | Document | What it holds | Status |
 |----------|---------------|--------|
 | [03-hld.md](03-hld.md), [adr/](adr/), [diagrams/](diagrams/) | High-level design, 8 ADRs, every PlantUML diagram (rendered to `diagrams/out/`) | Approved |
-| [05-lld.md](05-lld.md) | Low-level design: components, contracts, error handling, metrics, decisions D1 to D9 | Approved; kept in step with the code |
+| [05-lld.md](05-lld.md) | Low-level design: components, contracts, error handling, metrics, decisions D1 to D10 (D8 and D9 in the test review) | Approved; kept in step with the code |
 | [06-test-review.md](06-test-review.md) | A verdict for every acceptance criterion, known limitations, decisions D8 and D9 | Complete |
 | [traceability.md](traceability.md) | Requirements → epics → stories → criteria → tests → code (generated, checked in CI) | 89 of 89 criteria tested |
 | [milestones.md](milestones.md) | One row per story merged, with its PR and review | 32 of 32 stories |

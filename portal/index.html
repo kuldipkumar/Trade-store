@@ -303,7 +303,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
         <p>Every gap or contradiction in the brief became a question with a proposed assumption and its impact if wrong. Design-time choices are recorded as decisions with the reason.</p></div>
     </div>
     <div class="grid g3" id="clarify-cards"></div>
-    <div class="card" style="margin-top:12px"><div class="spread"><h3>Decisions taken during design and build</h3><a target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/05-lld.md#10-design-decisions-accepted-by-the-human-on-2026-11-20">LLD §10</a></div><div class="grid g3" id="decisions"></div></div>
+    <div class="card" style="margin-top:12px"><div class="spread"><h3>Decisions taken during design and build</h3><a target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/05-lld.md#10-design-decisions">LLD §10</a></div><div class="grid g3" id="decisions"></div></div>
   </div></section>
 
   <!-- 3. Tests -->
@@ -364,7 +364,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
     <p class="muted" style="font-size:.8rem;margin-top:8px" id="pipeline-note"></p>
   </div></section>
 
-  <!-- 6. Code -->
+  <!-- 7. Code -->
   <section class="block" id="modules"><div class="wrap">
     <div class="block-head">
       <div><span class="eyebrow">7 · One deployable, clear layers</span><h2>Code modules and their responsibilities</h2>
@@ -374,7 +374,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
     <div class="grid g3" id="module-cards"></div>
   </div></section>
 
-  <!-- 7. Security -->
+  <!-- 8. Security -->
   <section class="block" id="security"><div class="wrap">
     <div class="block-head">
       <div><span class="eyebrow">8 · Shift-left security</span><h2>SAST, SCA, image and DAST scans</h2>
@@ -386,7 +386,7 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
     <div class="tbl-wrap"><table class="data owasp"><thead><tr><th>Risk</th><th>How the Trade Store addresses it</th><th>Evidence</th></tr></thead><tbody id="owasp"></tbody></table></div>
   </div></section>
 
-  <!-- 8. Observability -->
+  <!-- 9. Observability -->
   <section class="block" id="observability"><div class="wrap">
     <div class="block-head">
       <div><span class="eyebrow">9 · Run and operate</span><h2>Observability dashboard</h2>
@@ -575,7 +575,7 @@ scripts/demo-load.sh        # drive every outcome</pre>
       ["Trivy dependency scan", "Trivy SCA", "critical"], ["Trivy full report", "Full SCA report"], ["Build Docker image", "Image build"],
       ["Trivy image scan", "Image scan", "critical"], ["Upload reports", "Reports"] ] },
     { name: "CI · run the stack", job: "docker compose smoke test", file: "ci.yml", nodes: [
-      ["Start the stack and wait for readiness", "Compose up + smoke", "ready"], ["Observability profile (Prometheus scrapes, Grafana dashboard loads)", "Prometheus + Grafana", "dashboard"], ["OWASP ZAP API scan", "ZAP DAST"], ["DAST gate (fails on any High risk alert)", "DAST gate", "high risk"],
+      ["Start the stack and wait for readiness", "Compose up + smoke", "ready"], ["Observability profile (Prometheus scrapes, Grafana dashboard loads)", "Prometheus + Grafana", "dashboard"], ["Dashboard snapshot for the portal", "Demo load + snapshot"], ["Upload dashboard snapshot", "Snapshot upload"], ["OWASP ZAP API scan", "ZAP DAST"], ["DAST gate (fails on any High risk alert)", "DAST gate", "high risk"],
       ["Upload DAST report", "DAST report"], ["Stop the stack", "Tear down"] ] }
   ];
   var OTHER = [
@@ -653,13 +653,13 @@ scripts/demo-load.sh        # drive every outcome</pre>
       return '<div class="card"><div class="spread"><span class="eyebrow">' + esc(c.e) + "</span>" + c.st + "</div><h3>" + esc(c.h) + "</h3>" + c.body + '<div class="row" style="margin-top:auto">' + c.links.map(function (l) { return '<a class="btn" ' + ext + ' href="' + esc(l[1]) + '">' + esc(l[0]) + "</a>"; }).join("") + "</div></div>";
     }).join("");
     var owasp = [
-      ["A01 Broken access control", "Out of scope for the PoC (decision D10): no authentication or authorisation. Required before production.", "Decision D10", blob("docs/05-lld.md") + "#10-design-decisions-accepted-by-the-human-on-2026-11-20"],
+      ["A01 Broken access control", "Out of scope for the PoC (decision D10): no authentication or authorisation. Required before production.", "Decision D10", blob("docs/05-lld.md") + "#10-design-decisions"],
       ["A02 Cryptographic failures", "No secrets stored by the app; connections configured from the environment. TLS to brokers and databases is out of scope for the PoC (D10).", "ContainerAndSecretsConformanceTest", blob("src/test/java/com/tradestore/repo/ContainerAndSecretsConformanceTest.java")],
       ["A03 Injection", "Parameterised JDBC only; strict JSON type checks; Mongo queries built from typed criteria.", "JdbcTradeRepository, TradeJsonParser", blob("src/main/java/com/tradestore/persistence/sql/JdbcTradeRepository.java")],
       ["A04 Insecure design", "Threats designed out: size limits, poison-pill isolation, version-guarded writes, append-only audit.", "LLD §7 error handling", blob("docs/05-lld.md") + "#7-error-handling-strategy"],
       ["A05 Security misconfiguration", "ZAP scan of the running stack; actuator exposes only health, info and prometheus; errors never leak stack traces.", "ZAP report, GlobalExceptionHandler", reportBase + "reports/dast/zap-report.html"],
       ["A06 Vulnerable components", "Trivy fails the build on CRITICAL in dependencies and in the image; full report kept for every run.", "ADR-006", blob("docs/adr/006-trivy-oss-vulnerability-scan.md")],
-      ["A07 Identification and authentication", "Out of scope for the PoC with A01 (decision D10): no users or identities in this build.", "Decision D10", blob("docs/05-lld.md") + "#10-design-decisions-accepted-by-the-human-on-2026-11-20"],
+      ["A07 Identification and authentication", "Out of scope for the PoC with A01 (decision D10): no users or identities in this build.", "Decision D10", blob("docs/05-lld.md") + "#10-design-decisions"],
       ["A08 Software and data integrity", "Transactional outbox keeps trade and audit consistent; audit and history are insert-only; actions pinned to versions.", "ADR-005, AuditTrailImmutabilityTest", blob("docs/adr/005-transactional-outbox-for-audit.md")],
       ["A09 Logging and monitoring", "One structured line per outcome with IDs only (no payloads); metrics and alerts-ready dashboard.", "LLD §8", blob("docs/05-lld.md") + "#8-observability-us-604"],
       ["A10 Server-side request forgery", "The app makes no outbound calls driven by user input.", "Design (no URL inputs)", blob("docs/03-hld.md")]
@@ -720,8 +720,9 @@ scripts/demo-load.sh        # drive every outcome</pre>
     return a >= 1000 ? (v / 1000).toFixed(1) + "k" : a >= 10 || v === Math.round(v) ? Math.round(v).toString() : v.toFixed(1);
   }
   function chart(panel) {
-    var series = panel.series.filter(function (s) { return s.points && s.points.length; });
-    if (!series.length) return '<div class="empty">No data in this window</div>';
+    var all = panel.series.filter(function (s) { return s.points && s.points.length; });
+    if (!all.length) return '<div class="empty">' + (panel.error ? "Query failed in this run" : "No data in this window") + "</div>";
+    var series = all.slice(0, 6), hidden = all.length - series.length;   // the scale follows only what is drawn
     var W = 360, H = 150, L = 44, R = 8, T = 8, B = 20;
     var t0 = Infinity, t1 = -Infinity, max = 0;
     series.forEach(function (s) { s.points.forEach(function (p) { t0 = Math.min(t0, p[0]); t1 = Math.max(t1, p[0]); max = Math.max(max, p[1]); }); });
@@ -731,13 +732,13 @@ scripts/demo-load.sh        # drive every outcome</pre>
     var grid = [0, 0.5, 1].map(function (f) { var v = max * f; return '<line class="gl" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '"/><text class="axis" x="' + (L - 6) + '" y="' + (y(v) + 3).toFixed(1) + '" text-anchor="end">' + esc(fmtUnit(v, panel.unit)) + "</text>"; }).join("");
     var time = function (t) { var d = new Date(t * 1000); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); };
     var axis = '<text class="axis" x="' + L + '" y="' + (H - 4) + '">' + time(t0) + '</text><text class="axis" x="' + (W - R) + '" y="' + (H - 4) + '" text-anchor="end">' + time(t1) + "</text>";
-    var lines = series.slice(0, 6).map(function (s, i) {
+    var lines = series.map(function (s, i) {
       var d = s.points.map(function (p, j) { return (j ? "L" : "M") + x(p[0]).toFixed(1) + " " + y(p[1]).toFixed(1); }).join(" ");
       var last = s.points[s.points.length - 1];
       return '<path d="' + d + '" fill="none" stroke="' + SERIES[i] + '" stroke-width="1.8" stroke-linejoin="round"/><circle cx="' + x(last[0]).toFixed(1) + '" cy="' + y(last[1]).toFixed(1) + '" r="2.6" fill="' + SERIES[i] + '"/>';
     }).join("");
-    var legend = series.slice(0, 6).map(function (s, i) { var last = s.points[s.points.length - 1][1]; return '<span><i style="background:' + SERIES[i] + '"></i>' + esc(s.label) + " " + esc(fmtUnit(last, panel.unit)) + "</span>"; }).join("");
-    return '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(panel.title) + '">' + grid + axis + lines + '</svg><div class="legend">' + legend + "</div>";
+    var legend = series.map(function (s, i) { var last = s.points[s.points.length - 1][1]; return '<span><i style="background:' + SERIES[i] + '"></i>' + esc(s.label) + " " + esc(fmtUnit(last, panel.unit)) + "</span>"; }).join("");
+    return '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(panel.title) + '">' + grid + axis + lines + '</svg><div class="legend">' + legend + (hidden ? "<span>+" + hidden + " more in Grafana</span>" : "") + "</div>";
   }
   function renderDashboard(snap) {
     if (!snap || !snap.panels) {

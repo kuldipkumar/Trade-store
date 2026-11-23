@@ -270,7 +270,9 @@ Error bodies are always `application/json` (the content type is preset), so a cl
 
 Test names follow `should_<behaviour>_when_<condition>` and reference the AC ID in a comment.
 
-## 10. Design decisions (accepted by the human on 2026-11-20)
+## 10. Design decisions
+
+D1 to D7 were accepted by the human on 2026-11-20 and D10 on 2026-11-23; D8 and D9 are recorded in the [test review](06-test-review.md).
 
 | ID | Decision | Context |
 |----|----------|---------------------|
