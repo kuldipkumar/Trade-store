@@ -125,7 +125,7 @@ CREATE TABLE trades (
 CREATE INDEX idx_trades_unexpired_maturity ON trades (maturity_date) WHERE expired = FALSE;
 """
 
-    def test_reads_tables_columns_and_indexes_from_a_migration(self):
+    def test_should_readTablesColumnsAndIndexes_when_aMigrationIsParsed(self):
         tables = portal_data.parse_sql(self.SQL)
 
         self.assertEqual([t["name"] for t in tables], ["trades"])
@@ -137,12 +137,33 @@ CREATE INDEX idx_trades_unexpired_maturity ON trades (maturity_date) WHERE expir
                                               "where": "expired = FALSE",
                                               "comment": "The expiry job only scans unexpired trades (A-52)."}])
 
-    def test_reads_mongo_index_keys_and_names(self):
-        source = """audit.createIndex(new Index().on("outcome", Direction.ASC).on("eventTimestamp", Direction.ASC)
-                .on("_id", Direction.ASC).named("outcome_eventTimestamp_id"));"""
+    def test_should_skipTableConstraintsAndComments_when_theyAreNotColumns(self):
+        # Code review of PR #70
+        sql = """CREATE TABLE pairs (
+    a   INTEGER NOT NULL,
+    -- the second half
+    b   INTEGER NOT NULL,
+    PRIMARY KEY (a, b),
+    CONSTRAINT positive CHECK (a > 0)
+);
+CREATE INDEX idx_pairs_lower ON pairs (lower(a::text));
+"""
+        tables = portal_data.parse_sql(sql)
 
-        self.assertEqual(portal_data.parse_mongo_indexes(source),
-                         [{"name": "outcome_eventTimestamp_id", "keys": ["outcome", "eventTimestamp", "_id"]}])
+        self.assertEqual([c["name"] for c in tables[0]["columns"]], ["a", "b"])
+        self.assertEqual(tables[0]["indexes"][0]["columns"], "lower(a::text)")
+
+    def test_should_groupMongoIndexesByTheCollectionTheyAreCreatedOn_when_theInitializerIsParsed(self):
+        # Code review of PR #70: by the receiver of createIndex, not by guessing from names
+        source = """var audit = mongo.indexOps(MongoAuditEventStore.COLLECTION);
+        audit.createIndex(new Index().on("outcome", Direction.ASC).on("eventTimestamp", Direction.ASC)
+                .on("_id", Direction.ASC).named("outcome_eventTimestamp_id"));
+        mongo.indexOps(MongoTradeHistoryStore.COLLECTION).createIndex(new Index()
+                .on("tradeId", Direction.ASC).named("history_by_trade"));"""
+
+        self.assertEqual(portal_data.parse_mongo_indexes(source), [
+            {"store": "MongoAuditEventStore", "name": "outcome_eventTimestamp_id", "keys": ["outcome", "eventTimestamp", "_id"]},
+            {"store": "MongoTradeHistoryStore", "name": "history_by_trade", "keys": ["tradeId"]}])
 
 
 class StatusTest(unittest.TestCase):
