@@ -1,6 +1,6 @@
 # Trade Store
 
-**Project portal: https://kuldipkumar.github.io/Trade-store/** shows the whole journey in one view, from the BRD and backlog to tests, design, the live pipeline, code, security scans and observability.
+**Project portal: https://kuldipkumar.github.io/Trade-store/** shows the whole journey in one view, from the BRD and backlog to tests, design, the database, the live pipeline, code, security scans and the observability dashboard. The REST API reference (Swagger UI) is at **https://kuldipkumar.github.io/Trade-store/api.html**.
 
 ## Overview
 
@@ -155,7 +155,7 @@ All 54 assumptions, each agreed with the product owner, are in [ASSUMPTIONS.md](
 - **The audit report's counts and its page come from two reads,** so the counts can lag by one entry that is relayed in between.
 - **The DLT holds the message as text.** Bytes that aren't valid UTF-8 are not kept exactly, and oversized messages are truncated.
 - **A CSV export client that stops reading for more than 10 minutes** hits MongoDB's idle cursor timeout. Exports may run for up to 30 minutes (`TRADE_STORE_EXPORT_TIMEOUT`).
-- **It runs as a single instance with no authentication.** Everything is behind the readiness and metrics endpoints only.
+- **Security controls are out of scope for this PoC** (decision D10, agreed 2026-11-23): there is no authentication, authorisation or TLS, and it runs as a single instance. The CodeQL, Trivy and ZAP scans still run and report on every change.
 
 ## Future improvements
 

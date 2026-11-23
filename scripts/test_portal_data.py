@@ -111,6 +111,61 @@ class PerformanceDateTest(unittest.TestCase):
         self.assertEqual(portal_data.parse_performance(text)["burstSeconds"], 8.1)
 
 
+class SchemaTest(unittest.TestCase):
+
+    SQL = """
+-- Latest version of each trade: the system of record (A-36).
+CREATE TABLE trades (
+    trade_id         VARCHAR(64) PRIMARY KEY,
+    version          INTEGER     NOT NULL CHECK (version >= 1),
+    expired          BOOLEAN     NOT NULL DEFAULT FALSE
+);
+
+-- The expiry job only scans unexpired trades (A-52).
+CREATE INDEX idx_trades_unexpired_maturity ON trades (maturity_date) WHERE expired = FALSE;
+"""
+
+    def test_should_readTablesColumnsAndIndexes_when_aMigrationIsParsed(self):
+        tables = portal_data.parse_sql(self.SQL)
+
+        self.assertEqual([t["name"] for t in tables], ["trades"])
+        trades = tables[0]
+        self.assertEqual(trades["comment"], "Latest version of each trade: the system of record (A-36).")
+        self.assertEqual(trades["columns"][0], {"name": "trade_id", "type": "VARCHAR(64)", "constraints": "PRIMARY KEY"})
+        self.assertEqual(trades["columns"][1]["constraints"], "NOT NULL CHECK (version >= 1)")
+        self.assertEqual(trades["indexes"], [{"name": "idx_trades_unexpired_maturity", "columns": "maturity_date",
+                                              "where": "expired = FALSE",
+                                              "comment": "The expiry job only scans unexpired trades (A-52)."}])
+
+    def test_should_skipTableConstraintsAndComments_when_theyAreNotColumns(self):
+        # Code review of PR #70
+        sql = """CREATE TABLE pairs (
+    a   INTEGER NOT NULL,
+    -- the second half
+    b   INTEGER NOT NULL,
+    PRIMARY KEY (a, b),
+    CONSTRAINT positive CHECK (a > 0)
+);
+CREATE INDEX idx_pairs_lower ON pairs (lower(a::text));
+"""
+        tables = portal_data.parse_sql(sql)
+
+        self.assertEqual([c["name"] for c in tables[0]["columns"]], ["a", "b"])
+        self.assertEqual(tables[0]["indexes"][0]["columns"], "lower(a::text)")
+
+    def test_should_groupMongoIndexesByTheCollectionTheyAreCreatedOn_when_theInitializerIsParsed(self):
+        # Code review of PR #70: by the receiver of createIndex, not by guessing from names
+        source = """var audit = mongo.indexOps(MongoAuditEventStore.COLLECTION);
+        audit.createIndex(new Index().on("outcome", Direction.ASC).on("eventTimestamp", Direction.ASC)
+                .on("_id", Direction.ASC).named("outcome_eventTimestamp_id"));
+        mongo.indexOps(MongoTradeHistoryStore.COLLECTION).createIndex(new Index()
+                .on("tradeId", Direction.ASC).named("history_by_trade"));"""
+
+        self.assertEqual(portal_data.parse_mongo_indexes(source), [
+            {"store": "MongoAuditEventStore", "name": "outcome_eventTimestamp_id", "keys": ["outcome", "eventTimestamp", "_id"]},
+            {"store": "MongoTradeHistoryStore", "name": "history_by_trade", "keys": ["tradeId"]}])
+
+
 class StatusTest(unittest.TestCase):
 
     def test_keeps_the_newest_run_of_each_portal_workflow(self):

@@ -156,6 +156,22 @@ jobs:
       - name: Observability profile (Prometheus scrapes, Grafana dashboard loads)
         run: scripts/observability-smoke.sh
 
+      # The Grafana panels, evaluated after a short demo load, for the portal's dashboard view (US-604.2).
+      # Runs before the ZAP scan so the charts show the demo traffic, not scanner noise.
+      - name: Dashboard snapshot for the portal
+        run: |
+          scripts/demo-load.sh 10
+          sleep 12   # two more scrapes
+          python3 scripts/observability_snapshot.py --prometheus http://localhost:9090 --minutes 3 --out observability-snapshot.json
+
+      - name: Upload dashboard snapshot
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: observability
+          if-no-files-found: warn
+          path: observability-snapshot.json
+
       # DAST (A-47): OWASP ZAP API scan of the running app, driven by the OpenAPI contract
       - name: OWASP ZAP API scan
         run: |

@@ -647,10 +647,11 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (job) (increase(trade_job_failures_total[1h]))",
-          "legendFormat": "{{job}}"
+          "expr": "sum by (exported_job) (increase(trade_job_failures_total[1h]))",
+          "legendFormat": "{{exported_job}}"
         }
-      ]
+      ],
+      "description": "The metric's own job label (expiry, outbox-relay) is stored as exported_job, because Prometheus reserves job for the scrape target."
     },
     {
       "id": 15,

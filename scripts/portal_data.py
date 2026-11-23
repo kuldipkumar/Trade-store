@@ -256,6 +256,68 @@ def security(reports):
     return result
 
 
+def parse_sql(text):
+    """Tables (with the comment above them, columns and constraints) and their indexes, from a Flyway migration."""
+    tables, by_name = [], {}
+    for m in re.finditer(r"((?:^--[^\n]*\n)*)CREATE TABLE (\w+) \((.*?)\n\);", text, re.M | re.S):
+        columns = []
+        for line in m.group(3).strip().splitlines():
+            entry = line.strip()
+            if not entry or entry.startswith("--") or re.match(r"(PRIMARY KEY|CONSTRAINT|UNIQUE|CHECK|FOREIGN KEY)\b", entry, re.I):
+                continue   # table-level constraints and comments are not columns
+            parts = entry.rstrip(",").split(None, 2)
+            if len(parts) >= 2:
+                columns.append({"name": parts[0], "type": parts[1], "constraints": parts[2] if len(parts) > 2 else ""})
+        table = {"name": m.group(2), "comment": _comment(m.group(1)), "columns": columns, "indexes": []}
+        tables.append(table)
+        by_name[table["name"]] = table
+    for m in re.finditer(r"((?:^--[^\n]*\n)*)CREATE (?:UNIQUE )?INDEX (\w+) ON (\w+) \((.*?)\)(?: WHERE ([^;]+))?;$", text, re.M):
+        if m.group(3) in by_name:
+            by_name[m.group(3)]["indexes"].append({"name": m.group(2), "columns": m.group(4),
+                                                   "where": (m.group(5) or "").strip(), "comment": _comment(m.group(1))})
+    return tables
+
+
+def _comment(block):
+    return " ".join(line.lstrip("-").strip() for line in block.strip().splitlines()).strip()
+
+
+def parse_mongo_indexes(source):
+    """Indexes with the store whose collection they are created on: `var x = mongo.indexOps(Store.COLLECTION)`
+    then `x.createIndex(...)`, or `mongo.indexOps(Store.COLLECTION).createIndex(...)`."""
+    variables = dict(re.findall(r"var (\w+) = \w+\.indexOps\((\w+)\.COLLECTION\)", source))
+    found = []
+    for m in re.finditer(r"(\w+|\w+\.indexOps\((\w+)\.COLLECTION\))\.createIndex\((new Index\(\).*?)\);", source, re.S):
+        store = m.group(2) or variables.get(m.group(1), "")
+        keys = re.findall(r'\.on\("(\w+)"', m.group(3))
+        name = re.search(r'\.named\("(\w+)"\)', m.group(3))
+        found.append({"store": store, "name": name.group(1) if name else "", "keys": keys})
+    return found
+
+
+def database():
+    """PostgreSQL tables from the migrations; MongoDB collections from the store adapters and the index initializer."""
+    tables = []
+    migrations = sorted(glob.glob("src/main/resources/db/migration/V*__*.sql"))
+    for path in migrations:
+        for table in parse_sql(read(path)):
+            table["migration"] = path
+            tables.append(table)
+    init = read("src/main/java/com/tradestore/persistence/nosql/MongoIndexInitializer.java")
+    indexes = parse_mongo_indexes(init)
+    collections = []
+    for store, name, purpose in (
+            ("MongoAuditEventStore", "audit_events", "Append-only audit trail: one entry per outcome (ACCEPTED, REPLACED, REJECTED, EXPIRED, POISON, FAILED)"),
+            ("MongoTradeHistoryStore", "trade_history", "Every accepted version of each trade, for GET /trades/{id}/history")):
+        path = f"src/main/java/com/tradestore/persistence/nosql/{store}.java"
+        source = read(path)
+        fields = ["_id"] + [f for f in dict.fromkeys(re.findall(r'append\("(\w+)"', source)) if f not in ("reason", "field", "message")]
+        collections.append({"name": name, "purpose": purpose, "fields": fields, "store": path,
+                            "indexes": [{"name": i["name"], "keys": i["keys"]} for i in indexes if i["store"] == store]})
+    return {"tables": tables, "migrations": migrations, "collections": collections, "indexInitializer":
+            "src/main/java/com/tradestore/persistence/nosql/MongoIndexInitializer.java"}
+
+
 def git_sha():
     try:
         return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
@@ -292,6 +354,7 @@ def build(reports):
         "design": design(),
         "security": security(reports),
         "metrics": metrics(),
+        "database": database(),
         "performance": performance(reports),
     }
 
