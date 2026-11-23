@@ -14,6 +14,8 @@ import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -23,14 +25,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.awaitility.core.ConditionTimeoutException;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.kafka.core.KafkaTemplate;
 
 /**
- * US-605: performance baseline (A-41) on a single instance with Testcontainers. Runs only with
+ * US-605: performance baseline (A-41) on a single instance with Testcontainers, driven by the shared load file
+ * loadtest/trades-10k.csv (the same file scripts/load_trades.py streams in demos). Runs only with
  * {@code -Pperformance} (the *PT suffix keeps it out of the normal suite); the summary goes to
  * target/performance/summary.md, uploaded by the on-demand workflow.
  */
@@ -38,28 +42,71 @@ import org.springframework.kafka.core.KafkaTemplate;
 class PerformanceBaselinePT {
 
     private static final Path SUMMARY = Path.of("target/performance/summary.md");
-    private static final int BURST = 10_000;
+    private static final Path TRADES = Path.of("loadtest/trades-10k.csv");
     private static final int RATE_PER_SECOND = 50;
     private static final int SECONDS = 60;
 
     private final KafkaTemplate<String, String> kafka;
-    private final JdbcClient jdbc;
+    private final MeterRegistry registry;
     private final int port;
 
-    PerformanceBaselinePT(KafkaTemplate<String, String> kafka, JdbcClient jdbc, @LocalServerPort int port) {
+    PerformanceBaselinePT(KafkaTemplate<String, String> kafka, MeterRegistry registry, @LocalServerPort int port) {
         this.kafka = kafka;
-        this.jdbc = jdbc;
+        this.registry = registry;
         this.port = port;
     }
 
-    private static String trade(String tradeId) {
-        return """
-                {"tradeId":"%s","version":1,"counterPartyId":"CP-1","bookId":"B1","maturityDate":"2099-05-20"}"""
-                .formatted(tradeId);
+    /** One row of loadtest/trades-10k.csv (scripts/generate_trades.py) with the outcome the store must produce. */
+    record Row(String tradeId, String version, String counterPartyId, String bookId, String maturityDate,
+               String expectedOutcome, String expectedReason, String raw) {
+
+        String key(String prefix) {
+            return prefix + tradeId;
+        }
+
+        String value(String prefix) {
+            return "POISON".equals(expectedOutcome) ? raw : """
+                    {"tradeId":"%s","version":%s,"counterPartyId":"%s","bookId":"%s","maturityDate":"%s"}"""
+                    .formatted(key(prefix), version, counterPartyId, bookId, maturityDate);
+        }
+
+        /** The REST status for this row's outcome (POISON is a malformed body over REST: 400). */
+        int restStatus() {
+            return switch (expectedOutcome + " " + expectedReason) {
+                case "ACCEPTED " -> 201;
+                case "REPLACED " -> 200;
+                case "REJECTED LOWER_VERSION" -> 409;
+                case "REJECTED MATURITY_IN_PAST" -> 422;
+                default -> 400;
+            };
+        }
     }
 
-    private long stored(String prefix) {
-        return jdbc.sql("SELECT count(*) FROM trades WHERE trade_id LIKE ?").param(prefix + "%").query(Long.class).single();
+    private static List<Row> rows() throws IOException {
+        return Files.readAllLines(TRADES).stream().skip(1).map(line -> line.split(",", -1))
+                .map(c -> new Row(c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8])).toList();
+    }
+
+    /** Trades processed so far, by outcome: the outcome counters plus dead letters (each row has at most one reason). */
+    private Map<String, Long> processed() {
+        Map<String, Long> counts = new TreeMap<>();
+        for (String outcome : List.of("ACCEPTED", "REPLACED", "REJECTED")) {
+            counts.put(outcome, (long) registry.find("trade.outcomes").tag("outcome", outcome).counters().stream()
+                    .mapToDouble(Counter::count).sum());
+        }
+        counts.put("POISON", (long) registry.find("trade.deadletter").tag("type", "POISON").counters().stream()
+                .mapToDouble(Counter::count).sum());
+        return counts;
+    }
+
+    private static Map<String, Long> delta(Map<String, Long> after, Map<String, Long> before) {
+        Map<String, Long> d = new TreeMap<>();
+        after.forEach((k, v) -> d.put(k, v - before.getOrDefault(k, 0L)));
+        return d;
+    }
+
+    private static long total(Map<String, Long> counts) {
+        return counts.values().stream().mapToLong(Long::longValue).sum();
     }
 
     private static void summarise(String section) throws IOException {
@@ -76,35 +123,38 @@ class PerformanceBaselinePT {
     @Test
     @Tag("US-605.1")
     @Tag("US-605.3")
-    void should_storeEveryTradeWithin60Seconds_when_aBurstOf10000IsPublished() throws Exception {
-        // Arrange
+    void should_processEveryTradeOfTheFileWithin60Seconds_when_all10000ArePublishedAtOnce() throws Exception {
+        // Arrange: the shared load file, with fresh trade IDs for this run
+        List<Row> rows = rows();
+        Map<String, Long> expected = new TreeMap<>(rows.stream().collect(
+                java.util.stream.Collectors.groupingBy(Row::expectedOutcome, java.util.stream.Collectors.counting())));
         String prefix = "PERF-" + UUID.randomUUID().toString().substring(0, 8) + "-";
+        Map<String, Long> before = processed();
         long start = System.nanoTime();
 
-        // Act: publish the burst, then wait until every trade is stored
-        List<CompletableFuture<?>> sends = new ArrayList<>(BURST);
-        for (int i = 0; i < BURST; i++) {
-            String tradeId = prefix + i;
-            sends.add(kafka.send("trades.inbound", tradeId, trade(tradeId)));
+        // Act: publish every row keyed by tradeId, then wait until every one has an outcome
+        List<CompletableFuture<?>> sends = new ArrayList<>(rows.size());
+        for (Row row : rows) {
+            sends.add(kafka.send("trades.inbound", row.key(prefix), row.value(prefix)));
         }
         CompletableFuture.allOf(sends.toArray(CompletableFuture[]::new)).get(30, TimeUnit.SECONDS);
         try {
             await().atMost(Duration.ofSeconds(SECONDS)).pollInterval(Duration.ofMillis(250))
-                    .until(() -> stored(prefix) == BURST);
+                    .until(() -> total(delta(processed(), before)) >= rows.size());
         } catch (ConditionTimeoutException tooSlow) {
             // Fall through: the summary below records how far it got, then the assertions fail
         }
         double seconds = (System.nanoTime() - start) / 1e9;
-        long stored = stored(prefix);
+        Map<String, Long> actual = delta(processed(), before);
 
-        // Assert: the summary is written first, so a miss still leaves evidence (code review of PR #67)
+        // Assert: summary first, so a miss still leaves evidence; then zero loss and the exact outcome of every row
         summarise("""
-                ## US-605.1 Stream burst
-                | Trades | Stored | Seconds | Throughput (trades/s) | Target |
-                |---|---|---|---|---|
-                | %d | %d | %.1f | %.0f | all within 60 s, zero loss |
-                """.formatted(BURST, stored, seconds, stored / seconds));
-        assertThat(stored).isEqualTo(BURST);
+                ## US-605.1 Stream burst (loadtest/trades-10k.csv)
+                | Messages | Processed | Seconds | Throughput (msg/s) | Outcomes (expected → actual) | Target |
+                |---|---|---|---|---|---|
+                | %d | %d | %.1f | %.0f | %s → %s | all within 60 s, zero loss |
+                """.formatted(rows.size(), total(actual), seconds, total(actual) / seconds, expected, actual));
+        assertThat(actual).isEqualTo(expected);
         assertThat(seconds).isLessThan(SECONDS);
     }
 
@@ -112,8 +162,10 @@ class PerformanceBaselinePT {
     @Tag("US-605.2")
     @Tag("US-605.3")
     void should_keepP95LatencyUnder200ms_when_restSubmissionsRunAt50PerSecondFor60Seconds() throws Exception {
-        // Arrange
+        // Arrange: the first 3,000 rows of the shared load file, with fresh trade IDs
         String prefix = "PERF-REST-" + UUID.randomUUID().toString().substring(0, 8) + "-";
+        List<Row> rows = rows();
+        Map<String, CompletableFuture<Void>> lastPerTrade = new java.util.HashMap<>();
         HttpClient client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofSeconds(5)).build(); // no h2c upgrade attempt on plain HTTP
         ConcurrentLinkedQueue<Long> latenciesMicros = new ConcurrentLinkedQueue<>();
@@ -132,11 +184,18 @@ class PerformanceBaselinePT {
                 if (wait > 0) {
                     TimeUnit.NANOSECONDS.sleep(wait);
                 }
-                String tradeId = prefix + i;
-                workers.submit(() -> {
+                Row row = rows.get(i);
+                long slot = due;
+                Runnable call = () -> {
+                    // A chained row still waits for its own 20 ms slot, so the load stays open loop
+                    long early = slot - System.nanoTime();
+                    if (early > 0) {
+                        java.util.concurrent.locks.LockSupport.parkNanos(early);
+                    }
+                    boolean retried = false;
                     HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/trades"))
                             .header("Content-Type", "application/json")
-                            .POST(HttpRequest.BodyPublishers.ofString(trade(tradeId))).build();
+                            .POST(HttpRequest.BodyPublishers.ofString(row.value(prefix))).build();
                     long sent = System.nanoTime();
                     try {
                         HttpResponse<Void> response;
@@ -146,22 +205,33 @@ class PerformanceBaselinePT {
                             if (!isStaleConnection(failed)) {
                                 throw failed;
                             }
-                            // Keep-alive race: the server closed a pooled connection as the request went out, so it
-                            // never arrived. Retried once like any HTTP client; safe because the same version replaces.
+                            // Keep-alive race: the server closed a pooled connection as the request went out. Retried
+                            // once like any HTTP client. If the first attempt did arrive, the retry is a same-version
+                            // resend, so a new trade answers 200 instead of 201; that is accepted below.
                             retries.incrementAndGet();
+                            retried = true;
                             response = client.send(request, HttpResponse.BodyHandlers.discarding());
                         }
                         latenciesMicros.add((System.nanoTime() - sent) / 1_000);
-                        if (response.statusCode() != 201 && response.statusCode() != 200) {
+                        boolean resentNewTrade = retried && row.restStatus() == 201 && response.statusCode() == 200;
+                        if (response.statusCode() != row.restStatus() && !resentNewTrade) {
                             errors.incrementAndGet();
-                            errorKinds.add("HTTP " + response.statusCode());
+                            errorKinds.add(row.expectedOutcome() + " " + row.expectedReason() + ": expected "
+                                    + row.restStatus() + ", got " + response.statusCode());
                         }
-                    } catch (IOException | InterruptedException e) {
+                    } catch (IOException | InterruptedException | RuntimeException e) {
+                        // Any failure is counted, never thrown: a thrown error would break the trade's chain and
+                        // abort the test before the summary is written (code review of PR #71)
                         errors.incrementAndGet();
                         errorKinds.add(e.getClass().getSimpleName() + ": " + e.getMessage());
                     }
-                });
+                };
+                // A trade's versions go one after another (as keyed messages would); different trades overlap
+                lastPerTrade.compute(row.key(prefix), (key, previous) -> previous == null
+                        ? CompletableFuture.runAsync(call, workers) : previous.thenRunAsync(call, workers));
             }
+            // Every chained call must be submitted before the executor closes
+            CompletableFuture.allOf(lastPerTrade.values().toArray(CompletableFuture[]::new)).join();
         }
 
         // Assert: p95 under 200 ms and no failed request (A-41)

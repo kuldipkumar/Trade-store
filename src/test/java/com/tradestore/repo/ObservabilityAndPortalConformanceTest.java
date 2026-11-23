@@ -77,8 +77,10 @@ class ObservabilityAndPortalConformanceTest {
         // Act
         String ci = read(".github/workflows/ci.yml");
 
-        // Assert: demo load, then the dashboard's own queries are evaluated and published (before the ZAP scan)
-        assertThat(ci).contains("scripts/demo-load.sh").contains("scripts/observability_snapshot.py")
+        // Assert: the shared load file over both channels, then the dashboard's own queries (before the ZAP scan)
+        assertThat(ci).contains("scripts/load_trades.py").contains("loadtest/trades-10k.csv")
+                .contains("--channel rest").contains("/reports/audit?outcome=REJECTED").contains("/trades?size=")
+                .contains("scripts/observability_snapshot.py")
                 .contains("observability-snapshot.json");
         assertThat(ci.indexOf("observability_snapshot.py")).isLessThan(ci.indexOf("zap-api-scan.py"));
         assertThat(read(".github/workflows/portal.yml")).contains("observability-snapshot.json");

@@ -252,9 +252,9 @@ Chain: [Requirements.md](../Requirements.md) → requirements R-xx ([01-clarific
 
 | AC | Then | Tests | Code | Status |
 |----|------|-------|------|--------|
-| US-605.1 | All 10,000 are stored or audited within 60 s, with zero loss (A-41) | [PerformanceBaselinePT.should_storeEveryTradeWithin60Seconds_when_aBurstOf10000IsPublished](../src/test/java/com/tradestore/it/PerformanceBaselinePT.java) | | ▫ not run |
+| US-605.1 | All 10,000 are stored or audited within 60 s, with zero loss (A-41) | [PerformanceBaselinePT.should_processEveryTradeOfTheFileWithin60Seconds_when_all10000ArePublishedAtOnce](../src/test/java/com/tradestore/it/PerformanceBaselinePT.java) | | ▫ not run |
 | US-605.2 | p95 latency is under 200 ms (A-41) | [PerformanceBaselinePT.should_keepP95LatencyUnder200ms_when_restSubmissionsRunAt50PerSecondFor60Seconds](../src/test/java/com/tradestore/it/PerformanceBaselinePT.java) | | ▫ not run |
-| US-605.3 | A summary is saved as a build artifact. It runs on demand, not as a gate on every pull request (it would be too slow and unreliable on shared runners) | [PerformanceBaselinePT.should_storeEveryTradeWithin60Seconds_when_aBurstOf10000IsPublished](../src/test/java/com/tradestore/it/PerformanceBaselinePT.java), [PerformanceBaselinePT.should_keepP95LatencyUnder200ms_when_restSubmissionsRunAt50PerSecondFor60Seconds](../src/test/java/com/tradestore/it/PerformanceBaselinePT.java), [CiPipelineConformanceTest.should_runThePerformanceBaselineOnDemandAndUploadItsSummary_when_dispatched](../src/test/java/com/tradestore/repo/CiPipelineConformanceTest.java) | | ▫ not run |
+| US-605.3 | A summary is saved as a build artifact. It runs on demand, not as a gate on every pull request (it would be too slow and unreliable on shared runners) | [PerformanceBaselinePT.should_processEveryTradeOfTheFileWithin60Seconds_when_all10000ArePublishedAtOnce](../src/test/java/com/tradestore/it/PerformanceBaselinePT.java), [PerformanceBaselinePT.should_keepP95LatencyUnder200ms_when_restSubmissionsRunAt50PerSecondFor60Seconds](../src/test/java/com/tradestore/it/PerformanceBaselinePT.java), [CiPipelineConformanceTest.should_runThePerformanceBaselineOnDemandAndUploadItsSummary_when_dispatched](../src/test/java/com/tradestore/repo/CiPipelineConformanceTest.java) | | ▫ not run |
 
 ### US-606: One-command local run and container image (E6): 3 of 3 criteria tested
 

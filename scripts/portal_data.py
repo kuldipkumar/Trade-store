@@ -214,7 +214,7 @@ def metrics():
 
 def parse_performance(text):
     """The baseline figures and their date, from a performance summary or the README table."""
-    burst = re.search(r"Burst of 10,000 stream trades \| All stored in ([\d.]+) s", text)
+    burst = re.search(r"Burst of the 10,000-message trade file \| All processed in ([\d.]+) s", text)
     rest = re.search(r"REST at 50 requests/s for 60 s \| p50 ([\d.]+) ms, p95 ([\d.]+) ms, p99 ([\d.]+) ms", text)
     when = re.search(r"Testcontainers \((\d{4}-\d{2}-\d{2})\)", text)
     return {"burstSeconds": float(burst.group(1)) if burst else None,

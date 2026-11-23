@@ -160,7 +160,15 @@ jobs:
       # Runs before the ZAP scan so the charts show the demo traffic, not scanner noise.
       - name: Dashboard snapshot for the portal
         run: |
-          scripts/demo-load.sh 10
+          # The shared load file (loadtest/trades-10k.csv): 1,500 rows on the stream and 300 over REST, every outcome
+          python3 scripts/load_trades.py --file loadtest/trades-10k.csv --limit 1500 --rate 50
+          python3 scripts/load_trades.py --file loadtest/trades-10k.csv --channel rest --limit 300 --rate 20
+          # Read traffic too, so the query endpoints appear on the latency and status panels
+          for i in $(seq 1 40); do
+            curl -s -o /dev/null "localhost:8080/trades?size=20&page=$((i % 5))"
+            curl -s -o /dev/null "localhost:8080/reports/audit?outcome=REJECTED&size=20"
+            curl -s -o /dev/null "localhost:8080/trades/does-not-exist-$i"
+          done
           sleep 12   # two more scrapes
           python3 scripts/observability_snapshot.py --prometheus http://localhost:9090 --minutes 3 --out observability-snapshot.json
 
