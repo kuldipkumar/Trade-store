@@ -12,12 +12,15 @@ import collections
 import csv
 import datetime
 import json
+import os
+import secrets
 import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REST_STATUS = {("ACCEPTED", ""): 201, ("REPLACED", ""): 200, ("REJECTED", "LOWER_VERSION"): 409,
                ("REJECTED", "MATURITY_IN_PAST"): 422, ("REJECTED", "INVALID_FIELD"): 400, ("POISON", ""): 400}
 
@@ -28,6 +31,11 @@ def read_rows(path, limit=None):
             if limit is not None and i >= limit:
                 return
             yield row
+
+
+def default_prefix():
+    """Unique per run, even for runs started in the same second (date, time and a random suffix)."""
+    return "L" + datetime.datetime.now().strftime("%y%m%d%H%M%S") + secrets.token_hex(2) + "-"
 
 
 def to_message(row, prefix):
@@ -67,17 +75,21 @@ def send_stream(rows, prefix, rate, service, topic):
         ["docker", "compose", "exec", "-T", service, "/opt/kafka/bin/kafka-console-producer.sh",
          "--bootstrap-server", "localhost:9092", "--topic", topic,
          "--property", "parse.key=true", "--property", "key.separator=|"],
-        stdin=subprocess.PIPE, text=True)
+        stdin=subprocess.PIPE, text=True, cwd=ROOT)
     pacer, sent, last_flush = Pacer(rate), collections.Counter(), time.monotonic()
-    for row in rows:
-        pacer.wait()
-        key, value = to_message(row, prefix)
-        producer.stdin.write(f"{key}|{value}\n")
-        sent[(row["expectedOutcome"], row["expectedReason"])] += 1
-        if time.monotonic() - last_flush > 0.2:
-            producer.stdin.flush()
-            last_flush = time.monotonic()
-    producer.stdin.close()
+    try:
+        for row in rows:
+            pacer.wait()
+            key, value = to_message(row, prefix)
+            producer.stdin.write(f"{key}|{value}\n")
+            sent[(row["expectedOutcome"], row["expectedReason"])] += 1
+            if time.monotonic() - last_flush > 0.2:
+                producer.stdin.flush()
+                last_flush = time.monotonic()
+        producer.stdin.close()
+    except (BrokenPipeError, OSError):
+        producer.kill()
+        raise SystemExit("The Kafka console producer stopped; is the stack up (docker compose up -d)?")
     if producer.wait() != 0:
         raise SystemExit("The Kafka console producer failed; is the stack up (docker compose up -d)?")
     return sent, collections.Counter()
@@ -103,7 +115,7 @@ def send_rest(rows, prefix, rate, api):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--file", default="loadtest/trades-10k.csv")
+    parser.add_argument("--file", default=os.path.join(ROOT, "loadtest", "trades-10k.csv"))
     parser.add_argument("--channel", choices=["stream", "rest"], default="stream")
     parser.add_argument("--rate", type=float, default=None, help="messages per second (default 500 stream, 50 REST; 0 = no limit)")
     parser.add_argument("--limit", type=int, default=None, help="send only the first N rows")
@@ -113,7 +125,7 @@ def main():
     parser.add_argument("--topic", default="trades.inbound")
     args = parser.parse_args()
     rate = args.rate if args.rate is not None else (500 if args.channel == "stream" else 50)
-    prefix = args.prefix or "L" + datetime.datetime.now().strftime("%m%d%H%M%S") + "-"
+    prefix = args.prefix or default_prefix()
     started = time.monotonic()
     rows = read_rows(args.file, args.limit)
     if args.channel == "stream":

@@ -1,6 +1,6 @@
 """Generates loadtest/trades-10k.csv: 10,000 trade messages with a known mix of outcomes (US-605).
 
-Each trade's rows are in version order and trades are interleaved at random, so the file behaves like a real stream
+Stored trades mature in 2090-2099, so the file stays valid for decades. Each trade's rows are in version order and trades are interleaved at random, so the file behaves like a real stream
 keyed by tradeId. Every row records the outcome the store must produce. Deterministic for a given seed.
 Usage: python3 scripts/generate_trades.py [--seed 42] [--out loadtest/trades-10k.csv]
 """
@@ -31,7 +31,7 @@ def generate(seed=42):
     lower = set(rng.sample(sorted(higher), LOWER))
     same = set(rng.sample(base, SAME))
     for tid in base:
-        maturity = _date(rng, "2028-01-01", "2032-12-31")
+        maturity = _date(rng, "2090-01-01", "2099-12-31")
         rows = [dict(_trade(rng, tid, 1, maturity), expectedOutcome="ACCEPTED", expectedReason="")]
         current = 1
         if tid in higher:
@@ -46,7 +46,7 @@ def generate(seed=42):
         streams.append([dict(_trade(rng, f"T{i:05d}", 1, _date(rng, "2012-01-01", "2025-12-31")),
                              expectedOutcome="REJECTED", expectedReason="MATURITY_IN_PAST")])
     for i in range(NEW + PAST + 1, NEW + PAST + INVALID + 1):
-        streams.append([dict(_trade(rng, f"T{i:05d}", 1, _date(rng, "2028-01-01", "2032-12-31"), book=""),
+        streams.append([dict(_trade(rng, f"T{i:05d}", 1, _date(rng, "2090-01-01", "2099-12-31"), book=""),
                              expectedOutcome="REJECTED", expectedReason="INVALID_FIELD")])
     for i in range(1, POISON + 1):
         streams.append([{"tradeId": f"P{i:05d}", "version": "", "counterPartyId": "", "bookId": "", "maturityDate": "",

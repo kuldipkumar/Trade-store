@@ -185,7 +185,14 @@ class PerformanceBaselinePT {
                     TimeUnit.NANOSECONDS.sleep(wait);
                 }
                 Row row = rows.get(i);
+                long slot = due;
                 Runnable call = () -> {
+                    // A chained row still waits for its own 20 ms slot, so the load stays open loop
+                    long early = slot - System.nanoTime();
+                    if (early > 0) {
+                        java.util.concurrent.locks.LockSupport.parkNanos(early);
+                    }
+                    boolean retried = false;
                     HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/trades"))
                             .header("Content-Type", "application/json")
                             .POST(HttpRequest.BodyPublishers.ofString(row.value(prefix))).build();
@@ -198,18 +205,23 @@ class PerformanceBaselinePT {
                             if (!isStaleConnection(failed)) {
                                 throw failed;
                             }
-                            // Keep-alive race: the server closed a pooled connection as the request went out, so it
-                            // never arrived. Retried once like any HTTP client; safe because the same version replaces.
+                            // Keep-alive race: the server closed a pooled connection as the request went out. Retried
+                            // once like any HTTP client. If the first attempt did arrive, the retry is a same-version
+                            // resend, so a new trade answers 200 instead of 201; that is accepted below.
                             retries.incrementAndGet();
+                            retried = true;
                             response = client.send(request, HttpResponse.BodyHandlers.discarding());
                         }
                         latenciesMicros.add((System.nanoTime() - sent) / 1_000);
-                        if (response.statusCode() != row.restStatus()) {
+                        boolean resentNewTrade = retried && row.restStatus() == 201 && response.statusCode() == 200;
+                        if (response.statusCode() != row.restStatus() && !resentNewTrade) {
                             errors.incrementAndGet();
                             errorKinds.add(row.expectedOutcome() + " " + row.expectedReason() + ": expected "
                                     + row.restStatus() + ", got " + response.statusCode());
                         }
-                    } catch (IOException | InterruptedException e) {
+                    } catch (IOException | InterruptedException | RuntimeException e) {
+                        // Any failure is counted, never thrown: a thrown error would break the trade's chain and
+                        // abort the test before the summary is written (code review of PR #71)
                         errors.incrementAndGet();
                         errorKinds.add(e.getClass().getSimpleName() + ": " + e.getMessage());
                     }
