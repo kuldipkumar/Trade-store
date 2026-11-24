@@ -18,6 +18,7 @@
     <description>Trade Store: ingests trades, enforces version/maturity rules, tracks expiry</description>
 
     <properties>
+        <opentelemetry-instrumentation.version>2.28.1-alpha</opentelemetry-instrumentation.version>
         <java.version>21</java.version>
         <jacoco-plugin.version>0.8.16</jacoco-plugin.version>
         <!-- Minimum line coverage (AGENTS.md section 5). The build fails below this. -->
@@ -39,6 +40,27 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <!-- Traces and logs over OTLP (US-604, ADR-012): Micrometer Tracing with the OpenTelemetry bridge -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-opentelemetry</artifactId>
+        </dependency>
+        <!-- OpenTelemetry instrumentation 2.28.1-alpha is the release built on OTel API 1.62, the version Boot 4.1 manages -->
+        <dependency>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-logback-appender-1.0</artifactId>
+            <version>${opentelemetry-instrumentation.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-jdbc</artifactId>
+            <version>${opentelemetry-instrumentation.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-mongo-3.1</artifactId>
+            <version>${opentelemetry-instrumentation.version}</version>
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
@@ -81,6 +103,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-testing</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
