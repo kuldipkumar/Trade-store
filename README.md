@@ -83,18 +83,25 @@ curl localhost:8080/actuator/prometheus | grep '^trade_'
 
 Settings live under `trade-store.*` ([LLD §6.4](docs/05-lld.md)). Every one can be overridden with an environment variable, for example `TRADE_STORE_TIME_ZONE=Asia/Kolkata`, `TRADE_STORE_EXPIRY_CRON`, `TRADE_STORE_RETRY_MAX_ATTEMPTS`, `TRADE_STORE_KAFKA_MAX_MESSAGE_BYTES`. Connections come from `POSTGRES_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `MONGODB_URI` and `KAFKA_BOOTSTRAP_SERVERS`. The compose defaults are for local use only.
 
-### Observability dashboard
+### Observability: metrics, traces and logs
+
+`docker compose up` also starts Prometheus (metrics, `:9090`), Tempo (traces, `:3200`), Loki (logs, `:3100`) and Grafana (`:3000`). Drive some traffic:
 
 ```bash
-docker compose --profile observability up --build -d   # adds Prometheus (localhost:9090) and Grafana (localhost:3000)
-python3 scripts/load_trades.py --rate 100               # streams loadtest/trades-10k.csv into Kafka
+python3 scripts/load_trades.py --rate 100   # streams loadtest/trades-10k.csv into Kafka
 ```
 
 Grafana opens on the provisioned **Trade Store** dashboard ([JSON](observability/grafana/dashboards/trade-store.json)). It shows:
 
-- outcomes per minute, rejections by reason, and outcomes by channel
-- trade-processing and HTTP latency (p50, p95, p99)
-- dead letters, retries, outbox backlog, consumer lag and scheduled-job failures
+- **Business outcomes:** outcomes per minute, rejections by reason, and outcomes by channel.
+- **Latency:** trade-processing and HTTP latency (p50, p95, p99). Each point carries an exemplar that opens its trace.
+- **Platform:** dead letters, retries, outbox backlog, consumer lag and scheduled-job failures.
+- **Logs and traces:** outcome and error log lines, each with a link to its trace, and the most recent trade traces.
+
+**One trade is one trace** ([ADR-012](docs/adr/012-traces-and-logs-with-opentelemetry.md)): the Kafka consume, `trade.ingest` (tagged with the trade ID, version, channel and outcome), each PostgreSQL statement, and about a second later the outbox relay's MongoDB inserts. The relay continues the trace through the `traceparent` stored in each outbox row.
+
+- **Find a trade's trace** in Tempo with TraceQL: `{ span.trade.id = "T00001" }`.
+- **Find its logs** in Loki: `{service_name="trade-store"} | trace_id="<id>"`.
 
 ### Load: the shared trade file
 

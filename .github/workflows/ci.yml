@@ -170,7 +170,8 @@ jobs:
             curl -s -o /dev/null "localhost:8080/trades/does-not-exist-$i"
           done
           sleep 12   # two more scrapes
-          python3 scripts/observability_snapshot.py --prometheus http://localhost:9090 --minutes 3 --out observability-snapshot.json
+          python3 scripts/observability_snapshot.py --prometheus http://localhost:9090 --minutes 3 \
+            --tempo http://localhost:3200 --loki http://localhost:3100 --out observability-snapshot.json
 
       - name: Upload dashboard snapshot
         if: always()

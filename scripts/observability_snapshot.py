@@ -45,6 +45,65 @@ def points(values):
     return kept
 
 
+def full_trace_id(trace_id):
+    """Tempo's search drops leading zeros; W3C trace IDs are 32 hex characters."""
+    return trace_id.rjust(32, "0")
+
+
+def _attributes(span):
+    return {a["key"]: next(iter(a["value"].values())) for a in span.get("attributes", [])}
+
+
+def simplify_trace(tempo):
+    """A Tempo trace (OTLP JSON) as a list of spans in start order, with depth and millisecond offsets."""
+    raw = [span for batch in tempo.get("batches", tempo.get("resourceSpans", []))
+           for scope in batch.get("scopeSpans", batch.get("instrumentationLibrarySpans", []))
+           for span in scope.get("spans", [])]
+    if not raw:
+        return []
+    by_id = {s["spanId"]: s for s in raw}
+    t0 = min(int(s["startTimeUnixNano"]) for s in raw)
+
+    def depth(span):
+        d, parent = 0, span.get("parentSpanId")
+        while parent in by_id:
+            d, parent = d + 1, by_id[parent].get("parentSpanId")
+        return d
+
+    spans = []
+    for s in sorted(raw, key=lambda x: int(x["startTimeUnixNano"])):
+        attrs = _attributes(s)
+        spans.append({"name": s["name"], "kind": s.get("kind", "").replace("SPAN_KIND_", ""), "depth": depth(s),
+                      "startMs": round((int(s["startTimeUnixNano"]) - t0) / 1e6, 1),
+                      "durationMs": round((int(s["endTimeUnixNano"]) - int(s["startTimeUnixNano"])) / 1e6, 2),
+                      "db": attrs.get("db.system", ""), "tradeId": attrs.get("trade.id", ""),
+                      "outcome": attrs.get("trade.outcome", "")})
+    return spans
+
+
+def get_json(url):
+    with urllib.request.urlopen(url, timeout=20) as response:
+        return json.load(response)
+
+
+def sample_trace(tempo, loki, minutes):
+    """The most recent trade trace that reached MongoDB, and its log lines from Loki."""
+    found = get_json(f"{tempo}/api/search?" + urllib.parse.urlencode({"q": '{name="outbox.relay"}', "limit": 1}))
+    if not found.get("traces"):
+        return None
+    trace_id = full_trace_id(found["traces"][0]["traceID"])
+    spans = simplify_trace(get_json(f"{tempo}/api/traces/{trace_id}"))
+    logs = []
+    if loki:
+        end = time.time()
+        result = get_json(f"{loki}/loki/api/v1/query_range?" + urllib.parse.urlencode({
+            "query": '{service_name="trade-store"} | trace_id="' + trace_id + '"',
+            "start": int((end - minutes * 60) * 1e9), "end": int(end * 1e9), "limit": 20}))
+        logs = sorted((v for stream in result["data"]["result"] for v in stream["values"]), key=lambda v: v[0])
+        logs = [{"ts": int(v[0]) // 1_000_000, "line": v[1]} for v in logs]
+    return {"traceId": trace_id, "spans": spans, "logs": logs}
+
+
 def query(base, path, params):
     url = f"{base}/api/v1/{path}?{urllib.parse.urlencode(params)}"
     with urllib.request.urlopen(url, timeout=20) as response:
@@ -83,11 +142,18 @@ def main():
     parser.add_argument("--prometheus", default="http://localhost:9090")
     parser.add_argument("--minutes", type=float, default=4)
     parser.add_argument("--out", default="observability-snapshot.json")
+    parser.add_argument("--tempo", help="Tempo URL, to include one trade's trace (e.g. http://localhost:3200)")
+    parser.add_argument("--loki", help="Loki URL, to include that trace's log lines (e.g. http://localhost:3100)")
     args = parser.parse_args()
     with open(DASHBOARD, encoding="utf-8") as f:
         dashboard = json.load(f)
     snapshot = {"takenAt": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "minutes": args.minutes, "dashboard": dashboard.get("title"), "panels": evaluate(args.prometheus, args.minutes, dashboard)}
+    if args.tempo:
+        try:
+            snapshot["trace"] = sample_trace(args.tempo, args.loki, args.minutes)
+        except (OSError, ValueError, KeyError) as failed:   # never blocks the snapshot
+            print(f"WARN no sample trace: {failed}")
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(snapshot, f)
     filled = sum(1 for p in snapshot["panels"] if p["series"])

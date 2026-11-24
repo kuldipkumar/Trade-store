@@ -9,8 +9,10 @@ node "Developer machine" as dev {
     node "kafka container" as kafkac <<KRaft, single broker>>
     database "postgres container" as pgc
     database "mongo container" as mongoc
-    node "prometheus container" as promc <<profile: observability>>
-    node "grafana container" as grafc <<profile: observability>>
+    node "prometheus container" as promc
+    node "tempo container" as tempoc <<traces>>
+    node "loki container" as lokic <<logs>>
+    node "grafana container" as grafc
   }
 }
 
@@ -51,5 +53,9 @@ codeql --> sectab : SARIF findings
 artifacts --> pages : Portal workflow publishes\npage + reports
 promc --> jar : scrape /actuator/prometheus
 grafc --> promc : PromQL
+jar --> tempoc : OTLP traces
+jar --> lokic : OTLP logs
+grafc --> tempoc : TraceQL
+grafc --> lokic : LogQL
 
 @enduml
