@@ -12,7 +12,7 @@ docker compose up -d --no-deps prometheus tempo loki grafana
 wait_for() {  # description, command
   local deadline=$((SECONDS + TIMEOUT))
   until eval "$2" > /dev/null 2>&1; do
-    if (( SECONDS > deadline )); then echo "Timed out waiting for: $1" >&2; docker compose --profile observability logs --tail 50 prometheus grafana >&2; exit 1; fi
+    if (( SECONDS > deadline )); then echo "Timed out waiting for: $1" >&2; docker compose logs --tail 50 prometheus tempo loki grafana >&2; exit 1; fi
     sleep 3
   done
   echo "OK: $1"

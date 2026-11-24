@@ -51,7 +51,7 @@ def full_trace_id(trace_id):
 
 
 def _attributes(span):
-    return {a["key"]: next(iter(a["value"].values())) for a in span.get("attributes", [])}
+    return {a["key"]: next(iter(a["value"].values()), "") for a in span.get("attributes", [])}
 
 
 def simplify_trace(tempo):

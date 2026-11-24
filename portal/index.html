@@ -589,7 +589,7 @@ python3 scripts/load_trades.py --rate 100   # 10,000-trade file</pre>
       ["Trivy dependency scan", "Trivy SCA", "critical"], ["Trivy full report", "Full SCA report"], ["Build Docker image", "Image build"],
       ["Trivy image scan", "Image scan", "critical"], ["Upload reports", "Reports"] ] },
     { name: "CI · run the stack", job: "docker compose smoke test", file: "ci.yml", nodes: [
-      ["Start the stack and wait for readiness", "Compose up + smoke", "ready"], ["Observability profile (Prometheus scrapes, Grafana dashboard loads)", "Prometheus + Grafana", "dashboard"], ["Dashboard snapshot for the portal", "Demo load + snapshot"], ["Upload dashboard snapshot", "Snapshot upload"], ["OWASP ZAP API scan", "ZAP DAST"], ["DAST gate (fails on any High risk alert)", "DAST gate", "high risk"],
+      ["Start the stack and wait for readiness", "Compose up + smoke", "ready"], ["Observability stack (Prometheus, Tempo, Loki, Grafana)", "Metrics, traces, logs", "all receive data"], ["Dashboard snapshot for the portal", "Demo load + snapshot"], ["Upload dashboard snapshot", "Snapshot upload"], ["OWASP ZAP API scan", "ZAP DAST"], ["DAST gate (fails on any High risk alert)", "DAST gate", "high risk"],
       ["Upload DAST report", "DAST report"], ["Stop the stack", "Tear down"] ] }
   ];
   var OTHER = [

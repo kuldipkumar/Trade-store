@@ -39,11 +39,13 @@ class TracingIT {
     private final InMemoryLogRecordExporter logs;
     private final RestTestClient rest;
     private final ApplicationContext context;
+    private final io.opentelemetry.sdk.trace.SdkTracerProvider tracerProvider;
 
     private final String tradeId = "TR-" + UUID.randomUUID();
 
     TracingIT(KafkaTemplate<String, String> kafka, InMemorySpanExporter spans, InMemoryLogRecordExporter logs, RestTestClient rest,
-              ApplicationContext context) {
+              ApplicationContext context, io.opentelemetry.sdk.trace.SdkTracerProvider tracerProvider) {
+        this.tracerProvider = tracerProvider;
         this.context = context;
         this.kafka = kafka;
         this.spans = spans;
@@ -187,6 +189,7 @@ class TracingIT {
         // Act: several relay polls (every second) and a Prometheus scrape, with no trade (code review of PR #72)
         rest.get().uri("/actuator/prometheus").exchange();
         await().pollDelay(Duration.ofSeconds(4)).atMost(Duration.ofSeconds(6)).until(() -> true);
+        tracerProvider.forceFlush().join(10, java.util.concurrent.TimeUnit.SECONDS);   // export what has finished
 
         // Assert: no empty traces crowd out the trade traces in Tempo
         assertThat(spans.getFinishedSpanItems()).filteredOn(s -> !s.getParentSpanContext().isValid())

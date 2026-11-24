@@ -708,7 +708,7 @@
     {
       "id": 16,
       "type": "logs",
-      "title": "Outcome and error log lines (open a line's Trace link)",
+      "title": "Outcome lines, warnings and errors (open a line's Trace link)",
       "gridPos": {
         "x": 0,
         "y": 40,
@@ -728,7 +728,15 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{service_name=\"trade-store\"} |~ \"outcome=|WARN|ERROR\"",
+          "expr": "{service_name=\"trade-store\"} |= \"outcome=\"",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "{service_name=\"trade-store\"} | detected_level=~\"warn|error\"",
           "datasource": {
             "type": "loki",
             "uid": "loki"

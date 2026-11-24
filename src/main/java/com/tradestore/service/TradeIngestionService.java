@@ -66,15 +66,20 @@ public class TradeIngestionService {
      */
     public IngestionResult ingest(TradeSubmission submission) {
         // One span per trade, tagged so Tempo can find it by trade ID (A-46, ADR-012)
-        return trace.inSpan("trade.ingest", null, tags -> {
+        Decision decision = trace.inSpan("trade.ingest", null, tags -> {
             tags.tag("trade.id", String.valueOf(submission.tradeId()));
             tags.tag("trade.version", String.valueOf(submission.version()));
             tags.tag("trade.channel", submission.channel().name());
             return ingestInSpan(submission, tags);
         });
+        // Thrown after the span has ended: a rejection is a normal outcome, not an error span
+        if (decision.rejection() != null) {
+            throw decision.rejection();
+        }
+        return decision.result();
     }
 
-    private IngestionResult ingestInSpan(TradeSubmission submission, TraceContext.SpanTags tags) {
+    private Decision ingestInSpan(TradeSubmission submission, TraceContext.SpanTags tags) {
         Timer.Sample timing = metrics.startProcessing();
         LocalDate today = LocalDate.now(clock);
         Decision decision = transactions.execute(status -> decide(submission, today));
@@ -83,10 +88,7 @@ public class TradeIngestionService {
         metrics.stopProcessing(timing, submission.channel());
         log.info("outcome={} tradeId={} version={} channel={} reasons={}",
                 decision.outcome(), submission.tradeId(), submission.version(), submission.channel(), decision.reasons());
-        if (decision.rejection() != null) {
-            throw decision.rejection();
-        }
-        return decision.result();
+        return decision;
     }
 
     private Decision decide(TradeSubmission submission, LocalDate today) {
