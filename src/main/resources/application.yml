@@ -32,6 +32,10 @@ server:
   shutdown: graceful
 
 management:
+  otlp:
+    metrics:
+      export:
+        enabled: false   # metrics stay on Prometheus (scraped); the OpenTelemetry starter would otherwise push them
   tracing:
     sampling:
       # Every trade is traced in this PoC; lower it (e.g. MANAGEMENT_TRACING_SAMPLING_PROBABILITY=0.1) under heavy load

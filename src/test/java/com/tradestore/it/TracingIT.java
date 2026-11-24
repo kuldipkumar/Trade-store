@@ -121,7 +121,9 @@ class TracingIT {
         // Assert: the relay (another thread, about a second later) joins the same trace; its MongoDB inserts are children
         await().atMost(TIMEOUT).untilAsserted(() -> {
             List<SpanData> trace = trace(ingest.getTraceId());
-            SpanData relay = trace.stream().filter(s -> s.getName().equals("outbox.relay")).findFirst().orElseThrow();
+            Optional<SpanData> relaySpan = trace.stream().filter(s -> s.getName().equals("outbox.relay")).findFirst();
+            assertThat(relaySpan).isPresent();
+            SpanData relay = relaySpan.get();
             assertThat(trace.stream().filter(s -> "mongodb".equals(dbSystem(s)) && s.getParentSpanId().equals(relay.getSpanId())))
                     .hasSizeGreaterThanOrEqualTo(2);   // audit_events and trade_history
         });
@@ -139,9 +141,11 @@ class TracingIT {
         await().atMost(TIMEOUT).untilAsserted(() -> assertThat(output.getOut().lines()
                 .filter(l -> l.contains("outcome=ACCEPTED tradeId=" + tradeId))).singleElement().asString().contains(ingest.getTraceId()));
         await().atMost(TIMEOUT).untilAsserted(() -> {
-            LogRecordData record = logs.getFinishedLogRecordItems().stream()
-                    .filter(r -> r.getBodyValue() != null && r.getBodyValue().asString().contains("tradeId=" + tradeId)).findFirst().orElseThrow();
-            assertThat(record.getSpanContext().getTraceId()).isEqualTo(ingest.getTraceId());
+            // assertThat, not orElseThrow: Awaitility retries assertion errors only
+            Optional<LogRecordData> record = logs.getFinishedLogRecordItems().stream()
+                    .filter(r -> r.getBodyValue() != null && r.getBodyValue().asString().contains("tradeId=" + tradeId)).findFirst();
+            assertThat(record).isPresent();
+            assertThat(record.get().getSpanContext().getTraceId()).isEqualTo(ingest.getTraceId());
         });
     }
 
