@@ -12,6 +12,7 @@ import com.tradestore.domain.Trade;
 import com.tradestore.domain.TradeRejectedException;
 import com.tradestore.domain.TradeSubmission;
 import com.tradestore.domain.Violation;
+import com.tradestore.observability.TraceContext;
 import com.tradestore.persistence.OutboxRepository;
 import com.tradestore.persistence.TradeRepository;
 import com.tradestore.persistence.UpsertResult;
@@ -44,10 +45,12 @@ public class TradeIngestionService {
     private final TransactionOperations transactions;
     private final Clock clock;
     private final TradeMetrics metrics;
+    private final TraceContext trace;
 
     public TradeIngestionService(CompositeTradeValidator validator, TradeRepository trades, OutboxRepository outbox,
                                  AuditEventFactory events, TransactionOperations transactions, Clock clock,
-                                 TradeMetrics metrics) {
+                                 TradeMetrics metrics, TraceContext trace) {
+        this.trace = trace;
         this.validator = validator;
         this.trades = trades;
         this.outbox = outbox;
@@ -62,9 +65,20 @@ public class TradeIngestionService {
      * @throws TradeRejectedException (or its subclass LowerVersionException) after the rejection is recorded
      */
     public IngestionResult ingest(TradeSubmission submission) {
+        // One span per trade, tagged so Tempo can find it by trade ID (A-46, ADR-012)
+        return trace.inSpan("trade.ingest", null, tags -> {
+            tags.tag("trade.id", String.valueOf(submission.tradeId()));
+            tags.tag("trade.version", String.valueOf(submission.version()));
+            tags.tag("trade.channel", submission.channel().name());
+            return ingestInSpan(submission, tags);
+        });
+    }
+
+    private IngestionResult ingestInSpan(TradeSubmission submission, TraceContext.SpanTags tags) {
         Timer.Sample timing = metrics.startProcessing();
         LocalDate today = LocalDate.now(clock);
         Decision decision = transactions.execute(status -> decide(submission, today));
+        tags.tag("trade.outcome", decision.outcome().name());
         metrics.recordOutcome(decision.outcome(), decision.reasons(), submission.channel());
         metrics.stopProcessing(timing, submission.channel());
         log.info("outcome={} tradeId={} version={} channel={} reasons={}",

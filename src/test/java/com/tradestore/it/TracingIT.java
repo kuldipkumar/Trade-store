@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.context.ApplicationContext;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.web.servlet.client.RestTestClient;
@@ -36,10 +37,13 @@ class TracingIT {
     private final InMemorySpanExporter spans;
     private final InMemoryLogRecordExporter logs;
     private final RestTestClient rest;
+    private final ApplicationContext context;
 
     private final String tradeId = "TR-" + UUID.randomUUID();
 
-    TracingIT(KafkaTemplate<String, String> kafka, InMemorySpanExporter spans, InMemoryLogRecordExporter logs, RestTestClient rest) {
+    TracingIT(KafkaTemplate<String, String> kafka, InMemorySpanExporter spans, InMemoryLogRecordExporter logs, RestTestClient rest,
+              ApplicationContext context) {
+        this.context = context;
         this.kafka = kafka;
         this.spans = spans;
         this.logs = logs;
@@ -155,5 +159,13 @@ class TracingIT {
         // Assert: a latency bucket links to a trace, so Grafana can jump from a slow point to its trace
         assertThat(metrics.lines().filter(l -> l.startsWith("trade_processing_seconds_bucket") && l.contains("trace_id=\"")))
                 .isNotEmpty();
+    }
+
+    @Test
+    @Tag("A-46")
+    void should_notPushMetricsOverOtlp_when_prometheusAlreadyScrapesThem() {
+        // Act + Assert: the OpenTelemetry starter brings an OTLP metrics registry that pushes to localhost:4318 every
+        // minute and logs a WARN when nothing listens; metrics stay on Prometheus only
+        assertThat(context.getBeanNamesForType(io.micrometer.registry.otlp.OtlpMeterRegistry.class)).isEmpty();
     }
 }

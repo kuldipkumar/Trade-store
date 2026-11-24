@@ -7,6 +7,8 @@ import java.util.UUID;
 
 import com.tradestore.domain.AuditEvent;
 import com.tradestore.persistence.OutboxBacklog;
+import com.tradestore.observability.TraceContext;
+import com.tradestore.persistence.OutboxEntry;
 import com.tradestore.persistence.OutboxRepository;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -17,20 +19,22 @@ import tools.jackson.databind.json.JsonMapper;
 public class JdbcOutboxRepository implements OutboxRepository {
 
     private static final String INSERT = """
-            INSERT INTO outbox_events (event_id, trade_id, outcome, payload, created_at)
-            VALUES (:eventId, :tradeId, :outcome, CAST(:payload AS jsonb), :createdAt)
+            INSERT INTO outbox_events (event_id, trade_id, outcome, payload, created_at, traceparent)
+            VALUES (:eventId, :tradeId, :outcome, CAST(:payload AS jsonb), :createdAt, :traceparent)
             """;
 
     private static final String CLAIM = """
-            SELECT payload FROM outbox_events ORDER BY id LIMIT :limit FOR UPDATE SKIP LOCKED
+            SELECT payload, traceparent FROM outbox_events ORDER BY id LIMIT :limit FOR UPDATE SKIP LOCKED
             """;
 
     private final JdbcClient jdbc;
     private final JsonMapper json;
+    private final TraceContext trace;
 
-    public JdbcOutboxRepository(JdbcClient jdbc, JsonMapper json) {
+    public JdbcOutboxRepository(JdbcClient jdbc, JsonMapper json, TraceContext trace) {
         this.jdbc = jdbc;
         this.json = json;
+        this.trace = trace;
     }
 
     @Override
@@ -41,14 +45,16 @@ public class JdbcOutboxRepository implements OutboxRepository {
                 .param("outcome", event.outcome().name())
                 .param("payload", json.writeValueAsString(event))
                 .param("createdAt", Timestamp.from(event.eventTimestamp()))
+                .param("traceparent", trace.currentTraceparent())
                 .update();
     }
 
     @Override
-    public List<AuditEvent> claimBatch(int limit) {
+    public List<OutboxEntry> claimBatch(int limit) {
         return jdbc.sql(CLAIM)
                 .param("limit", limit)
-                .query((rs, n) -> json.readValue(rs.getString("payload"), AuditEvent.class))
+                .query((rs, n) -> new OutboxEntry(json.readValue(rs.getString("payload"), AuditEvent.class),
+                        rs.getString("traceparent")))
                 .list();
     }
 

@@ -15,6 +15,7 @@ import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.Trade;
 import com.tradestore.domain.Violation;
 import com.tradestore.persistence.OutboxBacklog;
+import com.tradestore.persistence.OutboxEntry;
 import com.tradestore.persistence.OutboxRepository;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -67,7 +68,7 @@ class JdbcOutboxRepositoryIT {
             outbox.append(second);
 
             // Act
-            List<AuditEvent> claimed = outbox.claimBatch(1000);
+            List<AuditEvent> claimed = outbox.claimBatch(1000).stream().map(OutboxEntry::event).toList();
 
             // Assert: a full round trip through JSONB, in insertion order
             assertThat(claimed).filteredOn(e -> tradeId.equals(e.tradeId())).containsExactly(first, second);
@@ -86,7 +87,7 @@ class JdbcOutboxRepositoryIT {
             outbox.delete(List.of(event.eventId()));
 
             // Assert
-            assertThat(outbox.claimBatch(1000)).extracting(AuditEvent::eventId).doesNotContain(event.eventId());
+            assertThat(outbox.claimBatch(1000)).extracting(e -> e.event().eventId()).doesNotContain(event.eventId());
         });
     }
 
