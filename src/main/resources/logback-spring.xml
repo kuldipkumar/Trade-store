@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Console as Spring Boot defines it (with traceId and spanId in each line when tracing is on), plus OTLP export of
-     every log record with its trace context, for Loki (A-46, ADR-012). TelemetryConfig installs the OTLP appender. -->
+     every log record with its trace context, for Loki (A-46, ADR-012). TelemetryConfig installs the OTLP appender.
+     Logging goes to the console and OTLP only: this file replaces Boot's defaults, so logging.file.name is not used. -->
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
     <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
