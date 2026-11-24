@@ -77,5 +77,13 @@ class TraceSnapshotTest(unittest.TestCase):
                          "07cf97ac80e4be9c7a2476d247b56896")
 
 
+class EmptyAttributeTest(unittest.TestCase):
+
+    def test_should_readAnEmptyAttributeValueAsBlank_when_tempoSendsOne(self):
+        # Code review of PR #72: an empty OTLP value must not fail the snapshot
+        span = {"attributes": [{"key": "db.system", "value": {}}]}
+        self.assertEqual(observability_snapshot._attributes(span), {"db.system": ""})
+
+
 if __name__ == "__main__":
     unittest.main()

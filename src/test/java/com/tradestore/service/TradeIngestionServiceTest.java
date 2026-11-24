@@ -399,4 +399,21 @@ class TradeIngestionServiceTest {
                     .containsEntry("trade.channel", "REST").containsEntry("trade.outcome", "ACCEPTED");
         });
     }
+
+    @Test
+    @Tag("A-46")
+    void should_closeTheIngestSpanCleanly_when_aTradeIsRejected() {
+        // Arrange: a lower version, a normal business outcome (code review of PR #72)
+        when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 2, false)));
+        TradeSubmission v1 = new TradeSubmission("T1", 1, "CP-1", "B1", "2027-05-20", Channel.REST, "{}");
+
+        // Act
+        assertThatThrownBy(() -> service.ingest(v1)).isInstanceOf(LowerVersionException.class);
+
+        // Assert: the rejection is thrown after the span ends, so Tempo does not count it as an error
+        assertThat(trace.spans()).singleElement().satisfies(span -> {
+            assertThat(span.failed()).isFalse();
+            assertThat(span.tags()).containsEntry("trade.outcome", "REJECTED");
+        });
+    }
 }

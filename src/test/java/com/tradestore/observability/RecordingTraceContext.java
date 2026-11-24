@@ -10,7 +10,23 @@ import java.util.function.Function;
 public class RecordingTraceContext implements TraceContext {
 
     /** One recorded span. */
-    public record Recorded(String name, String parentTraceparent, Map<String, String> tags) {
+    public static final class Recorded {
+        private final String name;
+        private final String parentTraceparent;
+        private final Map<String, String> tags;
+        private boolean failed;
+
+        Recorded(String name, String parentTraceparent, Map<String, String> tags) {
+            this.name = name;
+            this.parentTraceparent = parentTraceparent;
+            this.tags = tags;
+        }
+
+        public String name() { return name; }
+        public String parentTraceparent() { return parentTraceparent; }
+        public Map<String, String> tags() { return tags; }
+        /** True when the work threw out of the span, which a real tracer records as an error span. */
+        public boolean failed() { return failed; }
     }
 
     private final List<Recorded> spans = new ArrayList<>();
@@ -27,7 +43,13 @@ public class RecordingTraceContext implements TraceContext {
     @Override
     public <T> T inSpan(String name, String parentTraceparent, Function<SpanTags, T> work) {
         Map<String, String> tags = new LinkedHashMap<>();
-        spans.add(new Recorded(name, parentTraceparent, tags));
-        return work.apply(tags::put);
+        Recorded recorded = new Recorded(name, parentTraceparent, tags);
+        spans.add(recorded);
+        try {
+            return work.apply(tags::put);
+        } catch (RuntimeException | Error failure) {
+            recorded.failed = true;
+            throw failure;
+        }
     }
 }

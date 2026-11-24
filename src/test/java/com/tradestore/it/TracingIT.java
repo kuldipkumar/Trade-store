@@ -14,6 +14,7 @@ import io.opentelemetry.sdk.logs.data.LogRecordData;
 import io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter;
 import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter;
 import io.opentelemetry.sdk.trace.data.SpanData;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,6 +49,13 @@ class TracingIT {
         this.spans = spans;
         this.logs = logs;
         this.rest = rest;
+    }
+
+    @BeforeEach
+    void clearExporters() {
+        // The exporters are shared by every IT context; start each test from empty (code review of PR #72)
+        spans.reset();
+        logs.reset();
     }
 
     private void publish() throws Exception {
@@ -171,5 +179,36 @@ class TracingIT {
         // Act + Assert: the OpenTelemetry starter brings an OTLP metrics registry that pushes to localhost:4318 every
         // minute and logs a WARN when nothing listens; metrics stay on Prometheus only
         assertThat(context.getBeanNamesForType(io.micrometer.registry.otlp.OtlpMeterRegistry.class)).isEmpty();
+    }
+
+    @Test
+    @Tag("A-46")
+    void should_notTraceIdleOutboxPollsOrMetricsScrapes_when_nothingHappens() {
+        // Act: several relay polls (every second) and a Prometheus scrape, with no trade (code review of PR #72)
+        rest.get().uri("/actuator/prometheus").exchange();
+        await().pollDelay(Duration.ofSeconds(4)).atMost(Duration.ofSeconds(6)).until(() -> true);
+
+        // Assert: no empty traces crowd out the trade traces in Tempo
+        assertThat(spans.getFinishedSpanItems()).filteredOn(s -> !s.getParentSpanContext().isValid())
+                .extracting(SpanData::getName).isEmpty();
+    }
+
+    @Test
+    @Tag("A-46")
+    void should_notMarkTheIngestSpanAsAnError_when_aTradeIsRejectedOnTheStream() throws Exception {
+        // Arrange: version 2 stored, then version 1 (lower version, a business rejection)
+        kafka.send("trades.inbound", tradeId, """
+                {"tradeId":"%s","version":2,"counterPartyId":"CP-1","bookId":"B1","maturityDate":"2099-05-20"}"""
+                .formatted(tradeId)).get();
+        publish();
+
+        // Act
+        SpanData rejected = await().atMost(TIMEOUT).until(() -> spans.getFinishedSpanItems().stream()
+                .filter(s -> s.getName().equals("trade.ingest") && tradeId.equals(s.getAttributes().get(TRADE_ID))
+                        && "REJECTED".equals(s.getAttributes().get(AttributeKey.stringKey("trade.outcome"))))
+                .findFirst(), Optional::isPresent).orElseThrow();
+
+        // Assert
+        assertThat(rejected.getStatus().getStatusCode()).isNotEqualTo(io.opentelemetry.api.trace.StatusCode.ERROR);
     }
 }
