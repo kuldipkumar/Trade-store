@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# US-604: the observability profile works: Prometheus scrapes the app and Grafana has the Trade Store dashboard.
+# US-604, ADR-012: the observability stack works: Prometheus scrapes the app, Tempo receives traces, Loki receives
+# logs, and Grafana has the Trade Store dashboard.
 # Run after the stack is up (CI: after `KEEP_UP=1 scripts/compose-smoke.sh`).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 TIMEOUT="${TIMEOUT:-180}"
 
-# --no-deps: leave the running app alone (recreating it would reset its counters)
-docker compose --profile observability up -d --no-deps prometheus grafana
+# Already started by `docker compose up`; --no-deps leaves the running app alone (recreating it resets counters)
+docker compose up -d --no-deps prometheus tempo loki grafana
 
 wait_for() {  # description, command
   local deadline=$((SECONDS + TIMEOUT))
@@ -26,3 +27,7 @@ wait_for "trade metrics are in Prometheus" \
   "curl -fsS 'http://localhost:9090/api/v1/query?query=trade_outcomes_total' | grep -q 'trade_outcomes_total'"
 wait_for "Grafana serves the Trade Store dashboard" \
   "curl -fsS 'http://localhost:3000/api/dashboards/uid/trade-store' | grep -q '\"title\":\"Trade Store\"'"
+wait_for "Tempo has a trade's full trace (consume, ingest, PostgreSQL, outbox relay, MongoDB)" \
+  "curl -fsS -G 'http://localhost:3200/api/search' --data-urlencode 'q={name=\"outbox.relay\"}' | grep -q traceID"
+wait_for "Loki has the outcome log lines" \
+  "curl -fsS -G 'http://localhost:3100/loki/api/v1/query_range' --data-urlencode 'query={service_name=\"trade-store\"} |= \"outcome=\"' | grep -q tradeId"
