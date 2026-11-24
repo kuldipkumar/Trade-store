@@ -17,7 +17,10 @@ import org.springframework.context.annotation.Import;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 // The daily expiry cron is off in ITs: tests run expiry explicitly, and a cron run at 00:05 could race them.
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "trade-store.expiry.cron=-")
+// The OTLP log queue (default 2,048 records, overflow is dropped) is enlarged: ITs forward every container's log lines
+// through the same pipeline, and a burst could drop the record TracingIT waits for.
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {"trade-store.expiry.cron=-",
+        "management.opentelemetry.logging.export.max-queue-size=100000"})
 @AutoConfigureMetrics // tests disable metrics exporters by default; we verify the real setup
 @AutoConfigureRestTestClient
 @Import(TestcontainersConfiguration.class)
