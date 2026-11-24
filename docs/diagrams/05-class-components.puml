@@ -63,7 +63,7 @@ package "service" {
     + expireMaturedTrades() : int
   }
   class OutboxRelayService {
-    + relayBatch() : int
+    + relayBatch() : int  (one outbox.relay span per event, continuing its trace)
   }
   class AuditReportService {
     + report(from : LocalDate, to : LocalDate, tradeId, outcome, page, size) : AuditReport
@@ -100,7 +100,7 @@ package "persistence" {
   }
   interface OutboxRepository {
     + append(event : AuditEvent)
-    + claimBatch(limit : int) : List<AuditEvent>
+    + claimBatch(limit : int) : List<OutboxEntry>  (event + traceparent, ADR-012)
     + delete(eventIds : List<String>)
     + backlog() : OutboxBacklog
     + pendingTradeIds(limit : int) : List<String>

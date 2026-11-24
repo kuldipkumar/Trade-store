@@ -4,6 +4,8 @@ import com.tradestore.config.ClockConfig;
 import com.tradestore.config.TradeStoreProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter;
+import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
@@ -47,6 +49,18 @@ public class TestcontainersConfiguration {
     @ServiceConnection
     KafkaContainer kafkaContainer() {
         return new KafkaContainer(DockerImageName.parse(KAFKA_IMAGE)).withLogConsumer(logsOf("kafka"));
+    }
+
+    /** Finished spans, kept in memory so tests can assert the traces (A-46, ADR-012). */
+    @Bean
+    InMemorySpanExporter inMemorySpanExporter() {
+        return InMemorySpanExporter.create();
+    }
+
+    /** Exported log records, kept in memory so tests can assert the OTLP log export (A-46, ADR-012). */
+    @Bean
+    InMemoryLogRecordExporter inMemoryLogRecordExporter() {
+        return InMemoryLogRecordExporter.create();
     }
 
     /** Replaces the application's Clock in ITs so a test can pin "today" (see MutableClock). */

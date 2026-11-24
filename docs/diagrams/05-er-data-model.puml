@@ -28,6 +28,7 @@ package "PostgreSQL (Flyway migration V2)" {
     * outcome : varchar(16)
     * payload : jsonb  (serialised AuditEvent)
     * created_at : timestamptz
+    traceparent : varchar(55)  (trace that wrote the row, ADR-012)
   }
 }
 

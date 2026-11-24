@@ -33,6 +33,8 @@ import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
 import com.tradestore.domain.TradeRejectedException;
 import com.tradestore.domain.TradeSubmission;
+import com.tradestore.observability.RecordingTraceContext;
+import com.tradestore.observability.TraceContext;
 import com.tradestore.persistence.OutboxRepository;
 import com.tradestore.persistence.TradeRepository;
 import com.tradestore.persistence.UpsertResult;
@@ -63,11 +65,12 @@ class TradeIngestionServiceTest {
     private final OutboxRepository outbox = mock(OutboxRepository.class);
     private final RecordingTransactions tx = new RecordingTransactions();
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
+    private final RecordingTraceContext trace = new RecordingTraceContext();
 
     private final TradeIngestionService service = new TradeIngestionService(
             new CompositeTradeValidator(List.of(new MandatoryFieldsValidator(), new PositiveVersionValidator(),
                     new MaturityDateFormatValidator(), new LowerVersionValidator(), new MaturityNotInPastValidator())),
-            trades, outbox, new AuditEventFactory(CLOCK, 10_000), tx, CLOCK, new TradeMetrics(registry));
+            trades, outbox, new AuditEventFactory(CLOCK, 10_000), tx, CLOCK, new TradeMetrics(registry), trace);
 
     /** Runs the callback directly and records whether it completed (i.e. would have committed). */
     static class RecordingTransactions implements TransactionOperations {
@@ -370,12 +373,47 @@ class TradeIngestionServiceTest {
         Clock kolkata = Clock.fixed(Instant.parse("2026-11-18T20:00:00Z"), ZoneId.of("Asia/Kolkata"));
         TradeIngestionService kolkataService = new TradeIngestionService(
                 new CompositeTradeValidator(List.of(new MaturityNotInPastValidator())),
-                trades, outbox, new AuditEventFactory(kolkata, 10_000), tx, kolkata, new TradeMetrics(registry));
+                trades, outbox, new AuditEventFactory(kolkata, 10_000), tx, kolkata, new TradeMetrics(registry), TraceContext.NONE);
         when(trades.findById("T1")).thenReturn(Optional.empty());
 
         // Act + Assert: local today is 2026-11-19, so a trade maturing on 2026-11-18 is in the past
         assertThatThrownBy(() -> kolkataService.ingest(withMaturityDate("2026-11-18")))
                 .isInstanceOf(TradeRejectedException.class)
                 .satisfies(e -> assertThat(((TradeRejectedException) e).reasons()).containsExactly(ReasonCode.MATURITY_IN_PAST));
+    }
+
+    @Test
+    @Tag("A-46")
+    void should_tagTheIngestSpanWithTheTradeAndItsOutcome_when_aTradeIsStored() {
+        // Arrange
+        when(trades.findById("T1")).thenReturn(Optional.empty());
+        when(trades.upsertIfNotOlder(org.mockito.ArgumentMatchers.any())).thenReturn(com.tradestore.persistence.UpsertResult.INSERTED);
+
+        // Act
+        service.ingest(validSubmission());
+
+        // Assert: Tempo finds the trace by trade ID; the outcome shows on the span (ADR-012)
+        assertThat(trace.spans()).singleElement().satisfies(span -> {
+            assertThat(span.name()).isEqualTo("trade.ingest");
+            assertThat(span.tags()).containsEntry("trade.id", "T1").containsEntry("trade.version", "1")
+                    .containsEntry("trade.channel", "REST").containsEntry("trade.outcome", "ACCEPTED");
+        });
+    }
+
+    @Test
+    @Tag("A-46")
+    void should_closeTheIngestSpanCleanly_when_aTradeIsRejected() {
+        // Arrange: a lower version, a normal business outcome (code review of PR #72)
+        when(trades.findById("T1")).thenReturn(Optional.of(new StoredTrade("T1", 2, false)));
+        TradeSubmission v1 = new TradeSubmission("T1", 1, "CP-1", "B1", "2027-05-20", Channel.REST, "{}");
+
+        // Act
+        assertThatThrownBy(() -> service.ingest(v1)).isInstanceOf(LowerVersionException.class);
+
+        // Assert: the rejection is thrown after the span ends, so Tempo does not count it as an error
+        assertThat(trace.spans()).singleElement().satisfies(span -> {
+            assertThat(span.failed()).isFalse();
+            assertThat(span.tags()).containsEntry("trade.outcome", "REJECTED");
+        });
     }
 }

@@ -17,6 +17,11 @@ spring:
     # Spring Boot 4 key (spring.data.mongodb.uri is no longer read)
     uri: ${MONGODB_URI:mongodb://localhost:27017/tradestore}
   kafka:
+    # Traces cross Kafka in the message headers (W3C traceparent): producer and consumer spans share a trace (ADR-012)
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
     consumer:
       group-id: trade-store
@@ -27,6 +32,16 @@ server:
   shutdown: graceful
 
 management:
+  otlp:
+    metrics:
+      export:
+        enabled: false   # metrics stay on Prometheus (scraped); the OpenTelemetry starter would otherwise push them
+  tracing:
+    sampling:
+      # Every trade is traced in this PoC; lower it (e.g. MANAGEMENT_TRACING_SAMPLING_PROBABILITY=0.1) under heavy load
+      probability: 1.0
+  # Traces and logs are exported over OTLP only when an endpoint is set (docker-compose.yml points them at Tempo
+  # and Loki): MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT, MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT
   metrics:
     distribution:
       # Buckets for p95/p99 in Prometheus/Grafana (histogram_quantile), US-604.2

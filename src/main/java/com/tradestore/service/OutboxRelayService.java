@@ -7,6 +7,8 @@ import com.tradestore.domain.AuditEvent;
 import com.tradestore.domain.Outcome;
 import com.tradestore.domain.TradeHistoryEntry;
 import com.tradestore.persistence.AuditEventStore;
+import com.tradestore.observability.TraceContext;
+import com.tradestore.persistence.OutboxEntry;
 import com.tradestore.persistence.OutboxRepository;
 import com.tradestore.persistence.TradeHistoryStore;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,34 +27,44 @@ public class OutboxRelayService {
     private final AuditEventStore audit;
     private final TradeHistoryStore history;
     private final int batchSize;
+    private final TraceContext trace;
 
     @Autowired
     public OutboxRelayService(OutboxRepository outbox, AuditEventStore audit, TradeHistoryStore history,
-                              TradeStoreProperties properties) {
-        this(outbox, audit, history, properties.outbox().batchSize());
+                              TradeStoreProperties properties, TraceContext trace) {
+        this(outbox, audit, history, properties.outbox().batchSize(), trace);
     }
 
-    OutboxRelayService(OutboxRepository outbox, AuditEventStore audit, TradeHistoryStore history, int batchSize) {
+    OutboxRelayService(OutboxRepository outbox, AuditEventStore audit, TradeHistoryStore history, int batchSize,
+                       TraceContext trace) {
         this.outbox = outbox;
         this.audit = audit;
         this.history = history;
         this.batchSize = batchSize;
+        this.trace = trace;
     }
 
     /** @return the number of events relayed */
     @Transactional
     public int relayBatch() {
-        List<AuditEvent> events = outbox.claimBatch(batchSize);
-        if (events.isEmpty()) {
+        List<OutboxEntry> entries = outbox.claimBatch(batchSize);
+        if (entries.isEmpty()) {
             return 0;
         }
-        for (AuditEvent event : events) {
-            audit.insert(event);
-            if (event.outcome() == Outcome.ACCEPTED || event.outcome() == Outcome.REPLACED) {
-                history.insert(TradeHistoryEntry.from(event));
-            }
+        for (OutboxEntry entry : entries) {
+            AuditEvent event = entry.event();
+            // Continues the trace of the transaction that wrote the row, so its MongoDB writes join that trade's trace
+            trace.inSpan("outbox.relay", entry.traceparent(), tags -> {
+                tags.tag("trade.id", String.valueOf(event.tradeId()));
+                tags.tag("trade.outcome", event.outcome().name());
+                audit.insert(event);
+                if (event.outcome() == Outcome.ACCEPTED || event.outcome() == Outcome.REPLACED) {
+                    history.insert(TradeHistoryEntry.from(event));
+                }
+                return null;
+            });
         }
-        outbox.delete(events.stream().map(AuditEvent::eventId).toList());
-        return events.size();
+        outbox.delete(entries.stream().map(e -> e.event().eventId()).toList());
+        return entries.size();
     }
 }

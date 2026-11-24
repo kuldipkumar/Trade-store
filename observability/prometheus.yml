@@ -1,4 +1,4 @@
-# Scrapes the Trade Store (docker compose --profile observability up). US-604.2
+# Scrapes the Trade Store (part of `docker compose up`). US-604.2
 global:
   scrape_interval: 5s
   evaluation_interval: 5s

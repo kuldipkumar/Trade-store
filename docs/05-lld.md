@@ -51,6 +51,7 @@ Base package: `com.tradestore`. The structure follows AGENTS.md §7. Services de
 | | `AuditCsvWriter` | Writes the CSV header and rows (RFC 4180 quoting). |
 | `scheduler` | `ExpiryScheduler` | `@Scheduled(cron, zone)` plus `@EventListener(ApplicationReadyEvent)` (US-203). |
 | | `OutboxRelayScheduler` | `@Scheduled(fixedDelayString = outbox.poll-interval)`. |
+| `observability` | `TraceContext`, `MicrometerTraceContext`, `TelemetryConfig` | The tracing port the use cases use (current `traceparent`, run work in a span), implemented on Micrometer Tracing (OpenTelemetry bridge); PostgreSQL and MongoDB span instrumentation; the Logback OTLP appender (ADR-012). |
 | `config` | `TradeStoreProperties` | `@ConfigurationProperties("trade-store")`, validated at startup (§6.4). |
 | | `ClockConfig` | `Clock.system(zone)`; the zone comes from `trade-store.time-zone`, or the server default if unset (A-16, US-205). |
 
@@ -250,7 +251,10 @@ Error bodies are always `application/json` (the content type is preset), so a cl
 | Counter | `trade_job_failures_total{job}`: failed runs of a scheduled job: `expiry` (each logged at ERROR) and `outbox-relay` (each logged at WARN; every `outbox.alert-after-failed-polls` consecutive failures, ERROR with the waiting trade IDs) |
 | Gauges | `trade_outbox_backlog_size`, `trade_outbox_oldest_age_seconds` |
 | Histograms | `trade.processing` and `http.server.requests` publish percentile buckets (`_bucket`), so dashboards compute p50/p95/p99 with `histogram_quantile` |
-| Dashboard | Prometheus + Grafana in the `observability` compose profile; provisioned dashboard `observability/grafana/dashboards/trade-store.json`, checked in CI by `scripts/observability-smoke.sh` |
+| Traces | One trace per trade (ADR-012): Kafka consume (W3C `traceparent` in message headers, producer to consumer), `trade.ingest` (attributes `trade.id`, `trade.version`, `trade.channel`, `trade.outcome`), every PostgreSQL statement, then `outbox.relay` and its MongoDB inserts as children of the ingest span via `outbox_events.traceparent`. Exported over OTLP to Tempo; sampling 1.0 (`MANAGEMENT_TRACING_SAMPLING_PROBABILITY`) |
+| Logs | Console lines carry `[traceId-spanId]`; every record is exported over OTLP to Loki with its trace and span IDs (structured metadata), so a log line opens its trace in Grafana |
+| Exemplars | The latency histograms carry trace IDs (OpenMetrics), so a dashboard point opens its trace |
+| Dashboard | Prometheus, Tempo, Loki and Grafana in the default compose stack (ADR-010, ADR-012); provisioned dashboard `observability/grafana/dashboards/trade-store.json`, checked in CI by `scripts/observability-smoke.sh` |
 | Timer (read side) | Read endpoints (`/trades…`, `/reports/audit`) are measured by Spring's `http_server_requests_seconds{uri,status}`; they have no business outcome to count, so no separate `trade.*` timer is added |
 | Kafka lag | Micrometer's Kafka client metrics (`kafka_consumer_fetch_manager_records_lag_max`) |
 | Health | `readiness` group = `readinessState`, `db`, `mongo`, `kafka` (`KafkaHealthIndicator`) (US-604.1); `liveness` = the application state only |

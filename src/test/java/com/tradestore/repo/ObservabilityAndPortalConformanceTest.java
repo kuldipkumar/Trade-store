@@ -14,13 +14,13 @@ class ObservabilityAndPortalConformanceTest {
 
     @Test
     @Tag("US-604.2")
-    void should_offerPrometheusAndAProvisionedGrafanaDashboard_when_theObservabilityProfileStarts() {
+    void should_offerPrometheusAndAProvisionedGrafanaDashboard_when_theStackStarts() {
         // Act
         String compose = read("docker-compose.yml");
         String dashboard = read("observability/grafana/dashboards/trade-store.json");
 
-        // Assert: opt-in profile, scraping the app, with the business panels (LLD section 8)
-        assertThat(compose).contains("profiles: [observability]").contains("prom/prometheus:").contains("grafana/grafana:");
+        // Assert: part of the default stack (the app always exports), scraping the app, with the business panels
+        assertThat(compose).doesNotContain("profiles: [observability]").contains("prom/prometheus:").contains("grafana/grafana:");
         assertThat(read("observability/prometheus.yml")).contains("/actuator/prometheus").contains("app:8080");
         for (String metric : List.of("trade_outcomes_total", "trade_processing_seconds_bucket", "trade_deadletter_total",
                 "trade_retries_total", "trade_outbox_backlog_size", "http_server_requests_seconds_bucket")) {
@@ -85,5 +85,25 @@ class ObservabilityAndPortalConformanceTest {
         assertThat(ci.indexOf("observability_snapshot.py")).isLessThan(ci.indexOf("zap-api-scan.py"));
         assertThat(read(".github/workflows/portal.yml")).contains("observability-snapshot.json");
         assertThat(read("portal/index.html")).contains("data/observability.json");
+    }
+
+    @Test
+    @Tag("A-46")
+    void should_sendTracesToTempoAndLogsToLokiAndLinkThemInGrafana_when_theStackStarts() {
+        // Act
+        String compose = read("docker-compose.yml");
+        String datasources = read("observability/grafana/provisioning/datasources/datasource.yml");
+        String dashboard = read("observability/grafana/dashboards/trade-store.json");
+
+        // Assert: the app exports over OTLP to Tempo and Loki (ADR-012)
+        assertThat(compose).contains("grafana/tempo:").contains("grafana/loki:")
+                .contains("MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: http://tempo:4318/v1/traces")
+                .contains("MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT: http://loki:3100/otlp/v1/logs")
+                .contains("--enable-feature=exemplar-storage");
+        // ... and Grafana links metrics -> traces (exemplars), logs -> traces (trace_id) and traces -> logs
+        assertThat(datasources).contains("type: tempo").contains("type: loki").contains("exemplarTraceIdDestinations")
+                .contains("derivedFields").contains("tracesToLogsV2");
+        assertThat(dashboard).contains("\"type\": \"logs\"").contains("\"type\": \"traces\"");
+        assertThat(read("scripts/observability-smoke.sh")).contains("localhost:3200/api/search").contains("localhost:3100/loki/api/v1/query_range");
     }
 }

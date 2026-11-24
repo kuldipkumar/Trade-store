@@ -1,10 +1,11 @@
 @startuml 05-seq-outbox-relay
-title Outbox relay: PostgreSQL outbox_events to MongoDB (ADR-005)
+title Outbox relay: PostgreSQL outbox_events to MongoDB (ADR-005), continuing each trade's trace (ADR-012)
 
 autonumber
 participant OutboxRelayScheduler
 participant OutboxRelayService
 participant OutboxRepository
+participant TraceContext
 database PostgreSQL
 participant AuditEventStore
 participant TradeHistoryStore
@@ -15,13 +16,14 @@ loop every outbox.poll-interval (default 1 s, fixed delay)
   activate OutboxRelayService
   OutboxRelayService -> PostgreSQL : BEGIN
   OutboxRelayService -> OutboxRepository : claimBatch(batch-size)
-  OutboxRepository -> PostgreSQL : SELECT ... FROM outbox_events ORDER BY id\nLIMIT ? FOR UPDATE SKIP LOCKED
-  OutboxRepository --> OutboxRelayService : List<AuditEvent> (ordered)
+  OutboxRepository -> PostgreSQL : SELECT payload, traceparent FROM outbox_events ORDER BY id\nLIMIT ? FOR UPDATE SKIP LOCKED
+  OutboxRepository --> OutboxRelayService : List<OutboxEntry> (event + traceparent, ordered)
 
   alt batch is empty
     OutboxRelayService -> PostgreSQL : COMMIT
   else events claimed
     loop each event, in id order
+      OutboxRelayService -> TraceContext : inSpan("outbox.relay", entry.traceparent)\n(child of the trade's ingest span; MongoDB spans nest under it)
       OutboxRelayService -> AuditEventStore : insert(event)  (_id = eventId)
       AuditEventStore -> MongoDB : insertOne audit_events
       alt duplicate key (relayed before a crash)

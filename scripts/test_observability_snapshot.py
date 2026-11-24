@@ -50,5 +50,40 @@ class SnapshotTest(unittest.TestCase):
         self.assertEqual(result[1]["series"], [{"label": "value", "value": 3.0}])
 
 
+class TraceSnapshotTest(unittest.TestCase):
+
+    TEMPO = {"batches": [{"resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "trade-store"}}]},
+                          "scopeSpans": [{"spans": [
+        {"spanId": "c", "parentSpanId": "b", "name": "INSERT tradestore.trades", "kind": "SPAN_KIND_CLIENT",
+         "startTimeUnixNano": "1002000000", "endTimeUnixNano": "1003500000",
+         "attributes": [{"key": "db.system", "value": {"stringValue": "postgresql"}}]},
+        {"spanId": "a", "name": "trades.inbound process", "kind": "SPAN_KIND_CONSUMER",
+         "startTimeUnixNano": "1000000000", "endTimeUnixNano": "1010000000", "attributes": []},
+        {"spanId": "b", "parentSpanId": "a", "name": "trade.ingest", "kind": "SPAN_KIND_INTERNAL",
+         "startTimeUnixNano": "1001000000", "endTimeUnixNano": "1009000000",
+         "attributes": [{"key": "trade.id", "value": {"stringValue": "T1"}}]}]}]}]}
+
+    def test_should_orderSpansByStartWithDepthAndOffsets_when_aTempoTraceIsSimplified(self):
+        spans = observability_snapshot.simplify_trace(self.TEMPO)
+
+        self.assertEqual([(s["name"], s["depth"], s["startMs"], s["durationMs"]) for s in spans],
+                         [("trades.inbound process", 0, 0.0, 10.0), ("trade.ingest", 1, 1.0, 8.0),
+                          ("INSERT tradestore.trades", 2, 2.0, 1.5)])
+        self.assertEqual(spans[2]["db"], "postgresql")
+        self.assertEqual(spans[1]["tradeId"], "T1")
+
+    def test_should_restoreTheLeadingZeros_when_tempoShortensATraceId(self):
+        self.assertEqual(observability_snapshot.full_trace_id("7cf97ac80e4be9c7a2476d247b56896"),
+                         "07cf97ac80e4be9c7a2476d247b56896")
+
+
+class EmptyAttributeTest(unittest.TestCase):
+
+    def test_should_readAnEmptyAttributeValueAsBlank_when_tempoSendsOne(self):
+        # Code review of PR #72: an empty OTLP value must not fail the snapshot
+        span = {"attributes": [{"key": "db.system", "value": {}}]}
+        self.assertEqual(observability_snapshot._attributes(span), {"db.system": ""})
+
+
 if __name__ == "__main__":
     unittest.main()

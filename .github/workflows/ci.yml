@@ -153,7 +153,7 @@ jobs:
       - name: Start the stack and wait for readiness
         run: KEEP_UP=1 scripts/compose-smoke.sh
 
-      - name: Observability profile (Prometheus scrapes, Grafana dashboard loads)
+      - name: Observability stack (Prometheus, Tempo, Loki, Grafana)
         run: scripts/observability-smoke.sh
 
       # The Grafana panels, evaluated after a short demo load, for the portal's dashboard view (US-604.2).
@@ -170,7 +170,8 @@ jobs:
             curl -s -o /dev/null "localhost:8080/trades/does-not-exist-$i"
           done
           sleep 12   # two more scrapes
-          python3 scripts/observability_snapshot.py --prometheus http://localhost:9090 --minutes 3 --out observability-snapshot.json
+          python3 scripts/observability_snapshot.py --prometheus http://localhost:9090 --minutes 3 \
+            --tempo http://localhost:3200 --loki http://localhost:3100 --out observability-snapshot.json
 
       - name: Upload dashboard snapshot
         if: always()
@@ -201,4 +202,4 @@ jobs:
 
       - name: Stop the stack
         if: always()
-        run: docker compose --profile observability down -v --remove-orphans
+        run: docker compose down -v --remove-orphans

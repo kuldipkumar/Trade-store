@@ -202,6 +202,18 @@ pre.cmd { margin: 0; background: var(--surface-2); border-radius: 8px; padding: 
 .chart .gl { stroke: var(--line); stroke-width: 1; }
 .chart .empty { padding: 28px 0; text-align: center; color: var(--muted); font-size: .84rem; }
 
+/* Trace waterfall */
+.wf { display: grid; grid-template-columns: minmax(180px, 34%) minmax(0, 1fr) 64px; gap: 4px 10px; align-items: center; font: .78rem/1.3 var(--mono); }
+.wf .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wf .trk { position: relative; height: 14px; background: var(--surface-2); border-radius: 3px; }
+.wf .trk i { position: absolute; top: 2px; bottom: 2px; min-width: 3px; border-radius: 2px; }
+.wf .dur { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.wf .hd { color: var(--muted); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; }
+.loglines { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 4px; font: .78rem/1.4 var(--mono); }
+.loglines span { color: var(--muted); }
+.legend-row { display: flex; gap: 14px; flex-wrap: wrap; font: .72rem var(--mono); color: var(--muted); margin-top: 10px; }
+.legend-row i { display: inline-block; width: 10px; height: 8px; border-radius: 2px; margin-right: 5px; }
+
 footer { padding-block: 40px; color: var(--muted); font-size: 0.84rem; }
 footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 18px; }
 .notice { border: 1px solid var(--line); background: var(--surface-2); border-radius: var(--radius); padding: 10px 14px; font-size: 0.86rem; color: var(--muted); }
@@ -390,20 +402,22 @@ footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wr
   <section class="block" id="observability"><div class="wrap">
     <div class="block-head">
       <div><span class="eyebrow">9 · Run and operate</span><h2>Observability dashboard</h2>
-        <p>Business outcomes, latency, dead letters, retries and the audit backlog are Prometheus metrics; a provisioned Grafana dashboard shows them live. Readiness is UP only when PostgreSQL, MongoDB and Kafka are reachable.</p></div>
+        <p>Metrics (Prometheus), traces (Tempo) and logs (Loki), linked by trace ID in one Grafana dashboard. Every trade is one trace: the Kafka message, ingestion, each PostgreSQL statement, and about a second later the outbox relay's MongoDB writes. Every log line carries its trace ID. Readiness is UP only when PostgreSQL, MongoDB and Kafka are reachable.</p></div>
       <div class="row"><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/observability/grafana/dashboards/trade-store.json">Dashboard JSON</a><a class="btn" target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/docs/runbook-dead-letter.md">Dead-letter runbook</a></div>
     </div>
     <div class="grid g3">
       <div class="card"><span class="eyebrow">Stream burst (US-605.1)</span><div class="big" id="perf-burst">–</div><p class="muted">All 10,000 rows of <a target="_blank" rel="noopener" href="https://github.com/kuldipkumar/Trade-store/blob/main/loadtest/trades-10k.csv">the shared trade file</a> published at once, every outcome as expected, none lost. Target: 60 s.</p></div>
       <div class="card"><span class="eyebrow">REST p95 at 50 req/s (US-605.2)</span><div class="big" id="perf-rest">–</div><p class="muted" id="perf-rest-note">Target: under 200 ms.</p></div>
       <div class="card"><span class="eyebrow">Open the live dashboard</span>
-        <pre class="cmd">docker compose --profile observability up --build -d
+        <pre class="cmd">docker compose up --build -d
 python3 scripts/load_trades.py --rate 100   # 10,000-trade file</pre>
-        <p class="muted" style="font-size:.84rem">Grafana: <code>localhost:3000</code> (dashboard “Trade Store”) · Prometheus: <code>localhost:9090</code></p></div>
+        <p class="muted" style="font-size:.84rem">Grafana: <code>localhost:3000</code> (dashboard “Trade Store”: metrics, logs, traces) · Prometheus <code>:9090</code> · Tempo <code>:3200</code> · Loki <code>:3100</code></p></div>
     </div>
     <div class="spread" style="margin:26px 0 12px;flex-wrap:wrap"><h3>Trade Store dashboard</h3><span class="muted mono" style="font-size:.78rem" id="dash-note"></span></div>
     <div class="kpis" id="dash-stats"></div>
     <div class="panel-grid" id="dash-charts" style="margin-top:10px"></div>
+    <div class="spread" style="margin:26px 0 12px;flex-wrap:wrap"><h3>One trade, end to end: its trace and its logs</h3><span class="muted mono" style="font-size:.78rem" id="trace-note"></span></div>
+    <div class="card" id="trace-view"><div class="empty muted">The trace appears after the next CI run on main.</div></div>
     <details style="margin-top:16px"><summary class="muted" style="cursor:pointer">Panels and the PromQL behind them</summary><div class="panel-grid" id="panels" style="margin-top:10px"></div></details>
   </div></section>
 </main>
@@ -575,7 +589,7 @@ python3 scripts/load_trades.py --rate 100   # 10,000-trade file</pre>
       ["Trivy dependency scan", "Trivy SCA", "critical"], ["Trivy full report", "Full SCA report"], ["Build Docker image", "Image build"],
       ["Trivy image scan", "Image scan", "critical"], ["Upload reports", "Reports"] ] },
     { name: "CI · run the stack", job: "docker compose smoke test", file: "ci.yml", nodes: [
-      ["Start the stack and wait for readiness", "Compose up + smoke", "ready"], ["Observability profile (Prometheus scrapes, Grafana dashboard loads)", "Prometheus + Grafana", "dashboard"], ["Dashboard snapshot for the portal", "Demo load + snapshot"], ["Upload dashboard snapshot", "Snapshot upload"], ["OWASP ZAP API scan", "ZAP DAST"], ["DAST gate (fails on any High risk alert)", "DAST gate", "high risk"],
+      ["Start the stack and wait for readiness", "Compose up + smoke", "ready"], ["Observability stack (Prometheus, Tempo, Loki, Grafana)", "Metrics, traces, logs", "all receive data"], ["Dashboard snapshot for the portal", "Demo load + snapshot"], ["Upload dashboard snapshot", "Snapshot upload"], ["OWASP ZAP API scan", "ZAP DAST"], ["DAST gate (fails on any High risk alert)", "DAST gate", "high risk"],
       ["Upload DAST report", "DAST report"], ["Stop the stack", "Tear down"] ] }
   ];
   var OTHER = [
@@ -758,6 +772,29 @@ python3 scripts/load_trades.py --rate 100   # 10,000-trade file</pre>
     }).join("");
   }
 
+  // ---------- trace waterfall ----------
+  function spanColour(s) {
+    if (s.db === "postgresql") return "var(--s2)";
+    if (s.db === "mongodb") return "var(--s5)";
+    if (s.kind === "CONSUMER" || s.kind === "PRODUCER") return "var(--s3)";
+    return "var(--s1)";
+  }
+  function renderTrace(t) {
+    if (!t || !t.spans || !t.spans.length) return;
+    var total = Math.max.apply(null, t.spans.map(function (s) { return s.startMs + s.durationMs; })) || 1;
+    var rows = t.spans.map(function (s) {
+      var left = (s.startMs / total * 100).toFixed(2), width = Math.max(s.durationMs / total * 100, 0.4).toFixed(2);
+      var label = (s.tradeId ? " · " + s.tradeId : "") + (s.outcome ? " · " + s.outcome : "");
+      return '<span class="nm" style="padding-left:' + (s.depth * 14) + 'px" title="' + esc(s.name + label) + '">' + esc(s.name) + '<span class="muted">' + esc(label) + "</span></span>" +
+        '<span class="trk"><i style="left:' + left + "%;width:" + width + "%;background:" + spanColour(s) + '"></i></span><span class="dur">' + (s.startMs >= 100 ? "+" + Math.round(s.startMs) + " ms · " : "") + s.durationMs + " ms</span>";
+    }).join("");
+    var logs = (t.logs || []).map(function (l) { return "<div><span>" + esc(new Date(l.ts).toISOString().slice(11, 23)) + "</span> " + esc(l.line) + "</div>"; }).join("");
+    $("trace-view").innerHTML = '<div class="wf"><span class="hd">Span</span><span class="hd">Timeline (' + Math.round(total) + ' ms)</span><span class="hd" style="text-align:right">Duration</span>' + rows + "</div>" +
+      '<div class="legend-row"><span><i style="background:var(--s3)"></i>Kafka</span><span><i style="background:var(--s1)"></i>application</span><span><i style="background:var(--s2)"></i>PostgreSQL</span><span><i style="background:var(--s5)"></i>MongoDB</span></div>' +
+      (logs ? '<div class="loglines"><b style="font-family:var(--body);font-size:.8rem">Log lines with this trace ID (Loki)</b>' + logs + "</div>" : "");
+    $("trace-note").textContent = "trace " + t.traceId + " · from CI";
+  }
+
   // ---------- data loading ----------
   function getJson(url) {
     return fetch(url, { headers: { Accept: "application/vnd.github+json" } }).then(function (r) { if (!r.ok) throw new Error(url + " " + r.status); return r.json(); });
@@ -804,7 +841,7 @@ python3 scripts/load_trades.py --rate 100   # 10,000-trade file</pre>
   getJson("data/portal.json").then(function (d) {
     data = d;
     renderKpis(); renderRequirements(); renderClarify(); renderTests(); renderDesign(); renderData(); renderModules(); renderSecurity(); renderObservability();
-    getJson("data/observability.json").then(renderDashboard).catch(function () { renderDashboard(null); });
+    getJson("data/observability.json").then(function (snap) { renderDashboard(snap); renderTrace(snap && snap.trace); }).catch(function () { renderDashboard(null); });
     $("footer-meta").textContent = "Data built " + new Date(d.generatedAt).toLocaleString("en-GB") + (d.commit ? " · commit " + d.commit.slice(0, 7) : "");
     renderPipeline();
     loadStatus();

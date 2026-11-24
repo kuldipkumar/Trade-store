@@ -23,6 +23,8 @@ import com.tradestore.domain.Trade;
 import com.tradestore.domain.TradeHistoryEntry;
 import com.tradestore.domain.Violation;
 import com.tradestore.persistence.AuditEventStore;
+import com.tradestore.observability.RecordingTraceContext;
+import com.tradestore.persistence.OutboxEntry;
 import com.tradestore.persistence.OutboxRepository;
 import com.tradestore.persistence.TradeHistoryStore;
 import org.junit.jupiter.api.Tag;
@@ -38,7 +40,12 @@ class OutboxRelayServiceTest {
     private final OutboxRepository outbox = mock(OutboxRepository.class);
     private final AuditEventStore audit = mock(AuditEventStore.class);
     private final TradeHistoryStore history = mock(TradeHistoryStore.class);
-    private final OutboxRelayService relay = new OutboxRelayService(outbox, audit, history, 100);
+    private final RecordingTraceContext trace = new RecordingTraceContext();
+    private final OutboxRelayService relay = new OutboxRelayService(outbox, audit, history, 100, trace);
+
+    private static List<OutboxEntry> entries(AuditEvent... events) {
+        return java.util.Arrays.stream(events).map(e -> new OutboxEntry(e, null)).toList();
+    }
 
     private static AuditEvent event(Outcome outcome, Trade trade) {
         return new AuditEvent(UUID.randomUUID().toString(), "T1", 1, outcome,
@@ -52,7 +59,7 @@ class OutboxRelayServiceTest {
         // Arrange
         AuditEvent accepted = event(Outcome.ACCEPTED, T1);
         AuditEvent rejected = event(Outcome.REJECTED, null);
-        when(outbox.claimBatch(100)).thenReturn(List.of(accepted, rejected));
+        when(outbox.claimBatch(100)).thenReturn(entries(accepted, rejected));
 
         // Act
         int relayed = relay.relayBatch();
@@ -71,7 +78,7 @@ class OutboxRelayServiceTest {
     void should_recordReplacedInHistory_when_eventIsReplaced() {
         // Arrange (US-102.3)
         AuditEvent replaced = event(Outcome.REPLACED, T1);
-        when(outbox.claimBatch(100)).thenReturn(List.of(replaced));
+        when(outbox.claimBatch(100)).thenReturn(entries(replaced));
 
         // Act
         relay.relayBatch();
@@ -84,7 +91,7 @@ class OutboxRelayServiceTest {
     @Tag("US-501.1")
     void should_doNothing_when_outboxIsEmpty() {
         // Arrange
-        when(outbox.claimBatch(100)).thenReturn(List.of());
+        when(outbox.claimBatch(100)).thenReturn(entries());
 
         // Act
         int relayed = relay.relayBatch();
@@ -99,11 +106,29 @@ class OutboxRelayServiceTest {
     void should_keepEventsInOutbox_when_mongoWriteFails() {
         // Arrange: the exception rolls back the claim, so the rows are retried on the next poll (CR-6)
         AuditEvent accepted = event(Outcome.ACCEPTED, T1);
-        when(outbox.claimBatch(100)).thenReturn(List.of(accepted));
+        when(outbox.claimBatch(100)).thenReturn(entries(accepted));
         doThrow(new DataAccessResourceFailureException("MongoDB down")).when(audit).insert(accepted);
 
         // Act + Assert
         assertThatThrownBy(relay::relayBatch).isInstanceOf(DataAccessResourceFailureException.class);
         verify(outbox, never()).delete(anyList());
+    }
+
+    @Test
+    @Tag("A-46")
+    void should_continueEachEventsOwnTrace_when_aBatchIsRelayed() {
+        // Arrange: two events written by two different traces
+        AuditEvent first = event(Outcome.ACCEPTED, T1);
+        AuditEvent second = event(Outcome.REJECTED, null);
+        when(outbox.claimBatch(100)).thenReturn(List.of(new OutboxEntry(first, "00-aaaa-1111-01"), new OutboxEntry(second, "00-bbbb-2222-01")));
+
+        // Act
+        relay.relayBatch();
+
+        // Assert: one relay span per event, each a child of the transaction that wrote it (ADR-012)
+        assertThat(trace.spans()).extracting(RecordingTraceContext.Recorded::name, RecordingTraceContext.Recorded::parentTraceparent)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("outbox.relay", "00-aaaa-1111-01"),
+                        org.assertj.core.groups.Tuple.tuple("outbox.relay", "00-bbbb-2222-01"));
+        assertThat(trace.spans().get(0).tags()).containsEntry("trade.outcome", "ACCEPTED");
     }
 }

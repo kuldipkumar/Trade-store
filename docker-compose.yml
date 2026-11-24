@@ -67,6 +67,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tradestore}
       MONGODB_URI: mongodb://mongo:27017/tradestore
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Traces to Tempo and logs to Loki over OTLP (ADR-012); unset these to stop exporting
+      MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: http://tempo:4318/v1/traces
+      MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT: http://loki:3100/otlp/v1/logs
       TZ: ${TZ:-Asia/Kolkata}
     depends_on:
       kafka:
@@ -76,21 +79,40 @@ services:
       mongo:
         condition: service_healthy
 
-  # Observability (US-604): docker compose --profile observability up --build
-  # Prometheus on http://localhost:9090, Grafana on http://localhost:3000 (dashboard "Trade Store", anonymous viewer)
+  # Observability (US-604, ADR-010, ADR-012), part of the default stack:
+  # Grafana http://localhost:3000 (dashboard "Trade Store", anonymous viewer) over Prometheus (metrics, :9090),
+  # Tempo (traces, :3200) and Loki (logs, :3100), linked by trace ID.
   prometheus:
     image: prom/prometheus:v3.5.0
-    profiles: [observability]
     ports:
       - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --enable-feature=exemplar-storage   # latency exemplars link to traces in Tempo
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     depends_on:
       - app
 
+  tempo:
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo.yaml"]
+    ports:
+      - "3200:3200"   # query API (Grafana)
+      - "4318:4318"   # OTLP over HTTP (the app)
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+
+  loki:
+    image: grafana/loki:3.2.1
+    command: ["-config.file=/etc/loki/config.yaml"]
+    ports:
+      - "3100:3100"   # query API and OTLP log ingestion
+    volumes:
+      - ./observability/loki.yaml:/etc/loki/config.yaml:ro
+
   grafana:
     image: grafana/grafana:12.1.1
-    profiles: [observability]
     ports:
       - "3000:3000"
     environment:
@@ -103,6 +125,8 @@ services:
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
+      - tempo
+      - loki
 
 volumes:
   postgres-data:
