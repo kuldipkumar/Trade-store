@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter;
 import io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter;
@@ -40,11 +41,14 @@ class TracingIT {
     private final RestTestClient rest;
     private final ApplicationContext context;
     private final io.opentelemetry.sdk.trace.SdkTracerProvider tracerProvider;
+    private final io.opentelemetry.api.OpenTelemetry openTelemetry;
 
     private final String tradeId = "TR-" + UUID.randomUUID();
 
     TracingIT(KafkaTemplate<String, String> kafka, InMemorySpanExporter spans, InMemoryLogRecordExporter logs, RestTestClient rest,
-              ApplicationContext context, io.opentelemetry.sdk.trace.SdkTracerProvider tracerProvider) {
+              ApplicationContext context, io.opentelemetry.sdk.trace.SdkTracerProvider tracerProvider,
+              io.opentelemetry.api.OpenTelemetry openTelemetry) {
+        this.openTelemetry = openTelemetry;
         this.tracerProvider = tracerProvider;
         this.context = context;
         this.kafka = kafka;
@@ -54,10 +58,13 @@ class TracingIT {
     }
 
     @BeforeEach
-    void clearExporters() {
+    void clearExportersAndOwnTheLogAppender() {
         // The exporters are shared by every IT context; start each test from empty (code review of PR #72)
         spans.reset();
         logs.reset();
+        // The Logback OTLP appender is process-wide: another test context (e.g. RetryThenDeadLetterIT's) may have
+        // re-pointed it at that context's SDK. Point it at this context's, so log records reach this exporter.
+        OpenTelemetryAppender.install(openTelemetry);
     }
 
     private void publish() throws Exception {
