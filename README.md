@@ -169,7 +169,7 @@ These tests run on demand, through the *Performance baseline* workflow or `./mvn
 
 ## Assumptions
 
-All 54 assumptions, each agreed with the product owner, are in [ASSUMPTIONS.md](ASSUMPTIONS.md); the open questions behind them are in [docs/01-clarifications.md](docs/01-clarifications.md). The ones that shape behaviour most:
+All 55 assumptions are in [ASSUMPTIONS.md](ASSUMPTIONS.md); the open questions behind them are in [docs/01-clarifications.md](docs/01-clarifications.md). A-01 to A-54 are agreed with the product owner; A-55 (unstorable trade IDs, added for v1.0.0) is proposed and awaits review. The ones that shape behaviour most:
 
 - **"Today"** is the date in the configured time zone (A-16). A maturity date equal to today is accepted.
 - **Expiry** runs daily at 00:05 and at startup to catch up. `expired` is a stored flag, so it can lag by up to the next run (A-18).

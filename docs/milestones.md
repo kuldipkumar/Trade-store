@@ -41,6 +41,6 @@ One entry per story that is completed, tested, peer-reviewed and merged. The sam
 | 35 | US-609 / US-604 Swagger API reference, dashboard charts, database design in the portal; decision D10 | 2026-11-23 | #70 | criteria unchanged | /code-review of #70 |
 | 36 | US-605 One 10,000-trade load file for demos and the performance baseline | 2026-11-23 | #71 | 3 of 3 | /code-review of #71 |
 | 37 | US-604 / A-46 Traces and logs (OpenTelemetry, Tempo, Loki), linked to metrics in Grafana (ADR-012) | 2026-11-24 | #72, #73 | criteria unchanged | /code-review of #72 and #73 |
-| 38 | Release v1.0.0: MIT licence, patched Kafka compression libraries, diagrams render on older PlantUML, D10 on the portal | 2026-11-28 | release PR | criteria unchanged | /code-review of the release PR |
+| 38 | Release v1.0.0: audit fixes (unstorable trade IDs, malformed query strings, surrogates, log forging), patched Kafka compression libraries, MIT licence, diagrams on older PlantUML, D10 on the portal | 2026-11-28 | #74 | criteria unchanged; A-55 proposed | /code-review of #74: 10 findings, none blocking; 2 pre-existing defects and 5 nits fixed |
 
 US-601 (card 1, Phase 4) gained its conformance tests in #67. **All 32 stories are done; 89 of 89 acceptance criteria are tested.**

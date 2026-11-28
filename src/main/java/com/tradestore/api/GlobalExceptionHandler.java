@@ -97,8 +97,11 @@ public class GlobalExceptionHandler {
                 e.getMessage())), request);
     }
 
-    /** A query parameter of the wrong type, for example page=abc or expired=maybe (US-403). */
-    /** A query string the servlet container cannot parse, such as {@code ?=&page=0}: a client error, not a bug. */
+    /**
+     * A query string the servlet container cannot parse, such as {@code ?=&page=0}: a client error, not a bug. The
+     * exception is Tomcat's, the only container this application ships with (spring-boot-starter-webmvc); no filter
+     * reads request parameters, so it always reaches this advice.
+     */
     @ExceptionHandler(InvalidParameterException.class)
     public ResponseEntity<ApiErrorResponse> malformedQuery(InvalidParameterException e, HttpServletRequest request) {
         log.debug("400 for {} {}: {}", request.getMethod(), request.getRequestURI(), e.getMessage());
@@ -106,6 +109,7 @@ public class GlobalExceptionHandler {
                 "The query string is malformed")), request);
     }
 
+    /** A query parameter of the wrong type, for example page=abc or expired=maybe (US-403). */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiErrorResponse> typeMismatch(MethodArgumentTypeMismatchException e, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, List.of(new ApiErrorResponse.Reason("INVALID_PARAMETER", e.getName(),

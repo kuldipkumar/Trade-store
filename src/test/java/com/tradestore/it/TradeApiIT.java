@@ -372,7 +372,8 @@ class TradeApiIT {
             JsonNode versions = get("/trades/" + tradeId + "/history").getResponseBody();
             assertThat(versions.findValues("version")).extracting(JsonNode::asInt).containsExactly(1, 1, 2);
             assertThat(versions.findValuesAsString("maturityDate")).containsExactly("2099-05-20", "2099-05-21", "2099-06-20");
-            assertThat(versions.findValuesAsString("receivedTimestamp")).isSorted();
+            // Compared as instants: as strings, "…:54Z" (a whole second) would sort after "…:54.015Z"
+            assertThat(versions.findValuesAsString("receivedTimestamp")).extracting(java.time.Instant::parse).isSorted();
         });
     }
 
