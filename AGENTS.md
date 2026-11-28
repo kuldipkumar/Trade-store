@@ -252,7 +252,7 @@ The last column is mandatory. It records human judgment over the AI's output.
   - A trade with the same version replaces the stored record.
   - Reject a trade whose maturity date is earlier than today.
   - Automatically mark a trade as expired once its maturity date has passed.
-- **Current phase:** Phases 6 to 8 complete on 2026-11-22. All 32 stories have been merged through PRs #39–#67, each with `/code-review`, and all 89 acceptance criteria are tested ([docs/traceability.md](docs/traceability.md)). Decision D9 is option C. The phase gate issues (#4, #5, #6) await the human's approval. Working rules still apply to any follow-up: strict TDD, one test at a time with a red on an assertion; every test tagged `@Tag("US-xxx.y")` or `@Tag("A-nn")`; the traceability matrix regenerated and committed; `/code-review` on each PR; a milestone recorded after each merge.
+- **Current phase:** Released as **v1.0.0** on 2026-11-28 ([release notes](docs/release-notes/v1.0.0.md)). Phases 6 to 8 complete on 2026-11-22; portal, security scans, load file and traces and logs followed in PRs #69–#73. All 32 stories have been merged through PRs #39–#73, each with `/code-review`, and all 89 acceptance criteria are tested ([docs/traceability.md](docs/traceability.md)). Decision D9 is option C. The phase gate issues (#4, #5, #6) await the human's approval. Working rules still apply to any follow-up: strict TDD, one test at a time with a red on an assertion; every test tagged `@Tag("US-xxx.y")` or `@Tag("A-nn")`; the traceability matrix regenerated and committed; `/code-review` on each PR; a milestone recorded after each merge.
 
 ---
 

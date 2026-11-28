@@ -37,5 +37,10 @@ One entry per story that is completed, tested, peer-reviewed and merged. The sam
 | 31 | US-605 Performance baseline | 2026-11-22 | #67 | 3 of 3 | /code-review of #67 |
 | 32 | US-608 Prompt log and design documentation | 2026-11-22 | #67 | 2 of 2 | /code-review of #67 |
 | 33 | US-609 README for a 10-minute onboarding | 2026-11-22 | #67 | 2 of 2 | /code-review of #67 |
+| 34 | US-609 / US-602 Project portal (GitHub Pages), CodeQL SAST, OWASP ZAP DAST, Grafana dashboard (ADR-009, 010, 011) | 2026-11-22 | #69 | criteria unchanged | /code-review of #69 |
+| 35 | US-609 / US-604 Swagger API reference, dashboard charts, database design in the portal; decision D10 | 2026-11-23 | #70 | criteria unchanged | /code-review of #70 |
+| 36 | US-605 One 10,000-trade load file for demos and the performance baseline | 2026-11-23 | #71 | 3 of 3 | /code-review of #71 |
+| 37 | US-604 / A-46 Traces and logs (OpenTelemetry, Tempo, Loki), linked to metrics in Grafana (ADR-012) | 2026-11-24 | #72, #73 | criteria unchanged | /code-review of #72 and #73 |
+| 38 | Release v1.0.0: MIT licence, patched Kafka compression libraries, diagrams render on older PlantUML, D10 on the portal | 2026-11-28 | release PR | criteria unchanged | /code-review of the release PR |
 
 US-601 (card 1, Phase 4) gained its conformance tests in #67. **All 32 stories are done; 89 of 89 acceptance criteria are tested.**

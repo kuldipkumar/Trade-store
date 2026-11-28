@@ -15,7 +15,8 @@ Both channels run the same ingestion use case. PostgreSQL holds the latest versi
 
 | | |
 |---|---|
-| Stack | Java 21, Spring Boot 4.1, Kafka (KRaft), PostgreSQL 17 + Flyway, MongoDB 8, Testcontainers, GitHub Actions, Trivy, PlantUML |
+| Stack | Java 21, Spring Boot 4.1, Kafka (KRaft), PostgreSQL 17 + Flyway, MongoDB 8, Testcontainers, GitHub Actions, Trivy, CodeQL, OWASP ZAP, PlantUML; observability with Micrometer, OpenTelemetry, Prometheus, Tempo, Loki and Grafana |
+| Release | [v1.0.0 release notes](docs/release-notes/v1.0.0.md) |
 | Assignment and requirements | [Requirements.md](Requirements.md), [docs/01-clarifications.md](docs/01-clarifications.md) |
 | Backlog (6 epics, 32 stories) | [docs/02-backlog.md](docs/02-backlog.md) |
 | Design | [docs/03-hld.md](docs/03-hld.md) (HLD), [docs/05-lld.md](docs/05-lld.md) (LLD), [docs/adr/](docs/adr/) (ADRs) |
@@ -46,7 +47,7 @@ The other diagrams are in [docs/diagrams/](docs/diagrams/), with PlantUML source
 You need Docker. For development you also need JDK 21.
 
 ```bash
-docker compose up --build -d          # app + Kafka + PostgreSQL + MongoDB
+docker compose up --build -d          # app, Kafka, PostgreSQL, MongoDB, Prometheus, Tempo, Loki, Grafana
 curl localhost:8080/actuator/health/readiness
 ```
 
@@ -185,6 +186,7 @@ All 54 assumptions, each agreed with the product owner, are in [ASSUMPTIONS.md](
 - **The audit report's counts and its page come from two reads,** so the counts can lag by one entry that is relayed in between.
 - **The DLT holds the message as text.** Bytes that aren't valid UTF-8 are not kept exactly, and oversized messages are truncated.
 - **A CSV export client that stops reading for more than 10 minutes** hits MongoDB's idle cursor timeout. Exports may run for up to 30 minutes (`TRADE_STORE_EXPORT_TIMEOUT`).
+- **Open scan findings, none blocking:** one MEDIUM dependency CVE (CVE-2026-118259 in `opentelemetry-api` 1.62.0, managed by Spring Boot; fixed in 1.67.0) and ZAP Medium/Low header findings (no `X-Content-Type-Options` or site-isolation headers; `/actuator/health` shows component status). They fall under D10 below, and the reports are on the [portal](https://kuldipkumar.github.io/Trade-store/#security).
 - **Security controls are out of scope for this PoC** (decision D10, agreed 2026-11-23): there is no authentication, authorisation or TLS, and it runs as a single instance. The CodeQL, Trivy and ZAP scans still run and report on every change.
 
 ## Future improvements
@@ -195,3 +197,7 @@ All 54 assumptions, each agreed with the product owner, are in [ASSUMPTIONS.md](
 - A replay tool for the dead-letter topic, so operators don't need console commands.
 - Horizontal scaling: several instances, `kafka.concurrency` tuning and expiry with a distributed lock. Batches are already safe because of `SKIP LOCKED`.
 - Alert rules on `trade_deadletter_total`, `trade_retries_total`, `trade_outbox_backlog_size` and consumer lag.
+
+## Licence
+
+[MIT](LICENSE).
