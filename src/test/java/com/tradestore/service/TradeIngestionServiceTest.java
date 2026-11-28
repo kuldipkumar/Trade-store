@@ -47,6 +47,8 @@ import com.tradestore.service.validation.PositiveVersionValidator;
 import org.junit.jupiter.api.Tag;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -176,6 +178,20 @@ class TradeIngestionServiceTest {
         assertThatThrownBy(() -> service.ingest(withTradeId(""))).isInstanceOf(TradeRejectedException.class);
 
         // Assert
+        verify(trades, never()).findById(anyString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"X\u0000Y", "a 65-character trade ID ........................................."})
+    @Tag("US-105.1")
+    void should_notLookUpTheStoredTrade_when_tradeIdCannotBeAStoredId(String tradeId) {
+        // Arrange: PostgreSQL rejects NUL characters and IDs longer than the 64-character column
+        assertThat(tradeId.contains("\u0000") || tradeId.length() == 65).isTrue();
+
+        // Act
+        assertThatThrownBy(() -> service.ingest(withTradeId(tradeId))).isInstanceOf(TradeRejectedException.class);
+
+        // Assert: rejected as INVALID_FIELD without a query that would fail as a database error
         verify(trades, never()).findById(anyString());
     }
 
