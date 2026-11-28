@@ -22,6 +22,7 @@ The Markdown files in this repository are the **source of truth**. GitHub Issues
 | [traceability.md](traceability.md) | Requirements → epics → stories → criteria → tests → code (generated, checked in CI) | 89 of 89 criteria tested |
 | [milestones.md](milestones.md) | One row per story merged, with its PR and review | 32 of 32 stories |
 | [runbook-dead-letter.md](runbook-dead-letter.md) | Inspect, find, fix and replay a dead-lettered message | Operations |
+| [release-notes/v1.0.0.md](release-notes/v1.0.0.md) | What v1.0.0 contains, how it was verified, what was fixed for release, known issues and open items | Release |
 
 ## Tracking
 
