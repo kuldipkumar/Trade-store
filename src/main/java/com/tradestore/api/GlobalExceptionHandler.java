@@ -9,6 +9,7 @@ import com.tradestore.domain.TradeNotFoundException;
 import com.tradestore.domain.TradeRejectedException;
 import com.tradestore.service.parsing.MalformedTradeException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.apache.tomcat.util.http.InvalidParameterException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -97,6 +98,14 @@ public class GlobalExceptionHandler {
     }
 
     /** A query parameter of the wrong type, for example page=abc or expired=maybe (US-403). */
+    /** A query string the servlet container cannot parse, such as {@code ?=&page=0}: a client error, not a bug. */
+    @ExceptionHandler(InvalidParameterException.class)
+    public ResponseEntity<ApiErrorResponse> malformedQuery(InvalidParameterException e, HttpServletRequest request) {
+        log.debug("400 for {} {}: {}", request.getMethod(), request.getRequestURI(), e.getMessage());
+        return error(HttpStatus.BAD_REQUEST, List.of(new ApiErrorResponse.Reason("INVALID_PARAMETER", null,
+                "The query string is malformed")), request);
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiErrorResponse> typeMismatch(MethodArgumentTypeMismatchException e, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, List.of(new ApiErrorResponse.Reason("INVALID_PARAMETER", e.getName(),
