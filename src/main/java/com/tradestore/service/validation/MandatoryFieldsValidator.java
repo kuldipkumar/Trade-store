@@ -3,6 +3,7 @@ package com.tradestore.service.validation;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.tradestore.domain.TradeIds;
 import com.tradestore.domain.TradeSubmission;
 import com.tradestore.domain.Violation;
 import org.springframework.core.annotation.Order;
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Component;
 @Order(100)
 public class MandatoryFieldsValidator implements TradeValidator {
 
-    static final int MAX_ID_LENGTH = 64;
+    static final int MAX_ID_LENGTH = TradeIds.MAX_LENGTH;
 
     @Override
     public List<Violation> validate(ValidationContext context) {
