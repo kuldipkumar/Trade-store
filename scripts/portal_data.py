@@ -192,7 +192,7 @@ def design():
 def decisions():
     lld = read("docs/05-lld.md")
     found = [{"id": m.group(1), "text": re.sub(r"[*`\[\]]|\(adr/[^)]*\)", "", m.group(2)).strip()}
-             for m in re.finditer(r"^\| \*\*(D\d)\*\* \| (.+?) \|", lld, re.M)]
+             for m in re.finditer(r"^\| \*\*(D\d+)\*\* \| (.+?) \|", lld, re.M)]
     review = read("docs/06-test-review.md")
     for d in ("D8", "D9"):
         m = re.search(r"## Decision " + d + r" \(([^)]*)\)", review)
@@ -200,7 +200,7 @@ def decisions():
             label = {"D8": "US-501.3 reworded for the transactional outbox",
                      "D9": "A database outage never dead-letters a trade (option C)"}[d]
             found.append({"id": d, "text": f"{label} ({m.group(1)})"})
-    return found
+    return sorted(found, key=lambda d: int(d["id"][1:]))
 
 
 def metrics():
