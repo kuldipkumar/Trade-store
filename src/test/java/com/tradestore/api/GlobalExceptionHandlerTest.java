@@ -154,4 +154,21 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().status()).isEqualTo(400);
     }
+
+    @Test
+    @Tag("US-401.5")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_return400WithoutLoggingAnError_when_theQueryStringIsMalformed(CapturedOutput output) {
+        // Arrange: what Tomcat throws for "GET /trades?=&page=0", found by the ZAP scan
+        var malformed = new org.apache.tomcat.util.http.InvalidParameterException(
+                "Invalid chunk starting at byte [0] and ending at byte [1] with a value of [=] ignored", 400);
+
+        // Act
+        ResponseEntity<ApiErrorResponse> response = handler.malformedQuery(malformed, new MockHttpServletRequest("GET", "/trades"));
+
+        // Assert: a client error in the standard shape, not a 500, and no false ERROR in the log
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().reasons().getFirst().reason()).isEqualTo("INVALID_PARAMETER");
+        assertThat(output).doesNotContain("ERROR");
+    }
 }
