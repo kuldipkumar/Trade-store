@@ -166,6 +166,27 @@ CREATE INDEX idx_pairs_lower ON pairs (lower(a::text));
             {"store": "MongoTradeHistoryStore", "name": "history_by_trade", "keys": ["tradeId"]}])
 
 
+class DecisionsTest(unittest.TestCase):
+
+    LLD = """
+| ID | Decision | Why |
+|----|----------|-----|
+| **D1** | **Plain JDBC** (Accepted) | Fits the SQL |
+| **D10** | **Security controls are out of scope for the PoC** | Agreed by the human |
+"""
+
+    def test_should_readTwoDigitDecisionIds_when_theLldListsTenOrMoreDecisions(self):
+        original = portal_data.read
+        portal_data.read = lambda path: self.LLD if path.endswith("05-lld.md") else ""
+        try:
+            found = portal_data.decisions()
+        finally:
+            portal_data.read = original
+
+        self.assertEqual([d["id"] for d in found], ["D1", "D10"])
+        self.assertEqual(found[1]["text"], "Security controls are out of scope for the PoC")
+
+
 class StatusTest(unittest.TestCase):
 
     def test_keeps_the_newest_run_of_each_portal_workflow(self):
