@@ -13,7 +13,7 @@
 
     <groupId>com.tradestore</groupId>
     <artifactId>trade-store</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>trade-store</name>
     <description>Trade Store: ingests trades, enforces version/maturity rules, tracks expiry</description>
 
@@ -26,6 +26,23 @@
         <!-- Lets CI run unit and integration tests as separate stages. -->
         <skipUnitTests>false</skipUnitTests>
     </properties>
+
+    <!-- Patched transitive versions (via kafka-clients) for HIGH CVEs Trivy reports: CVE-2026-106451 (lz4-java) and
+         CVE-2026-108106 (snappy-java). Remove once kafka-clients ships these versions or newer. -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>at.yawk.lz4</groupId>
+                <artifactId>lz4-java</artifactId>
+                <version>1.11.4</version>
+            </dependency>
+            <dependency>
+                <groupId>org.xerial.snappy</groupId>
+                <artifactId>snappy-java</artifactId>
+                <version>1.1.10.9</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- REST API, validation and operations (ADR-001) -->
