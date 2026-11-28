@@ -9,6 +9,7 @@ import com.tradestore.domain.Outcome;
 import com.tradestore.domain.ReasonCode;
 import com.tradestore.domain.StoredTrade;
 import com.tradestore.domain.Trade;
+import com.tradestore.domain.TradeIds;
 import com.tradestore.domain.TradeRejectedException;
 import com.tradestore.domain.TradeSubmission;
 import com.tradestore.domain.Violation;
@@ -115,8 +116,8 @@ public class TradeIngestionService {
     }
 
     private Optional<StoredTrade> lookUp(TradeSubmission submission) {
-        String tradeId = submission.tradeId();
-        return tradeId == null || tradeId.isBlank() ? Optional.empty() : trades.findById(tradeId);
+        // An unusable ID is already an INVALID_FIELD rejection; querying with it would fail as a database error
+        return TradeIds.isUsable(submission.tradeId()) ? trades.findById(submission.tradeId()) : Optional.empty();
     }
 
     private Decision reject(TradeSubmission submission, Optional<StoredTrade> stored, List<Violation> violations) {
