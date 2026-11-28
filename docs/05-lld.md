@@ -228,6 +228,8 @@ CREATE TABLE outbox_events (
 | `LOWER_VERSION` (and no invalid field) | `LowerVersionException` | **409** | Offset committed, no retry | `REJECTED` |
 | `MATURITY_IN_PAST` only | `TradeRejectedException` | **422** | Offset committed, no retry | `REJECTED` |
 | Out-of-range query parameter (page < 0, size < 1) | `InvalidRequestParameterException` | 400 `INVALID_PARAMETER` | n/a | n/a |
+| Malformed query string (for example an empty parameter name, `?=`) | Tomcat `InvalidParameterException` | 400 `INVALID_PARAMETER` | n/a | n/a |
+| Trade ID that cannot be stored (over 64 characters, control characters such as NUL; A-55) | `TradeRejectedException` | 400 `INVALID_FIELD` | Offset committed, no retry | `REJECTED`, without `tradeId` |
 | Unknown trade on the read side, or unknown path | `TradeNotFoundException`, `NoResourceFoundException` | 404 | n/a | n/a |
 | Database unavailable (no connection, transient or resource failure) | `CannotCreateTransactionException`, `TransientDataAccessException`, `DataAccessResourceFailureException` | 503, logged | Retried with backoff until it recovers, never dead-lettered (D9 option C) | None until stored |
 | Unsupported content type / method | `HttpMediaTypeNotSupportedException` / `HttpRequestMethodNotSupportedException` | 415 / 405 | n/a | n/a |

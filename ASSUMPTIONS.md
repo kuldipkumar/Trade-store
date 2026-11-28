@@ -2,7 +2,7 @@
 
 The list of assumptions the Trade Store is built on. The reasoning and the impact of each one are in [docs/01-clarifications.md](docs/01-clarifications.md); IDs match (`A-07` here = `C-07` there).
 
-**Status:** all assumptions were approved by the product owner on 2026-11-19. **Agreed (delegated)** means the AI proposed the choice at the product owner's request, and the product owner then approved it.
+**Status:** A-01 to A-54 were approved by the product owner on 2026-11-19. A-55 is proposed and awaits review. **Agreed (delegated)** means the AI proposed the choice at the product owner's request, and the product owner then approved it.
 
 ## Sample data and fields
 | ID | Assumption | Status |
@@ -85,3 +85,4 @@ The list of assumptions the Trade Store is built on. The reasoning and the impac
 | A-52 | **Capacity:** 1M trades and 10M audit entries without a design change. Expiry and report queries are indexed, and reports stream or page their results. | Agreed |
 | A-53 | **Timestamps:** business dates are local dates. Audit and history timestamps are UTC instants. | Agreed |
 | A-54 | **Backup and DR** are out of scope (a known limitation). | Agreed |
+| A-55 | **A trade ID that cannot be stored** (over 64 characters, or containing a control character such as NUL) is rejected as `INVALID_FIELD`, like any invalid field, and is never used as a database key. Its `REJECTED` audit entry has no `tradeId`, like a dead letter, and the raw payload keeps what was received. Found by the ZAP scan before v1.0.0. | **Proposed** (2026-11-28) |

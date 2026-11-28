@@ -60,6 +60,7 @@ class AuditEventFactoryTest {
     }
 
     @Test
+    @Tag("A-55")
     @Tag("US-105.1")
     @Tag("US-501.1")
     void should_recordNoTradeIdButKeepThePayload_when_theRejectedTradeIdCannotBeAStoredId() {

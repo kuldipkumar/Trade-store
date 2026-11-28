@@ -183,6 +183,7 @@ class TradeIngestionServiceTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"X\u0000Y", "a 65-character trade ID ........................................."})
+    @Tag("A-55")
     @Tag("US-105.1")
     void should_notLookUpTheStoredTrade_when_tradeIdCannotBeAStoredId(String tradeId) {
         // Arrange: PostgreSQL rejects NUL characters and IDs longer than the 64-character column

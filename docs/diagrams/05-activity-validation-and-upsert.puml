@@ -11,7 +11,7 @@ title Validation and version-guarded write (inside one transaction)
 start
 :Receive TradeSubmission\n(tradeId, version, counterPartyId, bookId, maturityDate as raw values);
 :today = LocalDate.now(clock)  (configured zone, US-205);
-:stored = findById(tradeId)  (skipped if tradeId is blank);
+:stored = findById(tradeId)\n(skipped if tradeId is not a usable ID: blank, over 64 characters, control characters; A-55);
 :attempt = 1;
 
 repeat

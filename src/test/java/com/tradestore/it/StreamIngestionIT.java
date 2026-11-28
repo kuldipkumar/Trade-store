@@ -148,6 +148,7 @@ class StreamIngestionIT {
     }
 
     @Test
+    @Tag("A-55")
     @Tag("US-105.1")
     @Tag("US-304.1")
     void should_auditAFinalRejectionWithoutATradeId_when_theTradeIdIsTooLongToStore() throws Exception {

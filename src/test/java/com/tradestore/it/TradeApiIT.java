@@ -377,6 +377,7 @@ class TradeApiIT {
     }
 
     @Test
+    @Tag("A-55")
     @Tag("US-105.1")
     @Tag("US-401.5")
     void should_return400NotAServerError_when_theTradeIdCannotBeAStoredId() {
