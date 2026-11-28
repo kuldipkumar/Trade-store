@@ -1,4 +1,11 @@
 @startuml 04-activity-ci-pipeline
+' Colours via style classes, not <<#colour>>: older PlantUML (1.2024.3, bundled with the VS Code extension) rejects that form.
+<style>
+activityDiagram {
+  .fail { BackGroundColor pink }
+  .ok { BackGroundColor palegreen }
+}
+</style>
 title CI/CD Pipeline Flow (.github/workflows/ci.yml)
 
 start
@@ -8,57 +15,57 @@ fork
 :1. Checkout + set up JDK 21 (Maven cache);
 :2. Render PlantUML diagrams to SVG;
 if (Diagram syntax error?) then (yes)
-  :Fail build; <<#pink>>
+  :Fail build; <<fail>>
   stop
 endif
 :3. Unit tests (mvn test);
 if (Any unit test fails?) then (yes)
-  :Fail build; <<#pink>>
+  :Fail build; <<fail>>
   stop
 endif
 :4. Integration / regression tests\n(Testcontainers: Kafka, PostgreSQL, MongoDB);
 if (Any integration test fails?) then (yes)
-  :Fail build; <<#pink>>
+  :Fail build; <<fail>>
   stop
 endif
 :5. JaCoCo coverage report + gate;
 if (Line coverage < 80%?) then (yes)
-  :Fail build; <<#pink>>
+  :Fail build; <<fail>>
   stop
 endif
 :5b. Traceability matrix\n(every test tagged with a known acceptance criterion;\ndocs/traceability.md up to date);
 if (Unknown/missing tag, failing tagged test\nor stale matrix?) then (yes)
-  :Fail build; <<#pink>>
+  :Fail build; <<fail>>
   stop
 endif
 :6a. Trivy dependency scan;
 if (CRITICAL vulnerability?) then (yes)
-  :Fail build; <<#pink>>
+  :Fail build; <<fail>>
   stop
 endif
 :6b. Trivy full report (every severity, never fails; uploaded);
 :8. Build Docker image (non-root);
 :6c. Trivy image scan (OS + libraries);
 if (CRITICAL vulnerability?) then (yes)
-  :Fail build; <<#pink>>
+  :Fail build; <<fail>>
   stop
 endif
-:Pipeline green; <<#palegreen>>
+:Pipeline green; <<ok>>
 :9. Upload reports (tests, coverage, traceability, scans) and rendered SVGs\n(always, also on failure);
 fork again
 :compose-smoke job: scripts/compose-smoke.sh\n(docker compose up --build, readiness UP, store and read a trade);
 if (Not ready or trade not stored?) then (yes)
-  :Fail build; <<#pink>>
+  :Fail build; <<fail>>
   stop
 endif
 :Observability profile: Prometheus scrapes the app,\nGrafana serves the Trade Store dashboard;
 if (Not scraping or dashboard missing?) then (yes)
-  :Fail build; <<#pink>>
+  :Fail build; <<fail>>
   stop
 endif
 :DAST: OWASP ZAP API scan of the running stack\n(driven by docs/api/openapi.yaml);
 if (Any High risk alert?) then (yes)
-  :Fail build; <<#pink>>
+  :Fail build; <<fail>>
   stop
 endif
 :Upload ZAP report; stop the stack;
