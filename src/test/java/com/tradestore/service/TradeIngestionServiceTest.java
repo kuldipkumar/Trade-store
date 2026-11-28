@@ -344,6 +344,22 @@ class TradeIngestionServiceTest {
     }
 
     @Test
+    @Tag("US-604.3")
+    @Tag("A-55")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_notWriteTheRawTradeId_when_itIsRejectedAsUnusable(CapturedOutput output) {
+        // Arrange: a trade ID that would forge a second outcome line in the log
+        String forged = "X\r\noutcome=ACCEPTED tradeId=FORGED";
+
+        // Act
+        assertThatThrownBy(() -> service.ingest(withTradeId(forged))).isInstanceOf(TradeRejectedException.class);
+
+        // Assert: the log line and the span tag carry a placeholder, never the raw value
+        assertThat(output).doesNotContain("tradeId=FORGED").contains("outcome=REJECTED tradeId=<invalid>");
+        assertThat(trace.spans().getFirst().tags()).containsEntry("trade.id", "<invalid>");
+    }
+
+    @Test
     @Tag("US-201.1")
     void should_rejectWithoutStoring_when_maturityDateIsBeforeToday() {
         // Arrange: today is 2026-11-19
