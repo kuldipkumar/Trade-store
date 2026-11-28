@@ -60,6 +60,27 @@ class AuditEventFactoryTest {
     }
 
     @Test
+    @Tag("A-55")
+    @Tag("US-105.1")
+    @Tag("US-501.1")
+    void should_recordNoTradeIdButKeepThePayload_when_theRejectedTradeIdCannotBeAStoredId() {
+        // Arrange: NUL is rejected by PostgreSQL, and the outbox trade_id column holds 64 characters
+        TradeSubmission withNul = new TradeSubmission("X\u0000Y", 1, "CP-1", "B1", "2027-05-20", Channel.REST, "raw");
+        TradeSubmission tooLong = new TradeSubmission("T".repeat(65), 1, "CP-1", "B1", "2027-05-20", Channel.STREAM, "raw");
+        List<Violation> violations = List.of(Violation.invalidField("tradeId", "tradeId is invalid"));
+
+        // Act
+        AuditEvent nul = factory.rejected(withNul, violations);
+        AuditEvent longId = factory.rejected(tooLong, violations);
+
+        // Assert: like a dead letter, it has no trusted trade identity; the raw payload keeps what was received
+        assertThat(nul.tradeId()).isNull();
+        assertThat(longId.tradeId()).isNull();
+        assertThat(longId.payload()).isEqualTo("raw");
+        assertThat(longId.reasons()).isEqualTo(violations);
+    }
+
+    @Test
     @Tag("US-302.2")
     void should_capPayload_when_payloadIsLongerThanTheLimit() {
         // Arrange

@@ -1,10 +1,17 @@
 @startuml 05-activity-validation-and-upsert
+' Colours via style classes, not <<#colour>>: older PlantUML (1.2024.3, bundled with the VS Code extension) rejects that form.
+<style>
+activityDiagram {
+  .fail { BackGroundColor pink }
+  .ok { BackGroundColor palegreen }
+}
+</style>
 title Validation and version-guarded write (inside one transaction)
 
 start
 :Receive TradeSubmission\n(tradeId, version, counterPartyId, bookId, maturityDate as raw values);
 :today = LocalDate.now(clock)  (configured zone, US-205);
-:stored = findById(tradeId)  (skipped if tradeId is blank);
+:stored = findById(tradeId)\n(skipped if tradeId is not a usable ID: blank, over 64 characters, control characters; A-55);
 :attempt = 1;
 
 repeat
@@ -22,9 +29,9 @@ repeat
     :append REJECTED outbox event with ALL reasons;
     :commit;
     if (LOWER_VERSION among reasons?) then (yes)
-      :throw LowerVersionException\n(carries every reason; US-104.4, US-201.4); <<#pink>>
+      :throw LowerVersionException\n(carries every reason; US-104.4, US-201.4); <<fail>>
     else (no)
-      :throw TradeRejectedException; <<#pink>>
+      :throw TradeRejectedException; <<fail>>
     endif
     stop
   endif
@@ -37,7 +44,7 @@ repeat
     endif
     :append ACCEPTED/REPLACED outbox event;
     :commit;
-    :return IngestionResult(outcome, trade); <<#palegreen>>
+    :return IngestionResult(outcome, trade); <<ok>>
     stop
   endif
   :STALE: a higher version was committed concurrently (US-106);
@@ -47,7 +54,7 @@ repeat while (attempt <= 2?) is (yes: re-validate, US-106.2)
 -> no;
 :append REJECTED (LOWER_VERSION) outbox event;
 :commit;
-:throw LowerVersionException; <<#pink>>
+:throw LowerVersionException; <<fail>>
 stop
 
 @enduml

@@ -21,8 +21,8 @@ The Trade Store is **one Spring Boot application** (ADR-001) that receives trade
 | [008](adr/008-plain-jdbc-for-postgresql.md) | Spring `JdbcClient` for PostgreSQL (Phase 5) | Every write is PostgreSQL-specific SQL (guarded upsert, `RETURNING`, `SKIP LOCKED`); an ORM adds nothing |
 | [009](adr/009-codeql-sast-and-owasp-zap-dast.md) | CodeQL (SAST) and OWASP ZAP API scan (DAST) | Static and dynamic application scans; High-risk DAST alerts fail the build |
 | [010](adr/010-prometheus-and-grafana-dashboard.md) | Prometheus + provisioned Grafana dashboard | Operations and live demos from the existing Micrometer metrics, as code |
-| [012](adr/012-traces-and-logs-with-opentelemetry.md) | Traces and logs with OpenTelemetry, Tempo and Loki | One trace per trade across Kafka, PostgreSQL, the outbox and MongoDB; logs linked by trace ID |
 | [011](adr/011-project-portal-on-github-pages.md) | Project portal on GitHub Pages | One live view of the journey for every audience |
+| [012](adr/012-traces-and-logs-with-opentelemetry.md) | Traces and logs with OpenTelemetry, Tempo and Loki | One trace per trade across Kafka, PostgreSQL, the outbox and MongoDB; logs linked by trace ID |
 
 ## 2. System context
 

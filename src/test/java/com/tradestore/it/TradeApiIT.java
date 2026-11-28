@@ -12,6 +12,7 @@ import com.tradestore.persistence.TradeRepository;
 import org.bson.Document;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -30,7 +31,11 @@ class TradeApiIT {
 
     private final String tradeId = "R-" + UUID.randomUUID();
 
-    TradeApiIT(RestTestClient rest, Clock clock, MongoTemplate mongo, TradeRepository trades) {
+    private final String baseUrl;
+
+    TradeApiIT(RestTestClient rest, Clock clock, MongoTemplate mongo, TradeRepository trades,
+               @Value("${local.server.port}") int port) {
+        this.baseUrl = "http://localhost:" + port;
         this.trades = trades;
         this.rest = rest;
         this.clock = clock;
@@ -367,7 +372,43 @@ class TradeApiIT {
             JsonNode versions = get("/trades/" + tradeId + "/history").getResponseBody();
             assertThat(versions.findValues("version")).extracting(JsonNode::asInt).containsExactly(1, 1, 2);
             assertThat(versions.findValuesAsString("maturityDate")).containsExactly("2099-05-20", "2099-05-21", "2099-06-20");
-            assertThat(versions.findValuesAsString("receivedTimestamp")).isSorted();
+            // Compared as instants: as strings, "…:54Z" (a whole second) would sort after "…:54.015Z"
+            assertThat(versions.findValuesAsString("receivedTimestamp")).extracting(java.time.Instant::parse).isSorted();
         });
+    }
+
+    @Test
+    @Tag("A-55")
+    @Tag("US-105.1")
+    @Tag("US-401.5")
+    void should_return400NotAServerError_when_theTradeIdCannotBeAStoredId() {
+        // Arrange: found by the ZAP scan; PostgreSQL rejects NUL and IDs longer than 64 characters
+        String tooLong = json(1, "2099-05-20").replace(tradeId, tradeId + "-".repeat(30));
+        String withNul = json(1, "2099-05-20").replace(tradeId, "R-\\u0000-" + tradeId);
+
+        // Act
+        EntityExchangeResult<JsonNode> longResponse = post(tooLong);
+        EntityExchangeResult<JsonNode> nulResponse = post(withNul);
+
+        // Assert
+        for (EntityExchangeResult<JsonNode> response : java.util.List.of(longResponse, nulResponse)) {
+            assertThat(response.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+            JsonNode reason = response.getResponseBody().path("reasons").get(0);
+            assertThat(reason.path("reason").asString()).isEqualTo("INVALID_FIELD");
+            assertThat(reason.path("field").asString()).isEqualTo("tradeId");
+        }
+    }
+
+    @Test
+    @Tag("US-401.5")
+    void should_return400InTheStandardShape_when_theQueryStringIsMalformed() {
+        // Act: an empty parameter name, which Tomcat refuses to parse (found by the ZAP scan). A raw URI, because a
+        // URI template would normalise the query string before it is sent.
+        EntityExchangeResult<JsonNode> response = rest.get().uri(java.net.URI.create(baseUrl + "/trades?=&page=0&size=20"))
+                .exchange().expectBody(JsonNode.class).returnResult();
+
+        // Assert
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getResponseBody().path("reasons").get(0).path("reason").asString()).isEqualTo("INVALID_PARAMETER");
     }
 }

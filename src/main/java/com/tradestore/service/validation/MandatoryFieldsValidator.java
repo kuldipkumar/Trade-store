@@ -3,20 +3,20 @@ package com.tradestore.service.validation;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.tradestore.domain.TradeIds;
 import com.tradestore.domain.TradeSubmission;
 import com.tradestore.domain.Violation;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
- * US-105.1: tradeId, counterPartyId and bookId must be present, not blank, fit the 64-character columns, and
- * contain no control characters (which PostgreSQL would otherwise reject later as a database error).
+ * US-105.1: tradeId, counterPartyId and bookId must be usable stored identifiers ({@link TradeIds}): present, not
+ * blank, within the 64-character columns, without control characters, and valid Unicode. Otherwise PostgreSQL would
+ * reject or alter them later, as a database error.
  */
 @Component
 @Order(100)
 public class MandatoryFieldsValidator implements TradeValidator {
-
-    static final int MAX_ID_LENGTH = 64;
 
     @Override
     public List<Violation> validate(ValidationContext context) {
@@ -29,12 +29,6 @@ public class MandatoryFieldsValidator implements TradeValidator {
     }
 
     private static void check(String field, String value, List<Violation> violations) {
-        if (value == null || value.isBlank()) {
-            violations.add(Violation.invalidField(field, field + " is required"));
-        } else if (value.length() > MAX_ID_LENGTH) {
-            violations.add(Violation.invalidField(field, field + " must be at most " + MAX_ID_LENGTH + " characters"));
-        } else if (value.chars().anyMatch(Character::isISOControl)) {
-            violations.add(Violation.invalidField(field, field + " must not contain control characters"));
-        }
+        TradeIds.problem(field, value).ifPresent(message -> violations.add(Violation.invalidField(field, message)));
     }
 }

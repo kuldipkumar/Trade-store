@@ -9,6 +9,7 @@ import com.tradestore.domain.AuditEvent;
 import com.tradestore.domain.Channel;
 import com.tradestore.domain.Outcome;
 import com.tradestore.domain.Trade;
+import com.tradestore.domain.TradeIds;
 import com.tradestore.domain.TradeSubmission;
 import com.tradestore.domain.Violation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,8 +38,13 @@ public class AuditEventFactory {
                 clock.instant(), cap(submission.rawPayload()), trade);
     }
 
+    /**
+     * A REJECTED submission. If its trade ID cannot be a stored ID (US-105.1), the event has no trusted trade
+     * identity, like a dead letter: its tradeId is empty and the raw payload keeps what was received.
+     */
     public AuditEvent rejected(TradeSubmission submission, List<Violation> violations) {
-        return new AuditEvent(newId(), submission.tradeId(), submission.version(), Outcome.REJECTED, violations,
+        String tradeId = TradeIds.isUsable(submission.tradeId()) ? submission.tradeId() : null;
+        return new AuditEvent(newId(), tradeId, submission.version(), Outcome.REJECTED, violations,
                 submission.channel(), clock.instant(), cap(submission.rawPayload()), null);
     }
 

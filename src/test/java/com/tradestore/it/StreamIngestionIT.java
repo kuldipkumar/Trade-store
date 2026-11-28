@@ -146,4 +146,25 @@ class StreamIngestionIT {
                 .untilAsserted(() -> assertThat(audit("REJECTED")).isEqualTo(1));
         assertThat(trades.findById(tradeId).map(StoredTrade::version)).contains(2);
     }
+
+    @Test
+    @Tag("A-55")
+    @Tag("US-105.1")
+    @Tag("US-304.1")
+    void should_auditAFinalRejectionWithoutATradeId_when_theTradeIdIsTooLongToStore() throws Exception {
+        // Arrange: 2 + 36 + 30 = 68 characters, more than the 64-character trade ID columns
+        String longId = tradeId + "-".repeat(30);
+        String json = """
+                {"tradeId":"%s","version":1,"counterPartyId":"CP-1","bookId":"B1","maturityDate":"2099-05-20"}"""
+                .formatted(longId);
+
+        // Act
+        kafka.send(TOPIC, longId, json).get();
+
+        // Assert: one REJECTED entry with no trade ID and the raw payload, never retried or dead-lettered as FAILED
+        Document byPayload = new Document("payload", new Document("$regex", java.util.regex.Pattern.quote(longId)));
+        await().atMost(TIMEOUT).untilAsserted(() -> assertThat(mongo.getCollection("audit_events")
+                .countDocuments(new Document(byPayload).append("outcome", "REJECTED").append("tradeId", null))).isEqualTo(1));
+        assertThat(mongo.getCollection("audit_events").countDocuments(new Document(byPayload).append("outcome", "FAILED"))).isZero();
+    }
 }

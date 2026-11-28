@@ -47,6 +47,8 @@ import com.tradestore.service.validation.PositiveVersionValidator;
 import org.junit.jupiter.api.Tag;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -176,6 +178,21 @@ class TradeIngestionServiceTest {
         assertThatThrownBy(() -> service.ingest(withTradeId(""))).isInstanceOf(TradeRejectedException.class);
 
         // Assert
+        verify(trades, never()).findById(anyString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"X\u0000Y", "a 65-character trade ID ........................................."})
+    @Tag("A-55")
+    @Tag("US-105.1")
+    void should_notLookUpTheStoredTrade_when_tradeIdCannotBeAStoredId(String tradeId) {
+        // Arrange: PostgreSQL rejects NUL characters and IDs longer than the 64-character column
+        assertThat(tradeId.contains("\u0000") || tradeId.length() == 65).isTrue();
+
+        // Act
+        assertThatThrownBy(() -> service.ingest(withTradeId(tradeId))).isInstanceOf(TradeRejectedException.class);
+
+        // Assert: rejected as INVALID_FIELD without a query that would fail as a database error
         verify(trades, never()).findById(anyString());
     }
 
@@ -324,6 +341,22 @@ class TradeIngestionServiceTest {
 
         // Assert (format from docs/05-lld.md section 8)
         assertThat(output).contains("outcome=REJECTED tradeId=T1 version=1 channel=REST reasons=[LOWER_VERSION]");
+    }
+
+    @Test
+    @Tag("US-604.3")
+    @Tag("A-55")
+    @ExtendWith(OutputCaptureExtension.class)
+    void should_notWriteTheRawTradeId_when_itIsRejectedAsUnusable(CapturedOutput output) {
+        // Arrange: a trade ID that would forge a second outcome line in the log
+        String forged = "X\r\noutcome=ACCEPTED tradeId=FORGED";
+
+        // Act
+        assertThatThrownBy(() -> service.ingest(withTradeId(forged))).isInstanceOf(TradeRejectedException.class);
+
+        // Assert: the log line and the span tag carry a placeholder, never the raw value
+        assertThat(output).doesNotContain("tradeId=FORGED").contains("outcome=REJECTED tradeId=<invalid>");
+        assertThat(trace.spans().getFirst().tags()).containsEntry("trade.id", "<invalid>");
     }
 
     @Test

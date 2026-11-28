@@ -128,4 +128,28 @@ class MandatoryFieldsValidatorTest {
         assertThat(violations).extracting(Violation::reason, Violation::field)
                 .containsExactly(tuple(ReasonCode.INVALID_FIELD, "tradeId"));
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"T\ud800", "\udc00T", "T\udc00\ud800"})
+    @Tag("US-105.1")
+    @Tag("A-55")
+    void should_reportInvalidField_when_anIdHasAnUnpairedSurrogate(String id) {
+        // Act: not valid UTF-8; the driver would store it as '?', so different IDs would collide
+        List<Violation> violations = validator.validate(contextFor(
+                new TradeSubmission(id, 1, id, "B1", "2027-05-20", Channel.REST, "{}")));
+
+        // Assert
+        assertThat(violations).extracting(Violation::reason, Violation::field)
+                .containsExactly(tuple(ReasonCode.INVALID_FIELD, "tradeId"), tuple(ReasonCode.INVALID_FIELD, "counterPartyId"));
+    }
+
+    @Test
+    @Tag("US-105.1")
+    void should_acceptAnIdWithAPairedSurrogate_when_itIsValidUnicode() {
+        // Act: an emoji is a valid surrogate pair
+        List<Violation> violations = validator.validate(contextFor(withTradeId("T-\ud83d\ude00")));
+
+        // Assert
+        assertThat(violations).isEmpty();
+    }
 }
